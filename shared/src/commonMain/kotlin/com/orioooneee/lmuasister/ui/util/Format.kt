@@ -37,6 +37,39 @@ fun Instant.formatStart(): String {
     return "${dt.dayOfMonth} $mon ${two(dt.hour)}:${two(dt.minute)}"
 }
 
+/** Lap time in ms -> "1:42.623". */
+fun formatLap(ms: Long): String {
+    if (ms <= 0) return "—"
+    val m = ms / 60_000
+    val s = (ms % 60_000) / 1000
+    val mmm = ms % 1000
+    return "$m:${two(s.toInt())}.${mmm.toString().padStart(3, '0')}"
+}
+
+/** Sector seconds -> "32.789". */
+fun formatSector(sec: Double): String {
+    val total = (sec * 1000).toLong()
+    return "${total / 1000}.${(total % 1000).toString().padStart(3, '0')}"
+}
+
+/** Weather sky code (+ rain chance) -> emoji. */
+fun skyEmoji(sky: Int, rainChance: Int): String = when {
+    rainChance >= 40 || sky >= 8 -> "🌧"
+    sky >= 6 -> "☁️"
+    sky >= 4 -> "⛅"
+    sky >= 2 -> "🌤"
+    else -> "☀️"
+}
+
+/** Background colour for a weather segment (clearer = bluer, rainy = dark slate). */
+fun skyColor(sky: Int, rainChance: Int): Color = when {
+    rainChance >= 40 || sky >= 8 -> Color(0xFF273B52)
+    sky >= 6 -> Color(0xFF323A47)
+    sky >= 4 -> Color(0xFF3C4A5E)
+    sky >= 2 -> Color(0xFF37597F)
+    else -> Color(0xFF3E6EA5)
+}
+
 /** Week key "2026-06-09" -> "9 Jun". */
 fun weekKeyShort(key: String): String {
     val p = key.split("-")
@@ -57,14 +90,14 @@ fun Instant.isToday(now: Instant): Boolean = local().date == now.local().date
 /** Local weekday short name, e.g. "WED". */
 fun Instant.weekdayShort(): String = DAYS.getOrElse(local().dayOfWeek.isoDayNumber - 1) { "" }.uppercase()
 
-/** Live countdown: "STARTS IN 2H 5M" / "39M 12S" / "45S" / "LIVE". Seconds shown under an hour. */
+/** Live countdown to start: "2h 5m" / "39m 12s" / "45s" / "LIVE". Seconds shown under an hour. */
 fun startsInLabel(next: Instant, now: Instant): String {
     val s = (next - now).inWholeSeconds
     return when {
         s <= 0 -> "LIVE"
-        s < 60 -> "STARTS IN ${s}S"
-        s < 3600 -> "STARTS IN ${s / 60}M ${s % 60}S"
-        else -> "STARTS IN ${s / 3600}H ${(s % 3600) / 60}M"
+        s < 60 -> "${s}s"
+        s < 3600 -> "${s / 60}m ${s % 60}s"
+        else -> "${s / 3600}h ${(s % 3600) / 60}m"
     }
 }
 

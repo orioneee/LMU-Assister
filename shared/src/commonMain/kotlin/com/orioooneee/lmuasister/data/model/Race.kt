@@ -37,6 +37,30 @@ data class TrackInfo(
     val mapUrl: String?,
 )
 
+/** One weather phase within a session. */
+data class WeatherSegment(
+    val sky: Int,
+    val tempC: Int?,
+    val humidity: Int?,
+    val windKmh: Int?,
+    val rainChance: Int?,
+    val durationMin: Int?,
+)
+
+data class SessionWeather(
+    val timeOfDay: String?,
+    val segments: List<WeatherSegment>,
+)
+
+/** Forecast for the three sessions — shown on the details screen. */
+data class RaceWeather(
+    val practice: SessionWeather?,
+    val qualifying: SessionWeather?,
+    val race: SessionWeather?,
+) {
+    val isEmpty: Boolean get() = practice == null && qualifying == null && race == null
+}
+
 /** Everything else from the lmuschedule race object — shown on the details screen. */
 data class RaceSettings(
     val setup: String?,
@@ -74,6 +98,8 @@ data class Race(
     val settings: RaceSettings,
     val track: TrackInfo?,
     val imageUrl: String?,
+    val weather: RaceWeather? = null,
+    val leaderboardId: String? = null,
 ) {
     val title: String get() = series.ifBlank { circuit }
 
@@ -82,6 +108,18 @@ data class Race(
 
     fun nextStart(now: Instant): Instant? = times.firstOrNull { it >= now }
 }
+
+/** One leaderboard row (fastest-lap board) for a race. */
+data class LapEntry(
+    val rank: Int,
+    val initials: String,
+    val bestLapMs: Long,
+    val sectors: List<Double>,
+    val car: String?,
+    val carClass: String?,
+    val drRank: String?,
+    val srRank: String?,
+)
 
 data class Schedule(val races: List<Race>) {
     val daily: List<Race> get() = races.filter { it.type == RaceType.DAILY }

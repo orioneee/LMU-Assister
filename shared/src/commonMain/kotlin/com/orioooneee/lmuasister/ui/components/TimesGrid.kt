@@ -49,12 +49,7 @@ fun TimesGrid(times: List<Instant>, columns: Int = 3) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(header, style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.SemiBold)
-            Text(
-                startsInLabel(next, now),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-            )
+            CountdownBadge(next, now)
         }
         Spacer(Modifier.height(8.dp))
         HorizontalDivider(color = Outline)

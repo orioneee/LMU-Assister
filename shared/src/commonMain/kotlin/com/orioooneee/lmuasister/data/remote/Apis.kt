@@ -5,6 +5,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.encodeURLQueryComponent
 import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -44,6 +45,12 @@ class LmuPortalApi(private val client: HttpClient) {
 
     suspend fun championshipEvents(): List<ChampionshipEventDto> =
         decodeList("championship_event?select=championship_series_id,round_name,week_number,race_starts_at&order=race_starts_at.asc&limit=1000")
+
+    suspend fun leaderboard(leaderboardId: String, limit: Int = 12): List<LeaderboardEntryDto> =
+        decodeList(
+            "race_series_leaderboard_entry?leaderboard_id=eq.${leaderboardId.encodeURLQueryComponent()}" +
+                "&select=rank,display_name_public,display_initials,score_ms,metadata&order=rank.asc&limit=$limit",
+        )
 
     suspend fun tracks(): List<PortalTrackDto> = decodeList("tracks?select=*")
 

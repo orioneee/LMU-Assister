@@ -193,7 +193,7 @@ private fun HomeHeader(dailyCount: Int, modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text("LMU Daily", style = MaterialTheme.typography.titleLarge, color = TextHigh, fontWeight = FontWeight.Black)
+            Text("Lmu Assister", style = MaterialTheme.typography.titleLarge, color = TextHigh, fontWeight = FontWeight.Black)
             Text("Race Control · $dailyCount events", style = MaterialTheme.typography.bodySmall, color = TextMed)
         }
         Box(

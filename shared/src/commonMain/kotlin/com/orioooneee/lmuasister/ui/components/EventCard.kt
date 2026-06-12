@@ -70,7 +70,7 @@ fun RaceCard(race: Race, modifier: Modifier = Modifier, onClick: () -> Unit = {}
             .border(1.dp, Outline, MaterialTheme.shapes.large)
             .clickable(onClick = onClick),
     ) {
-        Box(Modifier.fillMaxWidth().height(104.dp).background(Surface2)) {
+        Box(Modifier.fillMaxWidth().height(140.dp).background(Surface2)) {
             CoverImage(race.imageUrl, Modifier.fillMaxSize(), race.title)
             if (race.classInfos.isNotEmpty()) {
                 Box(Modifier.align(Alignment.TopStart).padding(8.dp)) {
@@ -247,14 +247,8 @@ fun HeroRaceCard(race: Race, maxHeight: Dp, onClick: () -> Unit = {}) {
                 val next = race.nextStart(now)
                 if (next != null) {
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            startsInLabel(next, now),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = accent,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                        )
-                        Spacer(Modifier.height(4.dp))
+                        CountdownBadge(next, now)
+                        Spacer(Modifier.height(6.dp))
                         Box(
                             Modifier
                                 .clip(MaterialTheme.shapes.medium)

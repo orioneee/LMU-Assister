@@ -14,6 +14,7 @@ data class RaceSeriesDto(
     val type: String = "",
     @SerialName("tier_name") val tierName: String = "",
     @SerialName("series_name") val seriesName: String = "",
+    @SerialName("leaderboard_id") val leaderboardId: String? = null,
     @SerialName("sr_requirement") val srRequirement: String? = null,
     @SerialName("track_friendly") val trackFriendly: String = "",
     @SerialName("track_config") val trackConfig: String? = null,
@@ -31,6 +32,26 @@ data class RaceSeriesDto(
     @SerialName("todays_start_times_utc") val todaysStartTimes: List<String> = emptyList(),
     @SerialName("race_days") val raceDays: List<Int> = emptyList(),
     @SerialName("times_utc") val timesUtc: List<String> = emptyList(),
+    @SerialName("race_weather") val raceWeather: WeatherDto? = null,
+    @SerialName("qualifying_weather") val qualifyingWeather: WeatherDto? = null,
+    @SerialName("practice_weather") val practiceWeather: WeatherDto? = null,
+)
+
+@Serializable
+data class WeatherDto(
+    val weather: List<WeatherSegmentDto> = emptyList(),
+    @SerialName("time_of_day") val timeOfDay: String? = null,
+    @SerialName("real_road") val realRoad: String? = null,
+)
+
+@Serializable
+data class WeatherSegmentDto(
+    val sky: String? = null,
+    val humidity: String? = null,
+    val temperature: String? = null,
+    @SerialName("wind_speed") val windSpeed: String? = null,
+    @SerialName("rain_change") val rainChange: String? = null,
+    @SerialName("duration_minutes") val durationMinutes: Int? = null,
 )
 
 /** championship_series — recurring championships (the 4th category). */
@@ -67,6 +88,28 @@ data class ChampionshipSeasonDto(
     @SerialName("season_name") val seasonName: String = "",
     val status: String = "",
 )
+
+// ── leaderboard (race_series_leaderboard_entry) ───────────────────────────────
+@Serializable
+data class LeaderboardEntryDto(
+    val rank: Int = 0,
+    @SerialName("display_name_public") val displayName: String? = null,
+    @SerialName("display_initials") val initials: String? = null,
+    @SerialName("score_ms") val scoreMs: Long = 0,
+    val metadata: LeaderboardMetaDto? = null,
+)
+
+@Serializable
+data class LeaderboardMetaDto(
+    val car: String? = null,
+    @SerialName("class") val carClass: String? = null,
+    val sectors: List<Double> = emptyList(),
+    val dr: RankDto? = null,
+    val sr: RankDto? = null,
+)
+
+@Serializable
+data class RankDto(val rank: String? = null)
 
 @Serializable
 data class PortalTrackDto(

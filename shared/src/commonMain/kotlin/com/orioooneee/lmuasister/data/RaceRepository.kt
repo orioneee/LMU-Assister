@@ -1,11 +1,15 @@
 package com.orioooneee.lmuasister.data
 
 import com.orioooneee.lmuasister.data.model.ClassInfo
+import com.orioooneee.lmuasister.data.model.LapEntry
 import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceType
+import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.Schedule
+import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
+import com.orioooneee.lmuasister.data.model.WeatherSegment
 import com.orioooneee.lmuasister.data.remote.ChampionshipEventDto
 import com.orioooneee.lmuasister.data.remote.ChampionshipSeriesDto
 import com.orioooneee.lmuasister.data.remote.LmuCardImageApi
@@ -13,6 +17,7 @@ import com.orioooneee.lmuasister.data.remote.LmuPortalApi
 import com.orioooneee.lmuasister.data.remote.PortalCarClassDto
 import com.orioooneee.lmuasister.data.remote.PortalTrackDto
 import com.orioooneee.lmuasister.data.remote.RaceSeriesDto
+import com.orioooneee.lmuasister.data.remote.WeatherDto
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlin.time.Clock
@@ -42,6 +47,22 @@ class RaceRepository(
     private val cards: LmuCardImageApi,
 ) {
     /** Current week + upcoming weeks (keys like "2026-06-09"), for the week picker. */
+    /** Fastest-lap leaderboard for a race (by its lmuportal leaderboard_id). */
+    suspend fun leaderboard(leaderboardId: String): Result<List<LapEntry>> = runCatching {
+        portal.leaderboard(leaderboardId).map { e ->
+            LapEntry(
+                rank = e.rank,
+                initials = e.initials ?: e.displayName ?: "—",
+                bestLapMs = e.scoreMs,
+                sectors = e.metadata?.sectors.orEmpty(),
+                car = e.metadata?.car,
+                carClass = e.metadata?.carClass,
+                drRank = e.metadata?.dr?.rank,
+                srRank = e.metadata?.sr?.rank,
+            )
+        }
+    }
+
     suspend fun availableWeeks(): List<String> {
         val today = Clock.System.now().toLocalDateTime(TimeZone.UTC).date.toString()
         val current = portal.currentWeekKey(today) ?: return emptyList()
@@ -179,7 +200,31 @@ private fun RaceSeriesDto.toRace(
         ),
         track = track,
         imageUrl = images.match(track?.shortName ?: trackFriendly, carClasses, seriesName),
+        weather = buildWeather(raceWeather, qualifyingWeather, practiceWeather),
+        leaderboardId = leaderboardId,
     )
+}
+
+private fun WeatherDto?.toSession(): SessionWeather? {
+    if (this == null || weather.isEmpty()) return null
+    return SessionWeather(
+        timeOfDay = timeOfDay,
+        segments = weather.map { s ->
+            WeatherSegment(
+                sky = s.sky?.toIntOrNull() ?: 0,
+                tempC = s.temperature?.toIntOrNull(),
+                humidity = s.humidity?.toIntOrNull(),
+                windKmh = s.windSpeed?.toIntOrNull(),
+                rainChance = s.rainChange?.toIntOrNull(),
+                durationMin = s.durationMinutes,
+            )
+        },
+    )
+}
+
+private fun buildWeather(race: WeatherDto?, quali: WeatherDto?, practice: WeatherDto?): RaceWeather? {
+    val w = RaceWeather(practice.toSession(), quali.toSession(), race.toSession())
+    return if (w.isEmpty) null else w
 }
 
 private fun ChampionshipSeriesDto.toRace(
