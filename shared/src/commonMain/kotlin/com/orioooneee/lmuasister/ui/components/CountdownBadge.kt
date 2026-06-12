@@ -15,6 +15,9 @@ import androidx.compose.ui.unit.dp
 import com.orioooneee.lmuasister.ui.theme.Lime
 import com.orioooneee.lmuasister.ui.util.startsInLabel
 import kotlin.time.Instant
+import lmuassister.shared.generated.resources.Res
+import lmuassister.shared.generated.resources.live
+import org.jetbrains.compose.resources.stringResource
 
 /** Small pill showing the live time-to-start (amber), or "LIVE" (lime) once started. */
 @Composable
@@ -29,7 +32,7 @@ fun CountdownBadge(next: Instant, now: Instant, modifier: Modifier = Modifier) {
             .padding(horizontal = 9.dp, vertical = 4.dp),
     ) {
         Text(
-            startsInLabel(next, now),
+            if (live) stringResource(Res.string.live) else startsInLabel(next, now),
             style = MaterialTheme.typography.labelMedium,
             color = accent,
             fontWeight = FontWeight.Bold,

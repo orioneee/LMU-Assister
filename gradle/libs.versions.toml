@@ -21,6 +21,7 @@ coil = "3.3.0"
 ksoup = "0.2.5"
 kotlinx-serialization = "1.8.0"
 kotlinx-datetime = "0.7.1"
+navigation = "2.9.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -63,6 +64,7 @@ ksoup = { module = "com.fleeksoft.ksoup:ksoup", version.ref = "ksoup" }
 # kotlinx serialization + datetime
 kotlinx-serializationJson = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation" }
 
 # Coil 3 (multiplatform image loading)
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }

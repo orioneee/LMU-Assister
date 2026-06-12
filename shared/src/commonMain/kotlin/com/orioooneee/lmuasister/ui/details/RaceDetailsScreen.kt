@@ -70,8 +70,48 @@ import com.orioooneee.lmuasister.ui.util.formatLap
 import com.orioooneee.lmuasister.ui.util.formatStart
 import com.orioooneee.lmuasister.ui.util.skyColor
 import com.orioooneee.lmuasister.ui.util.skyEmoji
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import kotlin.time.Clock
+import lmuassister.shared.generated.resources.Res
+import lmuassister.shared.generated.resources.col_best_lap
+import lmuassister.shared.generated.resources.col_driver
+import lmuassister.shared.generated.resources.col_gap
+import lmuassister.shared.generated.resources.col_pos
+import lmuassister.shared.generated.resources.duration_race
+import lmuassister.shared.generated.resources.fastest_laps
+import lmuassister.shared.generated.resources.format
+import lmuassister.shared.generated.resources.length_km
+import lmuassister.shared.generated.resources.loading_times
+import lmuassister.shared.generated.resources.next_start_times
+import lmuassister.shared.generated.resources.no
+import lmuassister.shared.generated.resources.no_lap_times
+import lmuassister.shared.generated.resources.race_label
+import lmuassister.shared.generated.resources.session_practice
+import lmuassister.shared.generated.resources.session_qualifying
+import lmuassister.shared.generated.resources.session_race
+import lmuassister.shared.generated.resources.set_assists
+import lmuassister.shared.generated.resources.set_damage
+import lmuassister.shared.generated.resources.set_driver_rank
+import lmuassister.shared.generated.resources.set_driver_swaps
+import lmuassister.shared.generated.resources.set_fuel_usage
+import lmuassister.shared.generated.resources.set_limited_tires
+import lmuassister.shared.generated.resources.set_practice
+import lmuassister.shared.generated.resources.set_qualifying
+import lmuassister.shared.generated.resources.set_safety_rank
+import lmuassister.shared.generated.resources.set_setup
+import lmuassister.shared.generated.resources.set_split_size
+import lmuassister.shared.generated.resources.set_tire_warmers
+import lmuassister.shared.generated.resources.set_tire_wear
+import lmuassister.shared.generated.resources.set_track_limits
+import lmuassister.shared.generated.resources.show_top
+import lmuassister.shared.generated.resources.track_city
+import lmuassister.shared.generated.resources.track_country
+import lmuassister.shared.generated.resources.track_length
+import lmuassister.shared.generated.resources.track_turns
+import lmuassister.shared.generated.resources.weather
+import lmuassister.shared.generated.resources.weather_rain
+import lmuassister.shared.generated.resources.yes
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -124,7 +164,7 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
                 itemVerticalAlignment = Alignment.CenterVertically,
             ) {
                 race.classInfos.take(6).forEach { ClassChip(it) }
-                if (race.raceLength > 0) MetaChip("${race.raceLength}m race")
+                if (race.raceLength > 0) MetaChip(stringResource(Res.string.duration_race, race.raceLength))
                 race.settings.safetyRank?.let { SrBadge(it) }
             }
         }
@@ -135,12 +175,13 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
         race.track?.let { item { TrackCard(it) } }
         race.weather?.let { item { WeatherCard(it) } }
         item {
-            Card("Format") { DetailRows(settingRows(race.settings)) }
+            Card(stringResource(Res.string.format)) { DetailRows(settingRows(race.settings)) }
         }
         if (upcoming.isNotEmpty()) {
             item {
-                Card("Next start times") {
-                    DetailRows(upcoming.mapIndexed { i, t -> "Race ${i + 1}" to t.formatStart() })
+                val raceLabel = stringResource(Res.string.race_label)
+                Card(stringResource(Res.string.next_start_times)) {
+                    DetailRows(upcoming.mapIndexed { i, t -> "$raceLabel ${i + 1}" to t.formatStart() })
                 }
             }
         }
@@ -161,10 +202,10 @@ private fun TrackCard(track: TrackInfo) {
             }
             DetailRows(
                 listOfNotNull(
-                    track.country?.let { "Country" to it },
-                    track.town?.let { "City" to it },
-                    track.lengthKm?.let { "Length" to "$it km" },
-                    track.numTurns?.let { "Turns" to it.toString() },
+                    track.country?.let { stringResource(Res.string.track_country) to it },
+                    track.town?.let { stringResource(Res.string.track_city) to it },
+                    track.lengthKm?.let { stringResource(Res.string.track_length) to stringResource(Res.string.length_km, it.toString()) },
+                    track.numTurns?.let { stringResource(Res.string.track_turns) to it.toString() },
                 ),
             )
         }
@@ -173,11 +214,11 @@ private fun TrackCard(track: TrackInfo) {
 
 @Composable
 private fun WeatherCard(w: RaceWeather) {
-    Card("Weather") {
+    Card(stringResource(Res.string.weather)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            w.race?.let { WeatherSession("Race", it) }
-            w.qualifying?.let { WeatherSession("Qualifying", it) }
-            w.practice?.let { WeatherSession("Practice", it) }
+            w.race?.let { WeatherSession(stringResource(Res.string.session_race), it) }
+            w.qualifying?.let { WeatherSession(stringResource(Res.string.session_qualifying), it) }
+            w.practice?.let { WeatherSession(stringResource(Res.string.session_practice), it) }
         }
     }
 }
@@ -189,7 +230,7 @@ private fun WeatherSession(label: String, sw: SessionWeather) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.SemiBold)
             if (rainPeak > 0) {
-                Text("💧 up to $rainPeak%", style = MaterialTheme.typography.labelSmall, color = ClassLmp2)
+                Text(stringResource(Res.string.weather_rain, rainPeak), style = MaterialTheme.typography.labelSmall, color = ClassLmp2)
             }
         }
         Spacer(Modifier.height(6.dp))
@@ -221,7 +262,7 @@ private val SHOW_STEPS = listOf(1, 5, 30)
 
 @Composable
 private fun LeaderboardCard(entries: List<LapEntry>?) {
-    Card("Fastest laps") {
+    Card(stringResource(Res.string.fastest_laps)) {
         when {
             entries == null -> Row(
                 Modifier.fillMaxWidth().padding(vertical = 14.dp),
@@ -230,11 +271,11 @@ private fun LeaderboardCard(entries: List<LapEntry>?) {
             ) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = TextLow)
                 Spacer(Modifier.width(10.dp))
-                Text("Loading times…", style = MaterialTheme.typography.bodyMedium, color = TextLow)
+                Text(stringResource(Res.string.loading_times), style = MaterialTheme.typography.bodyMedium, color = TextLow)
             }
 
             entries.isEmpty() -> Text(
-                "No lap times yet.",
+                stringResource(Res.string.no_lap_times),
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextLow,
             )
@@ -246,10 +287,10 @@ private fun LeaderboardCard(entries: List<LapEntry>?) {
 
                 Column(Modifier.fillMaxWidth().animateContentSize()) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)) {
-                        Text("#", Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall, color = TextLow)
-                        Text("DRIVER", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
-                        Text("BEST LAP", Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
-                        Text("GAP", Modifier.width(60.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
+                        Text(stringResource(Res.string.col_pos), Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall, color = TextLow)
+                        Text(stringResource(Res.string.col_driver), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
+                        Text(stringResource(Res.string.col_best_lap), Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
+                        Text(stringResource(Res.string.col_gap), Modifier.width(60.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
                     }
                     visible.forEachIndexed { i, e -> LeaderboardRow(i, e, best) }
 
@@ -264,7 +305,7 @@ private fun LeaderboardCard(entries: List<LapEntry>?) {
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                "Show top $next  ▾",
+                                stringResource(Res.string.show_top, next),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold,
@@ -312,21 +353,22 @@ private fun LeaderboardRow(i: Int, e: LapEntry, best: Long) {
     }
 }
 
+@Composable
 private fun settingRows(s: RaceSettings): List<Pair<String, String>> = listOfNotNull(
-    s.qualifyingLength?.let { "Qualifying" to "${it}m" },
-    s.practiceLength?.let { "Practice" to "${it}m" },
-    s.setup?.let { "Setup" to it },
-    s.assists?.let { "Assists" to it },
-    s.damage?.let { "Damage" to it },
-    s.tireWear?.let { "Tire wear" to "${it}x" },
-    s.fuelUsage?.let { "Fuel usage" to "${it}x" },
-    s.safetyRank?.let { "Safety rank" to it },
-    s.driverRank?.let { "Driver rank" to it },
-    s.splitSize?.let { "Split size" to it.toString() },
-    s.driverSwaps?.let { "Driver swaps" to if (it) "Yes" else "No" },
-    s.trackLimits?.let { "Track limits" to it },
-    s.tireWarmers?.let { "Tire warmers" to it },
-    s.limitedTires?.let { "Limited tires" to it },
+    s.qualifyingLength?.let { stringResource(Res.string.set_qualifying) to "${it}m" },
+    s.practiceLength?.let { stringResource(Res.string.set_practice) to "${it}m" },
+    s.setup?.let { stringResource(Res.string.set_setup) to it },
+    s.assists?.let { stringResource(Res.string.set_assists) to it },
+    s.damage?.let { stringResource(Res.string.set_damage) to it },
+    s.tireWear?.let { stringResource(Res.string.set_tire_wear) to "${it}x" },
+    s.fuelUsage?.let { stringResource(Res.string.set_fuel_usage) to "${it}x" },
+    s.safetyRank?.let { stringResource(Res.string.set_safety_rank) to it },
+    s.driverRank?.let { stringResource(Res.string.set_driver_rank) to it },
+    s.splitSize?.let { stringResource(Res.string.set_split_size) to it.toString() },
+    s.driverSwaps?.let { stringResource(Res.string.set_driver_swaps) to if (it) stringResource(Res.string.yes) else stringResource(Res.string.no) },
+    s.trackLimits?.let { stringResource(Res.string.set_track_limits) to it },
+    s.tireWarmers?.let { stringResource(Res.string.set_tire_warmers) to it },
+    s.limitedTires?.let { stringResource(Res.string.set_limited_tires) to it },
 )
 
 @Composable

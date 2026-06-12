@@ -23,6 +23,9 @@ import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.ui.theme.Surface2
 import com.orioooneee.lmuasister.ui.theme.TextLow
+import lmuassister.shared.generated.resources.Res
+import lmuassister.shared.generated.resources.couldnt_load
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Image that fills its box (crops to square or wider) with a Coil loading spinner
@@ -57,7 +60,7 @@ fun CoverImage(
                     Text("⚠️", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        "Couldn't load",
+                        stringResource(Res.string.couldnt_load),
                         style = MaterialTheme.typography.labelSmall,
                         color = TextLow,
                         textAlign = TextAlign.Center,

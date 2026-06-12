@@ -12,34 +12,36 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.orioooneee.lmuasister.data.model.Race
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.orioooneee.lmuasister.ui.components.RefreshableContent
 import com.orioooneee.lmuasister.ui.details.RaceDetailsScreen
 import com.orioooneee.lmuasister.ui.home.HomeScreen
 import com.orioooneee.lmuasister.ui.theme.Carbon
+import kotlinx.serialization.Serializable
+import lmuassister.shared.generated.resources.Res
+import lmuassister.shared.generated.resources.retry
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-/** Single-screen app: everything lives on Home (week picker + tier pager + all categories). */
+@Serializable private object HomeRoute
+@Serializable private data class DetailsRoute(val raceId: String)
+
+/** Single-screen app with a NavHost (Home ⇄ race details + a real back stack). */
 @Composable
 fun MainShell(viewModel: ScheduleViewModel = koinViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
-    var selected by remember { mutableStateOf<Race?>(null) }
+    val nav = rememberNavController()
 
-    selected?.let { race ->
-        RaceDetailsScreen(race, onBack = { selected = null })
-        return
-    }
-
-    Scaffold(containerColor = Carbon) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+    Scaffold(containerColor = Carbon) { insets ->
+        Box(Modifier.fillMaxSize().padding(insets)) {
             when (val s = state) {
                 is ScheduleUiState.Loading -> Center { CircularProgressIndicator() }
 
@@ -47,18 +49,32 @@ fun MainShell(viewModel: ScheduleViewModel = koinViewModel()) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("❌ ${s.message}", color = MaterialTheme.colorScheme.error)
                         Box(Modifier.height(12.dp))
-                        Button(onClick = viewModel::refresh) { Text("Retry") }
+                        Button(onClick = viewModel::refresh) { Text(stringResource(Res.string.retry)) }
                     }
                 }
 
-                is ScheduleUiState.Success -> RefreshableContent(refreshing, viewModel::refresh) {
-                    HomeScreen(
-                        schedule = s.data.schedule,
-                        weeks = s.data.weeks,
-                        selectedWeek = s.data.selected,
-                        onSelectWeek = viewModel::selectWeek,
-                        onOpenRace = { selected = it },
-                    )
+                is ScheduleUiState.Success -> {
+                    val data = s.data
+                    NavHost(navController = nav, startDestination = HomeRoute) {
+                        composable<HomeRoute> {
+                            RefreshableContent(refreshing, viewModel::refresh) {
+                                HomeScreen(
+                                    schedule = data.schedule,
+                                    weeks = data.weeks,
+                                    selectedWeek = data.selected,
+                                    onSelectWeek = viewModel::selectWeek,
+                                    onOpenRace = { nav.navigate(DetailsRoute(it.id)) },
+                                )
+                            }
+                        }
+                        composable<DetailsRoute> { entry ->
+                            val id = entry.toRoute<DetailsRoute>().raceId
+                            val race = data.schedule.races.firstOrNull { it.id == id }
+                            if (race != null) {
+                                RaceDetailsScreen(race, onBack = { nav.popBackStack() })
+                            }
+                        }
+                    }
                 }
             }
         }

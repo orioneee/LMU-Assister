@@ -28,6 +28,10 @@ import com.orioooneee.lmuasister.ui.util.rememberNow
 import com.orioooneee.lmuasister.ui.util.startsInLabel
 import com.orioooneee.lmuasister.ui.util.weekdayShort
 import kotlin.time.Instant
+import lmuassister.shared.generated.resources.Res
+import lmuassister.shared.generated.resources.times
+import lmuassister.shared.generated.resources.times_day
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The day's full start-time grid (like the in-game schedule cards): past slots
@@ -40,7 +44,8 @@ fun TimesGrid(times: List<Instant>, columns: Int = 3) {
     if (upcoming.isEmpty()) return
     val next = upcoming.first()
 
-    val header = next.let { if (it.isToday(now)) "TIMES" else "${it.weekdayShort()} · TIMES" }
+    val header = if (next.isToday(now)) stringResource(Res.string.times)
+    else stringResource(Res.string.times_day, next.weekdayShort())
 
     Column(Modifier.fillMaxWidth()) {
         Row(

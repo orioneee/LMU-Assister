@@ -48,6 +48,9 @@ import com.orioooneee.lmuasister.ui.util.hhmm
 import com.orioooneee.lmuasister.ui.util.rememberNow
 import com.orioooneee.lmuasister.ui.util.startsInLabel
 import kotlin.time.Clock
+import lmuassister.shared.generated.resources.Res
+import lmuassister.shared.generated.resources.next_up
+import org.jetbrains.compose.resources.stringResource
 
 private fun Race.trackLabel(): String = track?.shortName?.takeIf { it.isNotBlank() } ?: circuit
 private fun Race.durationLabel(): String = if (raceLength > 0) "${raceLength}m" else ""
@@ -219,7 +222,7 @@ fun HeroRaceCard(race: Race, maxHeight: Dp, onClick: () -> Unit = {}) {
             ),
         )
         Column(Modifier.fillMaxWidth().padding(18.dp).align(Alignment.BottomStart)) {
-            Text("NEXT UP", style = MaterialTheme.typography.labelMedium, color = accent)
+            Text(stringResource(Res.string.next_up), style = MaterialTheme.typography.labelMedium, color = accent)
             Spacer(Modifier.height(8.dp))
             Text(
                 race.title,

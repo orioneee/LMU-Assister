@@ -1,0 +1,64 @@
+<resources>
+    <!-- App / Home -->
+    <string name="app_name">Lmu Assister</string>
+    <string name="home_events">Race Control · %d events</string>
+    <string name="home_all_races">All %s races</string>
+    <string name="home_empty">No races parsed.\nPull down to refresh.</string>
+
+    <!-- Loading / errors -->
+    <string name="retry">Retry</string>
+    <string name="couldnt_load">Couldn\'t load</string>
+
+    <!-- Cards -->
+    <string name="next_up">NEXT UP</string>
+    <string name="open">Open</string>
+    <string name="live">LIVE</string>
+    <string name="times">TIMES</string>
+    <string name="times_day">%s · TIMES</string>
+    <string name="duration_race">%dm race</string>
+
+    <!-- Details: weather -->
+    <string name="weather">Weather</string>
+    <string name="session_race">Race</string>
+    <string name="session_qualifying">Qualifying</string>
+    <string name="session_practice">Practice</string>
+    <string name="weather_rain">💧 up to %d%%</string>
+
+    <!-- Details: leaderboard -->
+    <string name="fastest_laps">Fastest laps</string>
+    <string name="loading_times">Loading times…</string>
+    <string name="no_lap_times">No lap times yet.</string>
+    <string name="show_top">Show top %d  ▾</string>
+    <string name="col_pos">#</string>
+    <string name="col_driver">DRIVER</string>
+    <string name="col_best_lap">BEST LAP</string>
+    <string name="col_gap">GAP</string>
+
+    <!-- Details: track -->
+    <string name="track_country">Country</string>
+    <string name="track_city">City</string>
+    <string name="track_length">Length</string>
+    <string name="track_turns">Turns</string>
+    <string name="length_km">%s km</string>
+
+    <!-- Details: format / settings -->
+    <string name="format">Format</string>
+    <string name="next_start_times">Next start times</string>
+    <string name="race_label">Race</string>
+    <string name="set_qualifying">Qualifying</string>
+    <string name="set_practice">Practice</string>
+    <string name="set_setup">Setup</string>
+    <string name="set_assists">Assists</string>
+    <string name="set_damage">Damage</string>
+    <string name="set_tire_wear">Tire wear</string>
+    <string name="set_fuel_usage">Fuel usage</string>
+    <string name="set_safety_rank">Safety rank</string>
+    <string name="set_driver_rank">Driver rank</string>
+    <string name="set_split_size">Split size</string>
+    <string name="set_driver_swaps">Driver swaps</string>
+    <string name="set_track_limits">Track limits</string>
+    <string name="set_tire_warmers">Tire warmers</string>
+    <string name="set_limited_tires">Limited tires</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+</resources>

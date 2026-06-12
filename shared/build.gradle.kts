@@ -80,6 +80,7 @@ kotlin {
             implementation(libs.coil.svg)
             implementation(libs.kotlinx.serializationJson)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.navigation.compose)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

@@ -54,6 +54,12 @@ import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import kotlin.time.Clock
 import kotlinx.coroutines.launch
+import lmuassister.shared.generated.resources.Res
+import lmuassister.shared.generated.resources.app_name
+import lmuassister.shared.generated.resources.home_all_races
+import lmuassister.shared.generated.resources.home_empty
+import lmuassister.shared.generated.resources.home_events
+import org.jetbrains.compose.resources.stringResource
 
 private fun tierRank(difficulty: String): Int = when {
     "rookie" in difficulty.lowercase() -> 0
@@ -140,7 +146,7 @@ private fun TierPage(tier: String, races: List<Race>, heroHeight: Dp, onOpenRace
     ) {
         sorted.firstOrNull()?.let { hero ->
             item { HeroRaceCard(hero, maxHeight = heroHeight) { onOpenRace(hero) } }
-            item { SectionHeader("All ${tier.lowercase()} races") }
+            item { SectionHeader(stringResource(Res.string.home_all_races, tier.lowercase())) }
             items(sorted.chunked(cols)) { row -> EqualHeightRaceRow(row, cols, onOpenRace) }
         }
         if (sorted.isEmpty()) {
@@ -193,8 +199,8 @@ private fun HomeHeader(dailyCount: Int, modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text("Lmu Assister", style = MaterialTheme.typography.titleLarge, color = TextHigh, fontWeight = FontWeight.Black)
-            Text("Race Control · $dailyCount events", style = MaterialTheme.typography.bodySmall, color = TextMed)
+            Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.titleLarge, color = TextHigh, fontWeight = FontWeight.Black)
+            Text(stringResource(Res.string.home_events, dailyCount), style = MaterialTheme.typography.bodySmall, color = TextMed)
         }
         Box(
             Modifier.size(40.dp).clip(CircleShape).background(Surface1).border(1.dp, Outline, CircleShape),
@@ -209,7 +215,7 @@ private fun HomeHeader(dailyCount: Int, modifier: Modifier = Modifier) {
 private fun EmptyHint() {
     Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
         Text(
-            "No races parsed.\nPull to refresh or check the schedule tab.",
+            stringResource(Res.string.home_empty),
             style = MaterialTheme.typography.bodyMedium,
             color = TextLow,
         )
