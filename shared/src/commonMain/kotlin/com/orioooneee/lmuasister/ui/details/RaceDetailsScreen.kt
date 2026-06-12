@@ -101,7 +101,6 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
             ) {
                 race.classInfos.take(6).forEach { ClassChip(it) }
                 if (race.raceLength > 0) MetaChip("${race.raceLength}m race")
-                if (race.difficulty.isNotBlank()) SkillBadge(race.difficulty)
                 race.settings.safetyRank?.let { SrBadge(it) }
             }
         }
@@ -125,8 +124,8 @@ private fun TrackCard(track: TrackInfo) {
     Card(track.name) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (!track.mapUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = track.mapUrl,
+                CoverImage(
+                    url = track.mapUrl,
                     contentDescription = "${track.name} map",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxWidth().height(160.dp).clip(MaterialTheme.shapes.medium),

@@ -16,14 +16,14 @@ import androidx.compose.ui.unit.dp
 import com.orioooneee.lmuasister.data.model.Race
 
 /**
- * Column count for the race grids: at least 2 (so phones show cards two-up),
- * scaling up on wider screens, capped at [max].
+ * Column count for the race grids: as many [minCardWidth]-wide cards as fit,
+ * down to a single full-width card on narrow screens, capped at [max].
  */
 @Composable
-fun rememberGridColumns(minCardWidth: Dp = 300.dp, max: Int = 4): Int {
+fun rememberGridColumns(minCardWidth: Dp = 185.dp, max: Int = 5): Int {
     val widthDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
-    if (widthDp.value <= 0f) return 2
-    return (widthDp.value / minCardWidth.value).toInt().coerceIn(2, max)
+    if (widthDp.value <= 0f) return 1
+    return (widthDp.value / minCardWidth.value).toInt().coerceIn(1, max)
 }
 
 /**

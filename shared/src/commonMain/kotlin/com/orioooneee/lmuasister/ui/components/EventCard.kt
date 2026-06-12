@@ -39,10 +39,14 @@ import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.Surface1
 import com.orioooneee.lmuasister.ui.theme.Surface2
+import com.orioooneee.lmuasister.ui.theme.Surface3
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.formatStart
+import com.orioooneee.lmuasister.ui.util.hhmm
+import com.orioooneee.lmuasister.ui.util.rememberNow
+import com.orioooneee.lmuasister.ui.util.startsInLabel
 import kotlin.time.Clock
 
 private fun Race.trackLabel(): String = track?.shortName?.takeIf { it.isNotBlank() } ?: circuit
@@ -68,8 +72,10 @@ fun RaceCard(race: Race, modifier: Modifier = Modifier, onClick: () -> Unit = {}
     ) {
         Box(Modifier.fillMaxWidth().height(104.dp).background(Surface2)) {
             CoverImage(race.imageUrl, Modifier.fillMaxSize(), race.title)
-            race.classInfos.firstOrNull()?.let {
-                Box(Modifier.align(Alignment.TopStart).padding(8.dp)) { ClassChip(it) }
+            if (race.classInfos.isNotEmpty()) {
+                Box(Modifier.align(Alignment.TopStart).padding(8.dp)) {
+                    ClassChips(race.classInfos, max = 4)
+                }
             }
         }
         Column(Modifier.padding(12.dp)) {
@@ -95,8 +101,8 @@ fun RaceCard(race: Race, modifier: Modifier = Modifier, onClick: () -> Unit = {}
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 itemVerticalAlignment = Alignment.CenterVertically,
             ) {
+                TypeTag(race.type.label, Modifier)
                 MetaChip(race.durationLabel())
-                if (race.difficulty.isNotBlank()) SkillBadge(race.difficulty)
                 race.settings.safetyRank?.let { SrBadge(it) }
             }
             if (race.times.isNotEmpty()) {
@@ -104,6 +110,24 @@ fun RaceCard(race: Race, modifier: Modifier = Modifier, onClick: () -> Unit = {}
                 TimesGrid(race.times)
             }
         }
+    }
+}
+
+@Composable
+private fun TypeTag(label: String, modifier: Modifier) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(Surface3)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        Text(
+            label.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = TextMed,
+            maxLines = 1,
+        )
     }
 }
 
@@ -210,24 +234,35 @@ fun HeroRaceCard(race: Race, maxHeight: Dp, onClick: () -> Unit = {}) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Bottom,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     MetaChip(race.durationLabel())
-                    if (race.difficulty.isNotBlank()) {
+                    race.settings.safetyRank?.let {
                         Spacer(Modifier.width(8.dp))
-                        SkillBadge(race.difficulty)
+                        SrBadge(it)
                     }
                 }
-                val next = race.nextLabel()
-                if (next.isNotBlank()) {
-                    Box(
-                        Modifier
-                            .clip(MaterialTheme.shapes.medium)
-                            .background(MaterialTheme.colorScheme.primary)
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                    ) {
-                        Text(next, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimary, maxLines = 1)
+                val now = rememberNow()
+                val next = race.nextStart(now)
+                if (next != null) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            startsInLabel(next, now),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = accent,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            Modifier
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.primary)
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                        ) {
+                            Text(next.hhmm(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimary, maxLines = 1)
+                        }
                     }
                 }
             }

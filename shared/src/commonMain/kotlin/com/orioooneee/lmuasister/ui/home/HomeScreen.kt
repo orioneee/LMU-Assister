@@ -72,9 +72,9 @@ fun HomeScreen(
     onSelectWeek: (String) -> Unit,
     onOpenRace: (Race) -> Unit,
 ) {
-    val daily = schedule.daily
-    val tiers = remember(daily) {
-        daily.map { it.difficulty.ifBlank { "Other" } }.distinct().sortedBy { tierRank(it) }
+    val all = schedule.races
+    val tiers = remember(all) {
+        all.map { it.difficulty.ifBlank { "Other" } }.distinct().sortedBy { tierRank(it) }
     }
 
     val density = LocalDensity.current
@@ -82,7 +82,7 @@ fun HomeScreen(
     val heroHeight = with(density) { windowInfo.containerSize.height.toDp() / 3 }.coerceIn(180.dp, 300.dp)
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
-        HomeHeader(dailyCount = daily.size, modifier = Modifier.padding(16.dp))
+        HomeHeader(dailyCount = all.size, modifier = Modifier.padding(16.dp))
 
         if (weeks.size > 1) {
             Row(
@@ -103,11 +103,11 @@ fun HomeScreen(
         val scope = rememberCoroutineScope()
 
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             tiers.forEachIndexed { i, tier ->
-                TierTab(tier, pager.currentPage == i, Modifier.weight(1f)) {
+                TierTab(tier, pager.currentPage == i) {
                     scope.launch { pager.animateScrollToPage(i) }
                 }
             }
@@ -118,7 +118,7 @@ fun HomeScreen(
             val tier = tiers[page]
             TierPage(
                 tier = tier,
-                races = daily.filter { it.difficulty.ifBlank { "Other" } == tier },
+                races = all.filter { it.difficulty.ifBlank { "Other" } == tier },
                 heroHeight = heroHeight,
                 onOpenRace = onOpenRace,
             )
@@ -150,16 +150,16 @@ private fun TierPage(tier: String, races: List<Race>, heroHeight: Dp, onOpenRace
 }
 
 @Composable
-private fun TierTab(tier: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun TierTab(tier: String, selected: Boolean, onClick: () -> Unit) {
     val bg = if (selected) MaterialTheme.colorScheme.primary else Surface1
     val fg = if (selected) MaterialTheme.colorScheme.onPrimary else TextMed
     Box(
-        modifier
+        Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(bg)
             .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else Outline, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 9.dp),
+            .padding(horizontal = 18.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(tier, style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 1)
@@ -194,7 +194,7 @@ private fun HomeHeader(dailyCount: Int, modifier: Modifier = Modifier) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text("LMU Daily", style = MaterialTheme.typography.titleLarge, color = TextHigh, fontWeight = FontWeight.Black)
-            Text("Race Control · $dailyCount daily events", style = MaterialTheme.typography.bodySmall, color = TextMed)
+            Text("Race Control · $dailyCount events", style = MaterialTheme.typography.bodySmall, color = TextMed)
         }
         Box(
             Modifier.size(40.dp).clip(CircleShape).background(Surface1).border(1.dp, Outline, CircleShape),
