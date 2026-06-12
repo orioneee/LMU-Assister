@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,30 +19,42 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.orioooneee.lmuasister.data.RaceEvent
-import com.orioooneee.lmuasister.ui.IconBolt
+import coil3.compose.AsyncImage
+import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.ui.IconChevronRight
-import com.orioooneee.lmuasister.ui.theme.Lime
+import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.Surface1
+import com.orioooneee.lmuasister.ui.theme.Surface2
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
+import com.orioooneee.lmuasister.ui.util.formatStart
+import kotlin.time.Clock
 
-private fun durationLabel(min: Int): String =
-    if (min >= 60 && min % 60 == 0) "${min / 60} h" else "$min min"
+private fun Race.trackLabel(): String = track?.shortName?.takeIf { it.isNotBlank() } ?: circuit
+private fun Race.durationLabel(): String = if (raceLength > 0) "${raceLength}m" else ""
 
-/** Full-width card used in the schedule list. */
 @Composable
-fun EventCard(event: RaceEvent, onClick: () -> Unit = {}) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+private fun Race.nextLabel(): String {
+    val now = remember { Clock.System.now() }
+    return nextStart(now)?.formatStart().orEmpty()
+}
+
+/** Full-width card for the schedule + Home lists, with the day's full times grid. */
+@Composable
+fun RaceCard(race: Race, onClick: () -> Unit = {}) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
@@ -50,220 +63,185 @@ fun EventCard(event: RaceEvent, onClick: () -> Unit = {}) {
             .clickable(onClick = onClick)
             .padding(14.dp),
     ) {
-        // Left color rail keyed to the car class
-        Box(
-            Modifier
-                .width(4.dp)
-                .height(56.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(event.carClass.color()),
-        )
-        Spacer(Modifier.width(14.dp))
-
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ClassChip(event.carClass)
-                if (event.startingSoon) {
-                    Spacer(Modifier.width(8.dp))
-                    LivePill()
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Thumbnail(race.imageUrl, race.accentColor(), size = 64.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                if (race.classInfos.isNotEmpty()) {
+                    ClassChips(race.classInfos)
+                    Spacer(Modifier.height(8.dp))
                 }
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                event.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = TextHigh,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(3.dp))
-            Text(
-                "${event.countryFlag}  ${event.track}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextMed,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                MetaChip(durationLabel(event.durationMinutes))
-                Spacer(Modifier.width(8.dp))
-                MetaChip(event.format.label)
-                if (event.rounds > 1) {
-                    Spacer(Modifier.width(8.dp))
-                    MetaChip("${event.rounds} rounds")
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SkillBadge(event.skill)
-                DotSeparator()
                 Text(
-                    event.scheduleLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextLow,
+                    race.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextHigh,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    race.trackLabel(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextMed,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MetaChip(race.durationLabel())
+                    if (race.difficulty.isNotBlank()) {
+                        DotSeparator()
+                        SkillBadge(race.difficulty)
+                    }
+                }
             }
+            Spacer(Modifier.width(8.dp))
+            Icon(IconChevronRight, contentDescription = "Open", tint = TextLow, modifier = Modifier.size(18.dp))
         }
 
-        Spacer(Modifier.width(10.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                event.nextStartLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (event.startingSoon) Lime else MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(8.dp))
-            Icon(IconChevronRight, contentDescription = "Open", tint = TextLow, modifier = Modifier.size(18.dp))
+        if (race.times.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            TimesGrid(race.times)
         }
     }
 }
 
-/** Compact card for horizontal carousels on Home. */
+/**
+ * Compact card for the Home "Featured" carousel.
+ * Fixed width AND height so every card in the row is identical — no top class strip.
+ */
 @Composable
-fun EventCardCompact(event: RaceEvent, onClick: () -> Unit = {}) {
+fun RaceCardCompact(race: Race, onClick: () -> Unit = {}) {
     Column(
         modifier = Modifier
-            .width(220.dp)
+            .width(230.dp)
+            .height(248.dp)
             .clip(MaterialTheme.shapes.large)
             .background(Surface1)
             .border(1.dp, Outline, MaterialTheme.shapes.large)
-            .clickable(onClick = onClick)
-            .padding(14.dp),
+            .clickable(onClick = onClick),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ClassChip(event.carClass)
+        AsyncImage(
+            model = race.imageUrl,
+            contentDescription = race.title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxWidth().height(118.dp).background(Surface2),
+        )
+        Column(Modifier.fillMaxSize().padding(12.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                race.classInfos.firstOrNull()?.let { ClassChip(it) }
+                val next = race.nextLabel()
+                if (next.isNotBlank()) {
+                    Text(next, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             Text(
-                event.nextStartLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
+                race.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = TextHigh,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            event.title,
-            style = MaterialTheme.typography.titleMedium,
-            color = TextHigh,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "${event.countryFlag}  ${event.track}",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextMed,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            MetaChip(durationLabel(event.durationMinutes))
-            Spacer(Modifier.width(8.dp))
-            SkillBadge(event.skill)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                race.trackLabel(),
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMed,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MetaChip(race.durationLabel())
+                if (race.difficulty.isNotBlank()) {
+                    Spacer(Modifier.width(8.dp))
+                    SkillBadge(race.difficulty)
+                }
+            }
         }
     }
 }
 
-/** Pulsing-style "starting soon" pill. */
+/** Featured "NEXT UP" hero. [maxHeight] caps it to (e.g.) a third of the screen. */
 @Composable
-fun LivePill() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .clip(RoundedCornerShape(7.dp))
-            .background(Lime.copy(alpha = 0.16f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Icon(IconBolt, contentDescription = null, tint = Lime, modifier = Modifier.size(12.dp))
-        Spacer(Modifier.width(4.dp))
-        Text("Soon", style = MaterialTheme.typography.labelMedium, color = Lime)
-    }
-}
-
-/** Big featured "Next up" card for the top of Home. */
-@Composable
-fun HeroEventCard(event: RaceEvent, onClick: () -> Unit = {}) {
-    Column(
+fun HeroRaceCard(race: Race, maxHeight: Dp, onClick: () -> Unit = {}) {
+    val accent = race.accentColor()
+    Box(
         modifier = Modifier
             .fillMaxWidth()
+            .height(maxHeight)
             .clip(MaterialTheme.shapes.extraLarge)
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        event.carClass.color().copy(alpha = 0.28f),
-                        Surface1,
-                    ),
-                ),
-            )
-            .border(1.dp, event.carClass.color().copy(alpha = 0.45f), MaterialTheme.shapes.extraLarge)
-            .clickable(onClick = onClick)
-            .padding(18.dp),
+            .border(1.dp, accent.copy(alpha = 0.45f), MaterialTheme.shapes.extraLarge)
+            .clickable(onClick = onClick),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        CoverImage(
+            url = race.imageUrl,
+            contentDescription = race.title,
+            modifier = Modifier.fillMaxSize().background(Surface2),
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.45f to Carbon.copy(alpha = 0.35f),
+                    1f to Carbon.copy(alpha = 0.92f),
+                ),
+            ),
+        )
+        Column(Modifier.fillMaxWidth().padding(18.dp).align(Alignment.BottomStart)) {
+            Text("NEXT UP", style = MaterialTheme.typography.labelMedium, color = accent)
+            Spacer(Modifier.height(8.dp))
             Text(
-                "NEXT UP",
-                style = MaterialTheme.typography.labelMedium,
-                color = TextMed,
+                race.title,
+                style = MaterialTheme.typography.headlineMedium,
+                color = TextHigh,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            if (event.startingSoon) {
-                Spacer(Modifier.width(8.dp))
-                LivePill()
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            event.title,
-            style = MaterialTheme.typography.headlineMedium,
-            color = TextHigh,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "${event.countryFlag}  ${event.track}",
-            style = MaterialTheme.typography.bodyLarge,
-            color = TextMed,
-        )
-        Spacer(Modifier.height(16.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            MetaChip(durationLabel(event.durationMinutes))
-            Spacer(Modifier.width(8.dp))
-            MetaChip(event.format.label)
-            Spacer(Modifier.width(8.dp))
-            SkillBadge(event.skill)
-        }
-        Spacer(Modifier.height(18.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Column {
-                Text("STARTS", style = MaterialTheme.typography.labelMedium, color = TextLow)
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    event.nextStartLabel,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+            Spacer(Modifier.height(4.dp))
+            Text(race.trackLabel(), style = MaterialTheme.typography.bodyLarge, color = TextMed, maxLines = 1)
+            Spacer(Modifier.height(12.dp))
             Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(MaterialTheme.colorScheme.primary)
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
             ) {
-                Text(
-                    "View schedule",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MetaChip(race.durationLabel())
+                    if (race.difficulty.isNotBlank()) {
+                        Spacer(Modifier.width(8.dp))
+                        SkillBadge(race.difficulty)
+                    }
+                }
+                val next = race.nextLabel()
+                if (next.isNotBlank()) {
+                    Box(
+                        Modifier
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                    ) {
+                        Text(next, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimary, maxLines = 1)
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun Thumbnail(url: String?, accent: Color, size: Dp) {
+    CoverImage(
+        url = url,
+        modifier = Modifier
+            .size(size)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface2)
+            .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+    )
 }
