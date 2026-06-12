@@ -12,11 +12,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.orioooneee.lmuasister.data.model.Race
+import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.ui.theme.Lime
+import com.orioooneee.lmuasister.ui.theme.Surface3
+import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.startsInLabel
 import kotlin.time.Instant
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.live
+import lmuassister.shared.generated.resources.season_complete
+import lmuassister.shared.generated.resources.week_complete
 import org.jetbrains.compose.resources.stringResource
 
 /** Small pill showing the live time-to-start (amber), or "LIVE" (lime) once started. */
@@ -36,6 +42,30 @@ fun CountdownBadge(next: Instant, now: Instant, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.labelMedium,
             color = accent,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+    }
+}
+
+/** Grey pill shown for finished events ("Week complete" / "Season complete"). */
+@Composable
+fun CompletedBadge(race: Race, modifier: Modifier = Modifier) {
+    val label = if (race.type == RaceType.CHAMPIONSHIP) {
+        stringResource(Res.string.season_complete)
+    } else {
+        stringResource(Res.string.week_complete)
+    }
+    Box(
+        modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(Surface3)
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = TextMed,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )
     }

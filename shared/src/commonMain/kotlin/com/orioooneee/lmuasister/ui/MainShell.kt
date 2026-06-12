@@ -30,8 +30,11 @@ import lmuassister.shared.generated.resources.retry
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-@Serializable private object HomeRoute
-@Serializable private data class DetailsRoute(val raceId: String)
+@Serializable
+object HomeRoute
+
+@Serializable
+data class DetailsRoute(val raceId: String)
 
 /** Single-screen app with a NavHost (Home ⇄ race details + a real back stack). */
 @Composable

@@ -1,8 +1,12 @@
 <resources>
     <!-- App / Home -->
     <string name="app_name">Lmu Assister</string>
-    <string name="home_events">Race Control · %d events</string>
-    <string name="home_all_races">All %s races</string>
+    <string name="home_events">Race Control · %1$d events</string>
+    <string name="home_all_races">All %1$s races</string>
+    <string name="tab_special">Special</string>
+    <string name="tab_championship">Championship</string>
+    <string name="section_daily">Daily</string>
+    <string name="section_weekly">Weekly</string>
     <string name="home_empty">No races parsed.\nPull down to refresh.</string>
 
     <!-- Loading / errors -->
@@ -13,22 +17,24 @@
     <string name="next_up">NEXT UP</string>
     <string name="open">Open</string>
     <string name="live">LIVE</string>
+    <string name="week_complete">Week complete</string>
+    <string name="season_complete">Season complete</string>
     <string name="times">TIMES</string>
-    <string name="times_day">%s · TIMES</string>
-    <string name="duration_race">%dm race</string>
+    <string name="times_day">%1$s · TIMES</string>
+    <string name="duration_race">%1$dm race</string>
 
     <!-- Details: weather -->
     <string name="weather">Weather</string>
     <string name="session_race">Race</string>
     <string name="session_qualifying">Qualifying</string>
     <string name="session_practice">Practice</string>
-    <string name="weather_rain">💧 up to %d%%</string>
+    <string name="weather_rain">💧 up to %1$d%%</string>
 
     <!-- Details: leaderboard -->
     <string name="fastest_laps">Fastest laps</string>
     <string name="loading_times">Loading times…</string>
     <string name="no_lap_times">No lap times yet.</string>
-    <string name="show_top">Show top %d  ▾</string>
+    <string name="show_top">Show top %1$d  ▾</string>
     <string name="col_pos">#</string>
     <string name="col_driver">DRIVER</string>
     <string name="col_best_lap">BEST LAP</string>
@@ -39,7 +45,7 @@
     <string name="track_city">City</string>
     <string name="track_length">Length</string>
     <string name="track_turns">Turns</string>
-    <string name="length_km">%s km</string>
+    <string name="length_km">%1$s km</string>
 
     <!-- Details: format / settings -->
     <string name="format">Format</string>

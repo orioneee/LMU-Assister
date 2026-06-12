@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.orioooneee.lmuasister.data.model.Race
+import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.Schedule
 import com.orioooneee.lmuasister.ui.WeekTab
 import com.orioooneee.lmuasister.ui.IconFlag
@@ -56,19 +57,13 @@ import kotlin.time.Clock
 import kotlinx.coroutines.launch
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.app_name
-import lmuassister.shared.generated.resources.home_all_races
 import lmuassister.shared.generated.resources.home_empty
 import lmuassister.shared.generated.resources.home_events
+import lmuassister.shared.generated.resources.section_daily
+import lmuassister.shared.generated.resources.section_weekly
+import lmuassister.shared.generated.resources.tab_championship
+import lmuassister.shared.generated.resources.tab_special
 import org.jetbrains.compose.resources.stringResource
-
-private fun tierRank(difficulty: String): Int = when {
-    "rookie" in difficulty.lowercase() -> 0
-    "beginner" in difficulty.lowercase() -> 1
-    "intermediate" in difficulty.lowercase() -> 2
-    "advanced" in difficulty.lowercase() -> 3
-    "pro" in difficulty.lowercase() -> 4
-    else -> 5
-}
 
 @Composable
 fun HomeScreen(
@@ -78,17 +73,14 @@ fun HomeScreen(
     onSelectWeek: (String) -> Unit,
     onOpenRace: (Race) -> Unit,
 ) {
-    val all = schedule.races
-    val tiers = remember(all) {
-        all.map { it.difficulty.ifBlank { "Other" } }.distinct().sortedBy { tierRank(it) }
-    }
+    val tabs = remember(schedule) { buildTabs(schedule) }
 
     val density = LocalDensity.current
     val windowInfo = LocalWindowInfo.current
     val heroHeight = with(density) { windowInfo.containerSize.height.toDp() / 3 }.coerceIn(180.dp, 300.dp)
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
-        HomeHeader(dailyCount = all.size, modifier = Modifier.padding(16.dp))
+        HomeHeader(dailyCount = schedule.races.size, modifier = Modifier.padding(16.dp))
 
         if (weeks.size > 1) {
             Row(
@@ -100,20 +92,20 @@ fun HomeScreen(
             Spacer(Modifier.height(12.dp))
         }
 
-        if (tiers.isEmpty()) {
+        if (tabs.isEmpty()) {
             EmptyHint()
             return@Column
         }
 
-        val pager = rememberPagerState(pageCount = { tiers.size })
+        val pager = rememberPagerState(pageCount = { tabs.size })
         val scope = rememberCoroutineScope()
 
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            tiers.forEachIndexed { i, tier ->
-                TierTab(tier, pager.currentPage == i) {
+            tabs.forEachIndexed { i, tab ->
+                TierTab(tab.label(), pager.currentPage == i) {
                     scope.launch { pager.animateScrollToPage(i) }
                 }
             }
@@ -121,36 +113,76 @@ fun HomeScreen(
         Spacer(Modifier.height(8.dp))
 
         HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
-            val tier = tiers[page]
-            TierPage(
-                tier = tier,
-                races = all.filter { it.difficulty.ifBlank { "Other" } == tier },
-                heroHeight = heroHeight,
-                onOpenRace = onOpenRace,
-            )
+            TabContent(tabs[page], schedule, heroHeight, onOpenRace)
         }
     }
 }
 
+private val TIER_ORDER = listOf("Beginner", "Intermediate", "Advanced")
+
+private sealed interface HomeTab
+private data class Tier(val name: String) : HomeTab
+private data object SpecialTab : HomeTab
+private data object ChampTab : HomeTab
+
 @Composable
-private fun TierPage(tier: String, races: List<Race>, heroHeight: Dp, onOpenRace: (Race) -> Unit) {
-    val now = remember { Clock.System.now() }
-    val sorted = remember(races) {
-        races.sortedBy { it.nextStart(now)?.toEpochMilliseconds() ?: Long.MAX_VALUE }
+private fun HomeTab.label(): String = when (this) {
+    is Tier -> name
+    SpecialTab -> stringResource(Res.string.tab_special)
+    ChampTab -> stringResource(Res.string.tab_championship)
+}
+
+private fun buildTabs(schedule: Schedule): List<HomeTab> = buildList {
+    TIER_ORDER.forEach { t ->
+        val hasTier = schedule.races.any {
+            (it.type == RaceType.DAILY || it.type == RaceType.WEEKLY) && it.difficulty.equals(t, ignoreCase = true)
+        }
+        if (hasTier) add(Tier(t))
     }
+    if (schedule.special.isNotEmpty()) add(SpecialTab)
+    if (schedule.championship.isNotEmpty()) add(ChampTab)
+}
+
+private data class Section(val label: String?, val races: List<Race>)
+
+@Composable
+private fun TabContent(tab: HomeTab, schedule: Schedule, heroHeight: Dp, onOpenRace: (Race) -> Unit) {
+    val sections: List<Section> = when (tab) {
+        is Tier -> listOf(
+            Section(stringResource(Res.string.section_daily), schedule.daily.filter { it.difficulty.equals(tab.name, true) }),
+            Section(stringResource(Res.string.section_weekly), schedule.weekly.filter { it.difficulty.equals(tab.name, true) }),
+        ).filter { it.races.isNotEmpty() }
+        SpecialTab -> listOf(Section(null, schedule.special))
+        ChampTab -> listOf(Section(null, schedule.championship))
+    }
+
+    val now = remember { Clock.System.now() }
+    fun nextKey(r: Race) = r.nextStart(now)?.toEpochMilliseconds() ?: Long.MAX_VALUE
+    val all = sections.flatMap { it.races }
     val cols = rememberGridColumns()
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        sorted.firstOrNull()?.let { hero ->
-            item { HeroRaceCard(hero, maxHeight = heroHeight) { onOpenRace(hero) } }
-            item { SectionHeader(stringResource(Res.string.home_all_races, tier.lowercase())) }
-            items(sorted.chunked(cols)) { row -> EqualHeightRaceRow(row, cols, onOpenRace) }
-        }
-        if (sorted.isEmpty()) {
-            item { EmptyHint() }
+        when {
+            all.isEmpty() -> item { EmptyHint() }
+
+            // single event on this tab → just one bigger hero, no list
+            all.size == 1 -> item {
+                HeroRaceCard(all.first(), maxHeight = heroHeight * 1.5f) { onOpenRace(all.first()) }
+            }
+
+            else -> {
+                val hero = all.minByOrNull { nextKey(it) }!!
+                item { HeroRaceCard(hero, maxHeight = heroHeight) { onOpenRace(hero) } }
+                sections.forEach { sec ->
+                    val sorted = sec.races.sortedBy { nextKey(it) }
+                    sec.label?.let { lbl -> item { SectionHeader(lbl) } }
+                    items(sorted.chunked(cols)) { row -> EqualHeightRaceRow(row, cols, onOpenRace) }
+                }
+            }
         }
     }
 }

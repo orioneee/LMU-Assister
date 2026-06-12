@@ -100,6 +100,8 @@ data class Race(
     val imageUrl: String?,
     val weather: RaceWeather? = null,
     val leaderboardId: String? = null,
+    /** This period's race is over (week complete / season complete) — not active right now. */
+    val completed: Boolean = false,
 ) {
     val title: String get() = series.ifBlank { circuit }
 

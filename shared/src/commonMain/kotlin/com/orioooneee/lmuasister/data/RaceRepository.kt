@@ -78,9 +78,10 @@ class RaceRepository(
 
         val s = shared()
         val series = portal.raceSeries(weekKey) // the only per-week network call
+        val weekStart = runCatching { LocalDate.parse(weekKey) }.getOrNull() ?: todayDate
 
-        val weekly = series.map { it.toRace(s.tracks, s.classes, s.images, todayDate, now) }
-        val champ = s.champSeries.map { it.toRace(s.events, s.tracks, s.classes, s.images, todayDate, now) }
+        val weekly = series.map { it.toRace(s.tracks, s.classes, s.images, todayDate, weekStart, now) }
+        val champ = s.champSeries.map { it.toRace(s.events, s.tracks, s.classes, s.images, now, s.seasonComplete) }
         Schedule(weekly + champ)
     }
 
@@ -91,6 +92,7 @@ class RaceRepository(
         val images: ImageIndex,
         val champSeries: List<ChampionshipSeriesDto>,
         val events: List<ChampionshipEventDto>,
+        val seasonComplete: Boolean,
     )
 
     private var sharedCache: Shared? = null
@@ -109,6 +111,9 @@ class RaceRepository(
             val champSeries = season
                 ?.let { runCatching { portal.championshipSeries(it.seasonId) }.getOrDefault(emptyList()) }
                 .orEmpty()
+            val today = Clock.System.now().toLocalDateTime(TimeZone.UTC).date.toString()
+            // the lmuportal status field lies ("active" past end_date) — trust end_date
+            val seasonComplete = season?.endDate?.let { it < today } ?: false
 
             Shared(
                 tracks = TrackIndex(tracksD.await()),
@@ -116,6 +121,7 @@ class RaceRepository(
                 images = ImageIndex(imagesD.await(), rcD.await()),
                 champSeries = champSeries,
                 events = eventsD.await(),
+                seasonComplete = seasonComplete,
             )
         }.also { sharedCache = it }
     }
@@ -130,31 +136,16 @@ private fun timeAt(date: LocalDate, hhmmss: String): Instant? {
     return runCatching { date.atTime(LocalTime(h, m)).toInstant(TimeZone.UTC) }.getOrNull()
 }
 
-/**
- * The full slate of start times for the event's *current active day* — past AND
- * future, so the UI can show the whole grid with past slots struck through.
- * [days] are 0=Sun..6=Sat (lmuportal convention); [times] run on those days,
- * [nextDayTimes] on the morning after. Returns the first upcoming race day's slate.
- */
-private fun activeDaySlots(
-    days: List<Int>,
-    times: List<String>,
-    nextDayTimes: List<String>,
-    today: LocalDate,
-    now: Instant,
-): List<Instant> {
-    if (days.isEmpty() || (times.isEmpty() && nextDayTimes.isEmpty())) return emptyList()
-    for (offset in 0..8) {
-        val date = today.plus(offset, DateTimeUnit.DAY)
+/** All start times for the given race days within the week starting [weekStart] (0=Sun..6=Sat). */
+private fun weekSlots(weekStart: LocalDate, days: List<Int>, times: List<String>): List<Instant> {
+    if (days.isEmpty() || times.isEmpty()) return emptyList()
+    val out = ArrayList<Instant>()
+    for (offset in 0..6) {
+        val date = weekStart.plus(offset, DateTimeUnit.DAY)
         if (date.dayOfWeek.isoDayNumber % 7 !in days) continue
-        val slots = buildList {
-            times.forEach { t -> timeAt(date, t)?.let(::add) }
-            val nd = date.plus(1, DateTimeUnit.DAY)
-            nextDayTimes.forEach { t -> timeAt(nd, t)?.let(::add) }
-        }.distinct().sorted()
-        if (slots.any { it >= now }) return slots
+        times.forEach { t -> timeAt(date, t)?.let(out::add) }
     }
-    return emptyList()
+    return out.distinct().sorted()
 }
 
 private fun RaceSeriesDto.toRace(
@@ -162,15 +153,20 @@ private fun RaceSeriesDto.toRace(
     classes: ClassIndex,
     images: ImageIndex,
     today: LocalDate,
+    weekStart: LocalDate,
     now: Instant,
 ): Race {
     val displayCircuit = trackConfig?.takeIf { it.isNotBlank() }
         ?.let { "$trackFriendly ($it)" } ?: trackFriendly
-    val times = if (todaysStartTimes.isNotEmpty()) {
-        activeDaySlots((0..6).toList(), todaysStartTimes, emptyList(), today, now)
+    // Daily runs every day (today's slate). Weekly/Special run on fixed days *within their week*.
+    val isDaily = todaysStartTimes.isNotEmpty()
+    val times = if (isDaily) {
+        todaysStartTimes.mapNotNull { timeAt(today, it) }.sorted()
     } else {
-        activeDaySlots(raceDays, timesUtc, emptyList(), today, now)
+        weekSlots(weekStart, raceDays, timesUtc)
     }
+    // weekly/special whose race day already passed this week → "week complete"
+    val completed = !isDaily && times.isNotEmpty() && times.none { it >= now }
     val track = tracks.lookup(trackSlug, trackFriendly)
     return Race(
         id = seriesId,
@@ -202,6 +198,7 @@ private fun RaceSeriesDto.toRace(
         imageUrl = images.match(track?.shortName ?: trackFriendly, carClasses, seriesName),
         weather = buildWeather(raceWeather, qualifyingWeather, practiceWeather),
         leaderboardId = leaderboardId,
+        completed = completed,
     )
 }
 
@@ -232,16 +229,17 @@ private fun ChampionshipSeriesDto.toRace(
     tracks: TrackIndex,
     classes: ClassIndex,
     images: ImageIndex,
-    today: LocalDate,
     now: Instant,
+    seasonComplete: Boolean,
 ): Race {
-    // current round track comes from the next (or most recent) scheduled event
     val mine = events.filter { it.seriesId == id }
         .mapNotNull { e -> runCatching { Instant.parse(e.raceStartsAt) }.getOrNull()?.let { it to e } }
-    val round = (mine.filter { it.first >= now }.minByOrNull { it.first }
-        ?: mine.maxByOrNull { it.first })?.second?.roundName
+    val upcoming = mine.filter { it.first >= now }.sortedBy { it.first }
+    // current round track from the next (or most recent) scheduled event
+    val round = (upcoming.firstOrNull() ?: mine.maxByOrNull { it.first })?.second?.roundName
     val circuit = round?.substringAfter(':')?.trim()?.takeIf { it.isNotBlank() } ?: "Multi-round"
     val track = tracks.lookup(null, circuit)
+    val completed = seasonComplete || (mine.isNotEmpty() && upcoming.isEmpty())
 
     return Race(
         id = id,
@@ -251,7 +249,7 @@ private fun ChampionshipSeriesDto.toRace(
         difficulty = "Championship",
         carClasses = carClasses,
         classInfos = carClasses.map { classes.lookup(it) },
-        times = activeDaySlots(raceDays, raceTimesUtc, raceTimeNextDay, today, now),
+        times = if (completed) emptyList() else upcoming.map { it.first },
         raceLength = raceDuration,
         settings = RaceSettings(
             setup = setup,
@@ -271,6 +269,7 @@ private fun ChampionshipSeriesDto.toRace(
         ),
         track = track,
         imageUrl = images.match(track?.shortName ?: circuit, carClasses, seriesName),
+        completed = completed,
     )
 }
 

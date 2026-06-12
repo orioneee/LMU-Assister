@@ -87,6 +87,7 @@ data class ChampionshipSeasonDto(
     @SerialName("season_id") val seasonId: String = "",
     @SerialName("season_name") val seasonName: String = "",
     val status: String = "",
+    @SerialName("end_date") val endDate: String? = null,
 )
 
 // ── leaderboard (race_series_leaderboard_entry) ───────────────────────────────

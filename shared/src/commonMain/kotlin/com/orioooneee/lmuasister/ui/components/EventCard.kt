@@ -107,6 +107,7 @@ fun RaceCard(race: Race, modifier: Modifier = Modifier, onClick: () -> Unit = {}
                 TypeTag(race.type.label, Modifier)
                 MetaChip(race.durationLabel())
                 race.settings.safetyRank?.let { SrBadge(it) }
+                if (race.completed) CompletedBadge(race)
             }
             if (race.times.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
@@ -248,8 +249,9 @@ fun HeroRaceCard(race: Race, maxHeight: Dp, onClick: () -> Unit = {}) {
                 }
                 val now = rememberNow()
                 val next = race.nextStart(now)
-                if (next != null) {
-                    Column(horizontalAlignment = Alignment.End) {
+                when {
+                    race.completed -> CompletedBadge(race)
+                    next != null -> Column(horizontalAlignment = Alignment.End) {
                         CountdownBadge(next, now)
                         Spacer(Modifier.height(6.dp))
                         Box(
