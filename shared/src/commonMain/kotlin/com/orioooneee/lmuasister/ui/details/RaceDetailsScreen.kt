@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +42,7 @@ import com.orioooneee.lmuasister.ui.components.ClassChip
 import com.orioooneee.lmuasister.ui.components.CoverImage
 import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.SkillBadge
+import com.orioooneee.lmuasister.ui.components.SrBadge
 import com.orioooneee.lmuasister.ui.components.accentColor
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
@@ -100,24 +102,18 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
                 race.classInfos.take(6).forEach { ClassChip(it) }
                 if (race.raceLength > 0) MetaChip("${race.raceLength}m race")
                 if (race.difficulty.isNotBlank()) SkillBadge(race.difficulty)
-                race.settings.safetyRank?.let { MetaChip("SR $it") }
+                race.settings.safetyRank?.let { SrBadge(it) }
             }
         }
 
         race.track?.let { item { TrackCard(it) } }
         item {
-            Card("Format") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    settingRows(race.settings).forEach { (k, v) -> DetailRow(k, v) }
-                }
-            }
+            Card("Format") { DetailRows(settingRows(race.settings)) }
         }
         if (upcoming.isNotEmpty()) {
             item {
                 Card("Next start times") {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        upcoming.forEach { Text("• ${it.formatStart()}", color = TextMed, style = MaterialTheme.typography.bodyMedium) }
-                    }
+                    DetailRows(upcoming.mapIndexed { i, t -> "Race ${i + 1}" to t.formatStart() })
                 }
             }
         }
@@ -136,12 +132,14 @@ private fun TrackCard(track: TrackInfo) {
                     modifier = Modifier.fillMaxWidth().height(160.dp).clip(MaterialTheme.shapes.medium),
                 )
             }
-            listOfNotNull(
-                track.country?.let { "Country" to it },
-                track.town?.let { "City" to it },
-                track.lengthKm?.let { "Length" to "$it km" },
-                track.numTurns?.let { "Turns" to it.toString() },
-            ).forEach { (k, v) -> DetailRow(k, v) }
+            DetailRows(
+                listOfNotNull(
+                    track.country?.let { "Country" to it },
+                    track.town?.let { "City" to it },
+                    track.lengthKm?.let { "Length" to "$it km" },
+                    track.numTurns?.let { "Turns" to it.toString() },
+                ),
+            )
         }
     }
 }
@@ -175,11 +173,23 @@ private fun Card(title: String, content: @Composable () -> Unit) {
     }
 }
 
+/** Zebra-striped key/value rows for readability (alternating row shade). */
 @Composable
-private fun DetailRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = TextLow)
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = TextHigh, fontWeight = FontWeight.SemiBold)
+private fun DetailRows(rows: List<Pair<String, String>>) {
+    Column(Modifier.fillMaxWidth()) {
+        rows.forEachIndexed { i, (label, value) ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (i % 2 == 1) Surface2 else Color.Transparent)
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(label, style = MaterialTheme.typography.bodyMedium, color = TextLow)
+                Text(value, style = MaterialTheme.typography.bodyMedium, color = TextHigh, fontWeight = FontWeight.SemiBold)
+            }
+        }
     }
 }
 

@@ -16,10 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -38,7 +36,8 @@ import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.Schedule
 import com.orioooneee.lmuasister.ui.WeekTab
-import com.orioooneee.lmuasister.ui.components.RaceCard
+import com.orioooneee.lmuasister.ui.components.EqualHeightRaceRow
+import com.orioooneee.lmuasister.ui.components.rememberGridColumns
 import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
@@ -83,14 +82,13 @@ fun ScheduleScreen(
             tier to list.sortedBy { r -> r.nextStart(now)?.toEpochMilliseconds() ?: Long.MAX_VALUE }
         }
 
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 340.dp),
+    val cols = rememberGridColumns()
+    LazyColumn(
         modifier = Modifier.fillMaxSize().background(Carbon),
         contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
+        item {
             Column {
                 Text("Race Control", style = MaterialTheme.typography.headlineMedium, color = TextHigh, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(2.dp))
@@ -117,12 +115,12 @@ fun ScheduleScreen(
         }
 
         groups.forEach { (tier, list) ->
-            item(span = { GridItemSpan(maxLineSpan) }) { TierHeader(tier, list.size) }
-            items(list) { race -> RaceCard(race) { onOpenRace(race) } }
+            item { TierHeader(tier, list.size) }
+            items(list.chunked(cols)) { row -> EqualHeightRaceRow(row, cols, onOpenRace) }
         }
 
         if (races.isEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item {
                 Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
                     Text("No ${category.label.lowercase()} events.", color = TextLow, style = MaterialTheme.typography.bodyMedium)
                 }

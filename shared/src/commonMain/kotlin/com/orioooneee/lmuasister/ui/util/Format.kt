@@ -57,13 +57,14 @@ fun Instant.isToday(now: Instant): Boolean = local().date == now.local().date
 /** Local weekday short name, e.g. "WED". */
 fun Instant.weekdayShort(): String = DAYS.getOrElse(local().dayOfWeek.isoDayNumber - 1) { "" }.uppercase()
 
-/** Countdown label like "STARTS IN 39M" / "STARTS IN 2H 5M" / "LIVE". */
+/** Live countdown: "STARTS IN 2H 5M" / "39M 12S" / "45S" / "LIVE". Seconds shown under an hour. */
 fun startsInLabel(next: Instant, now: Instant): String {
-    val m = (next - now).inWholeMinutes
+    val s = (next - now).inWholeSeconds
     return when {
-        m < 1 -> "LIVE"
-        m < 60 -> "STARTS IN ${m}M"
-        else -> "STARTS IN ${m / 60}H ${m % 60}M"
+        s <= 0 -> "LIVE"
+        s < 60 -> "STARTS IN ${s}S"
+        s < 3600 -> "STARTS IN ${s / 60}M ${s % 60}S"
+        else -> "STARTS IN ${s / 3600}H ${(s % 3600) / 60}M"
     }
 }
 

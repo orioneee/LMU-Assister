@@ -1,5 +1,6 @@
 package com.orioooneee.lmuasister.data.remote
 
+import com.fleeksoft.ksoup.Ksoup
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -84,6 +85,26 @@ class LmuCardImageApi(private val client: HttpClient) {
     private suspend fun list(prefix: String): List<String> {
         val xml = client.get("$BUCKET/?list-type=2&prefix=$prefix&max-keys=1000").bodyAsText()
         return KEY_REGEX.findAll(xml).map { it.groupValues[1] }.toList()
+    }
+
+    /**
+     * racecontrol.gg's editorial cover per event, keyed by the exact race title
+     * (e.g. "LMGT3 Fixed" -> a specific Le Mans Night card). These take priority
+     * over filename matching so our covers match what racecontrol shows.
+     */
+    suspend fun fetchRaceControlCovers(): Map<String, String> {
+        val html = client.get("https://www.racecontrol.gg/") {
+            header("User-Agent", "Mozilla/5.0 (compatible; LmuAssister/1.0)")
+        }.bodyAsText()
+        val doc = Ksoup.parse(html)
+        val out = LinkedHashMap<String, String>()
+        doc.select(".glide__slide").forEach { slide ->
+            val title = slide.selectFirst(".race-info h4")?.text()?.trim().orEmpty()
+            val img = slide.select(".event-image img")
+                .firstOrNull { it.hasAttr("src") }?.attr("src").orEmpty()
+            if (title.isNotEmpty() && img.startsWith("http")) out.putIfAbsent(title, img)
+        }
+        return out
     }
 
     private companion object {

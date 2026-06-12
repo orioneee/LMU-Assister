@@ -20,12 +20,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.orioooneee.lmuasister.data.model.ClassInfo
 import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.ui.theme.Amber
+import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.ClassMixed
+import com.orioooneee.lmuasister.ui.theme.Outline
+import com.orioooneee.lmuasister.ui.theme.Surface3
 import com.orioooneee.lmuasister.ui.theme.SkillAdv
 import com.orioooneee.lmuasister.ui.theme.SkillBeginner
 import com.orioooneee.lmuasister.ui.theme.SkillInter
@@ -42,6 +46,24 @@ fun ClassInfo.color(): Color = parseHexColor(colorHex) ?: ClassMixed
 /** Accent for borders/labels — first class colour, else brand amber. */
 fun Race.accentColor(): Color = classInfos.firstNotNullOfOrNull { parseHexColor(it.colorHex) } ?: Amber
 
+/** LMU-style class code: only Hypercar -> HY and LMGT3 -> GT3 are shortened; the rest keep their name. */
+fun ClassInfo.shortCode(): String {
+    val n = "$id $name".lowercase()
+    return when {
+        "hyper" in n -> "HY"
+        "lmgt3" in n -> "GT3"
+        else -> name
+    }
+}
+
+private fun srColor(sr: String): Color = when {
+    "bronze" in sr.lowercase() -> Color(0xFFCD7F32)
+    "silver" in sr.lowercase() -> Color(0xFFC9D1DA)
+    "gold" in sr.lowercase() -> Color(0xFFE6B422)
+    "platinum" in sr.lowercase() || "plat" in sr.lowercase() -> Color(0xFF6FE3F0)
+    else -> Color(0xFF8A93A6)
+}
+
 fun difficultyColor(difficulty: String): Color = when {
     "rookie" in difficulty.lowercase() -> SkillRookie
     "beginner" in difficulty.lowercase() -> SkillBeginner
@@ -51,21 +73,41 @@ fun difficultyColor(difficulty: String): Color = when {
     else -> SkillRookie
 }
 
-/** Solid colour pill for one car class. */
+/** Solid LMU-style class badge with the short class code. */
 @Composable
 fun ClassChip(classInfo: ClassInfo) {
     val c = classInfo.color()
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(c)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(
+            classInfo.shortCode(),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = Carbon,
+            maxLines = 1,
+        )
+    }
+}
+
+/** Official-style SR badge: a dark "SR" segment + the tier in its colour. */
+@Composable
+fun SrBadge(sr: String) {
+    if (sr.isBlank()) return
+    val tier = srColor(sr)
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .clip(RoundedCornerShape(7.dp))
-            .background(c.copy(alpha = 0.16f))
-            .border(1.dp, c.copy(alpha = 0.5f), RoundedCornerShape(7.dp))
-            .padding(horizontal = 9.dp, vertical = 4.dp),
+        modifier = Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Outline, RoundedCornerShape(6.dp)),
     ) {
-        Box(Modifier.size(7.dp).clip(CircleShape).background(c))
-        Spacer(Modifier.width(6.dp))
-        Text(classInfo.name, style = MaterialTheme.typography.labelMedium, color = c, maxLines = 1)
+        Box(Modifier.background(Surface3).padding(horizontal = 6.dp, vertical = 3.dp)) {
+            Text("SR", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextMed)
+        }
+        Box(Modifier.background(tier).padding(horizontal = 6.dp, vertical = 3.dp)) {
+            Text(sr.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Carbon, maxLines = 1)
+        }
     }
 }
 

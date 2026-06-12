@@ -24,9 +24,9 @@ import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.hhmm
 import com.orioooneee.lmuasister.ui.util.isToday
+import com.orioooneee.lmuasister.ui.util.rememberNow
 import com.orioooneee.lmuasister.ui.util.startsInLabel
 import com.orioooneee.lmuasister.ui.util.weekdayShort
-import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -34,9 +34,9 @@ import kotlin.time.Instant
  * struck through, the next one highlighted, a "STARTS IN …" countdown up top.
  */
 @Composable
-fun TimesGrid(times: List<Instant>, columns: Int = 4) {
-    val now = remember { Clock.System.now() }
-    val upcoming = remember(times) { times.filter { it >= now } }
+fun TimesGrid(times: List<Instant>, columns: Int = 3) {
+    val now = rememberNow()
+    val upcoming = times.filter { it >= now }
     if (upcoming.isEmpty()) return
     val next = upcoming.first()
 

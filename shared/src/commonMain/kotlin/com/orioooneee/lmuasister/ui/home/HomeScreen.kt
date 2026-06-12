@@ -17,10 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -45,8 +43,9 @@ import com.orioooneee.lmuasister.data.model.Schedule
 import com.orioooneee.lmuasister.ui.WeekTab
 import com.orioooneee.lmuasister.ui.IconFlag
 import com.orioooneee.lmuasister.ui.components.HeroRaceCard
-import com.orioooneee.lmuasister.ui.components.RaceCard
+import com.orioooneee.lmuasister.ui.components.EqualHeightRaceRow
 import com.orioooneee.lmuasister.ui.components.SectionHeader
+import com.orioooneee.lmuasister.ui.components.rememberGridColumns
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.Surface1
@@ -133,24 +132,19 @@ private fun TierPage(tier: String, races: List<Race>, heroHeight: Dp, onOpenRace
     val sorted = remember(races) {
         races.sortedBy { it.nextStart(now)?.toEpochMilliseconds() ?: Long.MAX_VALUE }
     }
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 340.dp),
+    val cols = rememberGridColumns()
+    LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         sorted.firstOrNull()?.let { hero ->
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                HeroRaceCard(hero, maxHeight = heroHeight) { onOpenRace(hero) }
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                SectionHeader("All ${tier.lowercase()} races")
-            }
-            items(sorted) { race -> RaceCard(race) { onOpenRace(race) } }
+            item { HeroRaceCard(hero, maxHeight = heroHeight) { onOpenRace(hero) } }
+            item { SectionHeader("All ${tier.lowercase()} races") }
+            items(sorted.chunked(cols)) { row -> EqualHeightRaceRow(row, cols, onOpenRace) }
         }
         if (sorted.isEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) { EmptyHint() }
+            item { EmptyHint() }
         }
     }
 }

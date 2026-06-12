@@ -80,6 +80,7 @@ class RaceRepository(
             val tracksD = async { runCatching { portal.tracks() }.getOrDefault(emptyList()) }
             val classesD = async { runCatching { portal.carClasses() }.getOrDefault(emptyList()) }
             val imagesD = async { runCatching { cards.fetchCards() }.getOrDefault(emptyList()) }
+            val rcD = async { runCatching { cards.fetchRaceControlCovers() }.getOrDefault(emptyMap()) }
             val seasonD = async { runCatching { portal.activeSeason() }.getOrNull() }
             val eventsD = async { runCatching { portal.championshipEvents() }.getOrDefault(emptyList()) }
 
@@ -91,7 +92,7 @@ class RaceRepository(
             Shared(
                 tracks = TrackIndex(tracksD.await()),
                 classes = ClassIndex(classesD.await()),
-                images = ImageIndex(imagesD.await()),
+                images = ImageIndex(imagesD.await(), rcD.await()),
                 champSeries = champSeries,
                 events = eventsD.await(),
             )
@@ -280,7 +281,7 @@ private class ClassIndex(dtos: List<PortalCarClassDto>) {
     }
 }
 
-private class ImageIndex(urls: List<String>) {
+private class ImageIndex(urls: List<String>, rcCovers: Map<String, String>) {
     private data class Card(
         val url: String,
         val date: String,
@@ -288,6 +289,10 @@ private class ImageIndex(urls: List<String>) {
         val trackTok: String,
         val fullTok: String,
     )
+
+    // racecontrol.gg editorial cover keyed by series-name token (takes priority)
+    private val rcByName: Map<String, String> =
+        rcCovers.entries.associate { (title, url) -> title.token() to url }
 
     private val cards: List<Card> = urls.map { url ->
         val name = url.substringAfterLast('/').substringBeforeLast('.')
@@ -304,7 +309,9 @@ private class ImageIndex(urls: List<String>) {
     }
 
     fun match(trackName: String, carClasses: List<String>, series: String): String? =
-        byTrack(trackName, carClasses) ?: bySeries(series)
+        rcByName[series.token()] // exact racecontrol cover for this series
+            ?: byTrack(trackName, carClasses)
+            ?: bySeries(series)
 
     private fun byTrack(trackName: String, carClasses: List<String>): String? {
         val trackKey = trackName.baseToken()

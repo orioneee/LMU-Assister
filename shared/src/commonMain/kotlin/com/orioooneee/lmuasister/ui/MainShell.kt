@@ -22,7 +22,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.orioooneee.lmuasister.data.model.Race
@@ -32,13 +31,11 @@ import com.orioooneee.lmuasister.ui.home.HomeScreen
 import com.orioooneee.lmuasister.ui.schedule.ScheduleScreen
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Surface1
-import com.orioooneee.lmuasister.ui.tools.ToolsScreen
 import org.koin.compose.viewmodel.koinViewModel
 
 private enum class MainTab(val label: String, val icon: ImageVector) {
     HOME("Home", IconHome),
     SCHEDULE("Schedule", IconSchedule),
-    TOOLS("Tools", IconTools),
 }
 
 @Composable
@@ -47,7 +44,6 @@ fun MainShell(viewModel: ScheduleViewModel = koinViewModel()) {
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(MainTab.HOME) }
     var selected by remember { mutableStateOf<Race?>(null) }
-    val uriHandler = LocalUriHandler.current
 
     // Details takes over the whole screen (with its own back).
     selected?.let { race ->
@@ -103,7 +99,6 @@ fun MainShell(viewModel: ScheduleViewModel = koinViewModel()) {
                                 onOpenRace = { selected = it },
                             )
                         }
-                        MainTab.TOOLS -> ToolsScreen(onOpenUrl = { uriHandler.openUri(it) })
                     }
                 }
             }

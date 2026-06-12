@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -51,57 +54,55 @@ private fun Race.nextLabel(): String {
     return nextStart(now)?.formatStart().orEmpty()
 }
 
-/** Full-width card for the schedule + Home lists, with the day's full times grid. */
+/** Compact vertical card (fits two-up on phones) with the day's times grid. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RaceCard(race: Race, onClick: () -> Unit = {}) {
+fun RaceCard(race: Race, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(Surface1)
             .border(1.dp, Outline, MaterialTheme.shapes.large)
-            .clickable(onClick = onClick)
-            .padding(14.dp),
+            .clickable(onClick = onClick),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Thumbnail(race.imageUrl, race.accentColor(), size = 64.dp)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                if (race.classInfos.isNotEmpty()) {
-                    ClassChips(race.classInfos)
-                    Spacer(Modifier.height(8.dp))
-                }
-                Text(
-                    race.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextHigh,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    race.trackLabel(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextMed,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    MetaChip(race.durationLabel())
-                    if (race.difficulty.isNotBlank()) {
-                        DotSeparator()
-                        SkillBadge(race.difficulty)
-                    }
-                }
+        Box(Modifier.fillMaxWidth().height(104.dp).background(Surface2)) {
+            CoverImage(race.imageUrl, Modifier.fillMaxSize(), race.title)
+            race.classInfos.firstOrNull()?.let {
+                Box(Modifier.align(Alignment.TopStart).padding(8.dp)) { ClassChip(it) }
             }
-            Spacer(Modifier.width(8.dp))
-            Icon(IconChevronRight, contentDescription = "Open", tint = TextLow, modifier = Modifier.size(18.dp))
         }
-
-        if (race.times.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            TimesGrid(race.times)
+        Column(Modifier.padding(12.dp)) {
+            Text(
+                race.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = TextHigh,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                race.trackLabel(),
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMed,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                MetaChip(race.durationLabel())
+                if (race.difficulty.isNotBlank()) SkillBadge(race.difficulty)
+                race.settings.safetyRank?.let { SrBadge(it) }
+            }
+            if (race.times.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                TimesGrid(race.times)
+            }
         }
     }
 }
