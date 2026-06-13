@@ -38,6 +38,13 @@ private const val HOTLAP_POLL_DELAY_MS = 1500L
 @Serializable
 private data class CachedSchedule(val ts: Long = 0, val data: ScheduleResponse = ScheduleResponse())
 
+/** On-disk per-race detail snapshots (leaderboard / hot-laps). */
+@Serializable
+private data class LbCache(val ts: Long = 0, val data: List<LeaderboardEntryDto> = emptyList())
+
+@Serializable
+private data class HlCache(val ts: Long = 0, val data: List<HotlapDto> = emptyList())
+
 /**
  * Thin client over the LmuAssister backend. The backend already merges every
  * source into the unified race model, so this just fetches, caches the one
@@ -84,25 +91,56 @@ class RaceRepository(private val api: BackendApi) {
         Schedule(resp.schedules[key].orEmpty().map { it.toModel(api::imageUrl) })
     }
 
-    /** Fastest-lap leaderboard — the fast `/race/<id>` call. */
+    // Per-race detail caches (offline-first, like the schedule): instant on reopen,
+    // and they survive restarts via disk so hot-laps don't rebuild every time.
+    private val lbMem = mutableMapOf<String, List<LapEntry>>()
+    private val hlMem = mutableMapOf<String, List<Hotlap>>()
+
+    /** In-memory only (safe to call during composition) — null if not loaded this session. */
+    fun peekLeaderboard(raceId: String): List<LapEntry>? = lbMem[raceId]
+    fun peekHotlaps(raceId: String): List<Hotlap>? = hlMem[raceId]
+
+    /** Memory, then disk — for the first paint before the network refresh. */
+    fun cachedLeaderboard(raceId: String): List<LapEntry>? =
+        lbMem[raceId] ?: diskList<LbCache>("lb_$raceId")?.data?.map { it.toModel() }?.also { lbMem[raceId] = it }
+
+    fun cachedHotlaps(raceId: String): List<Hotlap>? =
+        hlMem[raceId] ?: diskList<HlCache>("hl_$raceId")?.data?.map { it.toModel() }?.also { hlMem[raceId] = it }
+
+    /** Fastest-lap leaderboard — the fast `/race/<id>` call. Caches mem + disk. */
     suspend fun leaderboard(raceId: String): Result<List<LapEntry>> = runCatching {
-        api.race(raceId).leaderboard.map { it.toModel() }
+        val dtos = api.race(raceId).leaderboard
+        lbMem[raceId] = dtos.map { it.toModel() }
+        runCatching { LocalCache.write("lb_$raceId", AppJson.encodeToString(LbCache(nowMs(), dtos))) }
+        lbMem.getValue(raceId)
     }
 
     /**
      * YouTube hot-laps for the race's track. The endpoint builds them asynchronously,
      * so we poll until "ready"; if it's still pending we force a synchronous build.
-     * Independent of [leaderboard] so the two load in parallel.
+     * Independent of [leaderboard] so the two load in parallel. Caches mem + disk.
      */
     suspend fun hotlaps(raceId: String): Result<List<Hotlap>> = runCatching {
+        val dtos = pollHotlaps(raceId)
+        hlMem[raceId] = dtos.map { it.toModel() }
+        runCatching { LocalCache.write("hl_$raceId", AppJson.encodeToString(HlCache(nowMs(), dtos))) }
+        hlMem.getValue(raceId)
+    }
+
+    private suspend fun pollHotlaps(raceId: String): List<HotlapDto> {
         repeat(HOTLAP_POLLS) {
             val r = api.hotlaps(raceId)
-            if (r.status == STATUS_READY) return@runCatching r.hotlaps.map { it.toModel() }
+            if (r.status == STATUS_READY) return r.hotlaps
             delay(HOTLAP_POLL_DELAY_MS)
         }
-        api.hotlaps(raceId, wait = true).hotlaps.map { it.toModel() }
+        return api.hotlaps(raceId, wait = true).hotlaps
     }
+
+    private inline fun <reified T> diskList(key: String): T? =
+        runCatching { LocalCache.read(key)?.let { AppJson.decodeFromString<T>(it) } }.getOrNull()
 }
+
+private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
 
 // ── mapping: backend DTOs → domain model ──────────────────────────────────────
 

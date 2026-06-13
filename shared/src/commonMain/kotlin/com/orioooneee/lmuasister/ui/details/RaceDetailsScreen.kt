@@ -89,10 +89,6 @@ import lmuassister.shared.generated.resources.duration_race
 import lmuassister.shared.generated.resources.fastest_laps
 import lmuassister.shared.generated.resources.format
 import lmuassister.shared.generated.resources.hotlaps
-import lmuassister.shared.generated.resources.hl_col_car
-import lmuassister.shared.generated.resources.hl_col_driver
-import lmuassister.shared.generated.resources.hl_col_lap
-import lmuassister.shared.generated.resources.hl_col_ver
 import lmuassister.shared.generated.resources.length_km
 import lmuassister.shared.generated.resources.next_start_times
 import lmuassister.shared.generated.resources.no
@@ -131,12 +127,24 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
 
     val repo = koinInject<RaceRepository>()
     // Leaderboard (fast) and hot-laps (async build) load in parallel — each resolves
-    // its own skeleton independently. null = still loading.
-    val leaderboard by produceState<List<LapEntry>?>(null, race.id) {
-        value = if (race.leaderboardId != null) repo.leaderboard(race.id).getOrDefault(emptyList()) else emptyList()
+    // its own skeleton independently. Offline-first: paint cached (memory/disk) instantly,
+    // then refresh from the network. null = nothing cached yet → skeleton.
+    val leaderboard by produceState<List<LapEntry>?>(
+        if (race.leaderboardId != null) repo.peekLeaderboard(race.id) else emptyList(),
+        race.id,
+    ) {
+        if (race.leaderboardId == null) {
+            value = emptyList()
+            return@produceState
+        }
+        if (value == null) repo.cachedLeaderboard(race.id)?.let { value = it }
+        val fresh = repo.leaderboard(race.id).getOrNull()
+        if (fresh != null) value = fresh else if (value == null) value = emptyList()
     }
-    val hotlaps by produceState<List<Hotlap>?>(null, race.id) {
-        value = repo.hotlaps(race.id).getOrDefault(emptyList())
+    val hotlaps by produceState<List<Hotlap>?>(repo.peekHotlaps(race.id), race.id) {
+        if (value == null) repo.cachedHotlaps(race.id)?.let { value = it }
+        val fresh = repo.hotlaps(race.id).getOrNull()
+        if (fresh != null) value = fresh else if (value == null) value = emptyList()
     }
 
     LazyVerticalGrid(
@@ -190,7 +198,16 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
                 if (lb == null) LeaderboardSkeletonCard() else LeaderboardCard(lb)
             }
         }
-        race.track?.let { item { TrackCard(it, hotlaps.orEmpty(), hotlapsLoading = hotlaps == null) } }
+        race.track?.let {
+            item {
+                TrackCard(
+                    it,
+                    hotlaps.orEmpty(),
+                    hotlapsLoading = hotlaps == null,
+                    hotlapsSkeletonCount = (race.carClasses.size * 2).coerceAtLeast(2),
+                )
+            }
+        }
         race.weather?.let { item { WeatherCard(it) } }
         item {
             Card(stringResource(Res.string.format)) { DetailRows(settingRows(race.settings)) }
@@ -206,7 +223,12 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
 }
 
 @Composable
-private fun TrackCard(track: TrackInfo, hotlaps: List<Hotlap> = emptyList(), hotlapsLoading: Boolean = false) {
+private fun TrackCard(
+    track: TrackInfo,
+    hotlaps: List<Hotlap> = emptyList(),
+    hotlapsLoading: Boolean = false,
+    hotlapsSkeletonCount: Int = 6,
+) {
     Card(track.name) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (!track.mapUrl.isNullOrBlank()) {
@@ -226,16 +248,17 @@ private fun TrackCard(track: TrackInfo, hotlaps: List<Hotlap> = emptyList(), hot
                 ),
             )
             when {
-                hotlapsLoading -> HotlapsSkeleton()
-                hotlaps.isNotEmpty() -> HotlapsTable(hotlaps)
+                hotlapsLoading -> HotlapsSkeleton(hotlapsSkeletonCount)
+                hotlaps.isNotEmpty() -> HotlapsFlow(hotlaps)
             }
         }
     }
 }
 
-/** Compact "hot laps" table inside the track card: lap · car · driver · version. */
+/** Hot-laps as a wrapping flow of equal-height cards (thumbnail + all the info). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HotlapsTable(hotlaps: List<Hotlap>) {
+private fun HotlapsFlow(hotlaps: List<Hotlap>) {
     val uri = LocalUriHandler.current
     Column(Modifier.fillMaxWidth()) {
         Spacer(Modifier.height(4.dp))
@@ -245,89 +268,111 @@ private fun HotlapsTable(hotlaps: List<Hotlap>) {
             color = TextMed,
             fontWeight = FontWeight.SemiBold,
         )
-        Spacer(Modifier.height(8.dp))
-        // header
-        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp)) {
-            Text(stringResource(Res.string.hl_col_lap), Modifier.width(78.dp), style = MaterialTheme.typography.labelSmall, color = TextLow)
-            Text(stringResource(Res.string.hl_col_car), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
-            Text(stringResource(Res.string.hl_col_driver), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
-            Text(stringResource(Res.string.hl_col_ver), Modifier.width(36.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
-            Spacer(Modifier.width(8.dp))
-            Spacer(Modifier.width(44.dp)) // reserve the class-badge column
+        Spacer(Modifier.height(10.dp))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            hotlaps.forEach { h -> HotlapCard(h) { runCatching { uri.openUri(h.url) } } }
         }
-        hotlaps.forEachIndexed { i, h -> HotlapTableRow(i, h) { runCatching { uri.openUri(h.url) } } }
     }
 }
+
+private val HOTLAP_CARD_W = 152.dp
+private val HOTLAP_CARD_H = 198.dp
+private val HOTLAP_THUMB_H = 86.dp
 
 @Composable
-private fun HotlapTableRow(i: Int, h: Hotlap, onOpen: () -> Unit) {
-    Row(
+private fun HotlapCard(h: Hotlap, onOpen: () -> Unit) {
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (i % 2 == 1) Surface2 else Color.Transparent)
-            .clickable(onClick = onOpen) // tap the row to open the video
-            .padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .width(HOTLAP_CARD_W)
+            .height(HOTLAP_CARD_H)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface2)
+            .border(1.dp, Outline, RoundedCornerShape(12.dp))
+            .clickable(onClick = onOpen),
     ) {
-        // lap time is the headline value — give it room so it never truncates
-        Text(
-            h.lapTime ?: "—",
-            Modifier.width(78.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (h.lapTime != null) MaterialTheme.colorScheme.primary else TextLow,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-        )
-        Text(
-            h.car ?: "—",
-            Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = TextHigh,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            h.driver ?: h.author ?: "—",
-            Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = TextMed,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            h.gameVersion ?: "—",
-            Modifier.width(36.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = TextMed,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-        )
-        Spacer(Modifier.width(8.dp))
-        Box(Modifier.width(44.dp), contentAlignment = Alignment.CenterEnd) {
-            h.classBadge?.let { ClassBadgeChip(it) }
+        Box(Modifier.fillMaxWidth().height(HOTLAP_THUMB_H).background(Carbon)) {
+            CoverImage(url = h.thumbnail, contentDescription = h.title, modifier = Modifier.fillMaxSize())
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(0f to Color.Transparent, 1f to Carbon.copy(alpha = 0.55f)),
+                ),
+            )
+            Box(
+                Modifier.align(Alignment.Center).size(28.dp).clip(CircleShape).background(Carbon.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("▶", style = MaterialTheme.typography.labelMedium, color = TextHigh)
+            }
+            h.lapTime?.let {
+                Box(
+                    Modifier.align(Alignment.BottomStart).padding(6.dp)
+                        .clip(RoundedCornerShape(6.dp)).background(Carbon.copy(alpha = 0.78f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        Column(Modifier.fillMaxSize().padding(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ClassBadgeChip(h.classBadge ?: h.carClass?.uppercase() ?: "—")
+                h.gameVersion?.let {
+                    Text("v$it", style = MaterialTheme.typography.labelSmall, color = TextMed, maxLines = 1)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                h.car ?: "—",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextHigh,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                h.driver ?: h.author ?: "—",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMed,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
-private fun classBadgeColor(badge: String): Color {
-    val b = badge.lowercase()
+private fun classBadgeColor(label: String): Color {
+    val b = label.lowercase()
     return when {
-        "hy" in b || "hyper" in b -> ClassHyper
+        "hyper" in b || b == "hy" -> ClassHyper
         "gt3" in b -> ClassGt3
         "lmp2" in b -> ClassLmp2
         else -> ClassMixed
     }
 }
 
-/** Solid class badge (HY / GT3 / LMP2 …) in its class colour. */
+/** Solid class badge (HY / GT3 / LMP2 / LMP3) in its class colour. */
 @Composable
-private fun ClassBadgeChip(badge: String) {
+private fun ClassBadgeChip(label: String) {
     Box(
-        Modifier.clip(RoundedCornerShape(6.dp)).background(classBadgeColor(badge)).padding(horizontal = 7.dp, vertical = 3.dp),
+        Modifier.clip(RoundedCornerShape(6.dp)).background(classBadgeColor(label)).padding(horizontal = 7.dp, vertical = 3.dp),
     ) {
-        Text(badge, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Carbon, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Carbon, maxLines = 1)
     }
 }
 
@@ -379,26 +424,38 @@ private fun LeaderboardSkeletonCard() {
     }
 }
 
-/** Shimmer placeholder shaped like the hot-laps table rows (incl. the View pill). */
+/** Shimmer placeholder shaped like the hot-laps card flow ([count] cards). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HotlapsSkeleton() {
+private fun HotlapsSkeleton(count: Int) {
     val brush = shimmerBrush()
     Column(Modifier.fillMaxWidth()) {
         Spacer(Modifier.height(4.dp))
         ShimmerBar(Modifier.width(58.dp).height(11.dp), brush)
         Spacer(Modifier.height(10.dp))
-        repeat(6) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ShimmerBar(Modifier.width(64.dp).height(11.dp), brush)
-                Spacer(Modifier.width(12.dp))
-                ShimmerBar(Modifier.weight(1f).height(11.dp), brush)
-                Spacer(Modifier.width(12.dp))
-                ShimmerBar(Modifier.weight(1f).height(11.dp), brush)
-                Spacer(Modifier.width(12.dp))
-                ShimmerBar(Modifier.width(40.dp).height(18.dp), brush)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            repeat(count) {
+                Column(
+                    Modifier.width(HOTLAP_CARD_W).height(HOTLAP_CARD_H)
+                        .clip(RoundedCornerShape(12.dp)).background(Surface2),
+                ) {
+                    ShimmerBar(Modifier.fillMaxWidth().height(HOTLAP_THUMB_H), brush, corner = 0.dp)
+                    Column(Modifier.fillMaxSize().padding(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            ShimmerBar(Modifier.width(40.dp).height(16.dp), brush)
+                            Spacer(Modifier.weight(1f))
+                            ShimmerBar(Modifier.width(24.dp).height(10.dp), brush)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        ShimmerBar(Modifier.fillMaxWidth(0.9f).height(10.dp), brush)
+                        Spacer(Modifier.weight(1f))
+                        ShimmerBar(Modifier.fillMaxWidth(0.6f).height(9.dp), brush)
+                    }
+                }
             }
         }
     }
