@@ -11,7 +11,7 @@
 
     <!-- Loading / errors -->
     <string name="retry">Retry</string>
-    <string name="couldnt_load">Couldn\'t load</string>
+    <string name="couldnt_load">Couldn’t load</string>
 
     <!-- Cards -->
     <string name="next_up">NEXT UP</string>

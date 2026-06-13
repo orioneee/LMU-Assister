@@ -64,7 +64,7 @@ private fun Race.nextLabel(): String {
 /** Compact vertical card (fits two-up on phones) with the day's times grid. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RaceCard(race: Race, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+fun RaceCard(race: Race, modifier: Modifier = Modifier, showCountdown: Boolean = true, onClick: () -> Unit = {}) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -111,7 +111,7 @@ fun RaceCard(race: Race, modifier: Modifier = Modifier, onClick: () -> Unit = {}
             }
             if (race.times.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
-                TimesGrid(race.times)
+                TimesGrid(race.times, showCountdown = showCountdown)
             }
         }
     }
@@ -196,18 +196,79 @@ fun RaceCardCompact(race: Race, onClick: () -> Unit = {}) {
     }
 }
 
-/** Featured "NEXT UP" hero. [maxHeight] caps it to (e.g.) a third of the screen. */
+/**
+ * Featured "NEXT UP" hero. [maxHeight] caps it to (e.g.) a third of the screen.
+ *
+ * @param showLabel show the "NEXT UP" caption — hide it when this is the only event.
+ * @param showCountdown show the live time-to-start — hide it for non-current weeks.
+ */
 @Composable
-fun HeroRaceCard(race: Race, maxHeight: Dp, onClick: () -> Unit = {}) {
+fun HeroRaceCard(
+    race: Race,
+    maxHeight: Dp,
+    showLabel: Boolean = true,
+    showCountdown: Boolean = true,
+    onClick: () -> Unit = {},
+) {
     val accent = race.accentColor()
-    Box(
+    HeroContent(
+        race = race,
+        showLabel = showLabel,
+        showCountdown = showCountdown,
         modifier = Modifier
             .fillMaxWidth()
             .height(maxHeight)
             .clip(MaterialTheme.shapes.extraLarge)
             .border(1.dp, accent.copy(alpha = 0.45f), MaterialTheme.shapes.extraLarge)
             .clickable(onClick = onClick),
+    )
+}
+
+/**
+ * Single-event card: the hero image and the day's start-times grid in ONE bordered
+ * card (instead of a loose hero with the times floating beneath it).
+ */
+@Composable
+fun HeroRaceTimesCard(
+    race: Race,
+    heroHeight: Dp,
+    showCountdown: Boolean = true,
+    onClick: () -> Unit = {},
+) {
+    val accent = race.accentColor()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.extraLarge)
+            .background(Surface1)
+            .border(1.dp, accent.copy(alpha = 0.45f), MaterialTheme.shapes.extraLarge)
+            .clickable(onClick = onClick),
     ) {
+        HeroContent(
+            race = race,
+            showLabel = false,
+            showCountdown = showCountdown,
+            modifier = Modifier.fillMaxWidth().height(heroHeight),
+        )
+        if (race.times.isNotEmpty()) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+                // No countdown here — the hero above already shows it.
+                TimesGrid(race.times, showCountdown = false, centered = true)
+            }
+        }
+    }
+}
+
+/** The hero's image + gradient + overlay text. [modifier] supplies size/clip/border. */
+@Composable
+private fun HeroContent(
+    race: Race,
+    showLabel: Boolean,
+    showCountdown: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val accent = race.accentColor()
+    Box(modifier) {
         CoverImage(
             url = race.imageUrl,
             contentDescription = race.title,
@@ -223,8 +284,10 @@ fun HeroRaceCard(race: Race, maxHeight: Dp, onClick: () -> Unit = {}) {
             ),
         )
         Column(Modifier.fillMaxWidth().padding(18.dp).align(Alignment.BottomStart)) {
-            Text(stringResource(Res.string.next_up), style = MaterialTheme.typography.labelMedium, color = accent)
-            Spacer(Modifier.height(8.dp))
+            if (showLabel) {
+                Text(stringResource(Res.string.next_up), style = MaterialTheme.typography.labelMedium, color = accent)
+                Spacer(Modifier.height(8.dp))
+            }
             Text(
                 race.title,
                 style = MaterialTheme.typography.headlineMedium,
@@ -251,7 +314,7 @@ fun HeroRaceCard(race: Race, maxHeight: Dp, onClick: () -> Unit = {}) {
                 val next = race.nextStart(now)
                 when {
                     race.completed -> CompletedBadge(race)
-                    next != null -> Column(horizontalAlignment = Alignment.End) {
+                    next != null && showCountdown -> Column(horizontalAlignment = Alignment.End) {
                         CountdownBadge(next, now)
                         Spacer(Modifier.height(6.dp))
                         Box(

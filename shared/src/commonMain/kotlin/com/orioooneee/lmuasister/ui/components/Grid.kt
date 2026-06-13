@@ -36,13 +36,14 @@ fun EqualHeightRaceRow(
     columns: Int,
     onOpenRace: (Race) -> Unit,
     spacing: Dp = 12.dp,
+    showCountdown: Boolean = true,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
         horizontalArrangement = Arrangement.spacedBy(spacing),
     ) {
         races.forEach { race ->
-            RaceCard(race, Modifier.weight(1f).fillMaxHeight()) { onOpenRace(race) }
+            RaceCard(race, Modifier.weight(1f).fillMaxHeight(), showCountdown = showCountdown) { onOpenRace(race) }
         }
         repeat(columns - races.size) { Spacer(Modifier.weight(1f)) }
     }

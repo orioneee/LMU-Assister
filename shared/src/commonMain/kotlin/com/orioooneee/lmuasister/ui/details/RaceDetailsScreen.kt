@@ -57,6 +57,7 @@ import com.orioooneee.lmuasister.ui.components.CoverImage
 import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.SkillBadge
 import com.orioooneee.lmuasister.ui.components.SrBadge
+import com.orioooneee.lmuasister.ui.components.TimesGrid
 import com.orioooneee.lmuasister.ui.components.accentColor
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
@@ -67,7 +68,6 @@ import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.theme.ClassLmp2
 import com.orioooneee.lmuasister.ui.util.formatLap
-import com.orioooneee.lmuasister.ui.util.formatStart
 import com.orioooneee.lmuasister.ui.util.skyColor
 import com.orioooneee.lmuasister.ui.util.skyEmoji
 import org.jetbrains.compose.resources.stringResource
@@ -86,7 +86,6 @@ import lmuassister.shared.generated.resources.loading_times
 import lmuassister.shared.generated.resources.next_start_times
 import lmuassister.shared.generated.resources.no
 import lmuassister.shared.generated.resources.no_lap_times
-import lmuassister.shared.generated.resources.race_label
 import lmuassister.shared.generated.resources.session_practice
 import lmuassister.shared.generated.resources.session_qualifying
 import lmuassister.shared.generated.resources.session_race
@@ -179,9 +178,8 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
         }
         if (upcoming.isNotEmpty()) {
             item {
-                val raceLabel = stringResource(Res.string.race_label)
                 Card(stringResource(Res.string.next_start_times)) {
-                    DetailRows(upcoming.mapIndexed { i, t -> "$raceLabel ${i + 1}" to t.formatStart() })
+                    TimesGrid(race.times)
                 }
             }
         }

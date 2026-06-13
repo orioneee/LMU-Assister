@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
+import com.orioooneee.lmuasister.ui.IconFlag
 import com.orioooneee.lmuasister.ui.theme.Surface2
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import lmuassister.shared.generated.resources.Res
@@ -38,6 +40,14 @@ fun CoverImage(
     contentDescription: String? = null,
     contentScale: ContentScale = ContentScale.Crop,
 ) {
+    // No cover for this race → quiet placeholder, not an alarming "couldn't load".
+    if (url.isNullOrBlank()) {
+        Box(modifier.then(Modifier.fillMaxSize()).background(Surface2), contentAlignment = Alignment.Center) {
+            Icon(IconFlag, contentDescription = null, tint = TextLow.copy(alpha = 0.35f), modifier = Modifier.size(40.dp))
+        }
+        return
+    }
+
     val painter = rememberAsyncImagePainter(model = url, contentScale = contentScale)
     val state by painter.state.collectAsState()
 

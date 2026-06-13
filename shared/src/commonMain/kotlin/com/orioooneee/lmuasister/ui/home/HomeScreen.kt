@@ -44,6 +44,7 @@ import com.orioooneee.lmuasister.data.model.Schedule
 import com.orioooneee.lmuasister.ui.WeekTab
 import com.orioooneee.lmuasister.ui.IconFlag
 import com.orioooneee.lmuasister.ui.components.HeroRaceCard
+import com.orioooneee.lmuasister.ui.components.HeroRaceTimesCard
 import com.orioooneee.lmuasister.ui.components.EqualHeightRaceRow
 import com.orioooneee.lmuasister.ui.components.SectionHeader
 import com.orioooneee.lmuasister.ui.components.rememberGridColumns
@@ -54,6 +55,7 @@ import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.launch
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.app_name
@@ -73,7 +75,8 @@ fun HomeScreen(
     onSelectWeek: (String) -> Unit,
     onOpenRace: (Race) -> Unit,
 ) {
-    val tabs = remember(schedule) { buildTabs(schedule) }
+    val now = remember { Clock.System.now() }
+    val tabs = remember(schedule) { buildTabs(schedule, now) }
 
     val density = LocalDensity.current
     val windowInfo = LocalWindowInfo.current
@@ -112,8 +115,10 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(8.dp))
 
+        val isCurrentWeek = weeks.isEmpty() || selectedWeek == weeks.first().key
+
         HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
-            TabContent(tabs[page], schedule, heroHeight, onOpenRace)
+            TabContent(tabs[page], schedule, heroHeight, isCurrentWeek, now, onOpenRace)
         }
     }
 }
@@ -132,31 +137,42 @@ private fun HomeTab.label(): String = when (this) {
     ChampTab -> stringResource(Res.string.tab_championship)
 }
 
-private fun buildTabs(schedule: Schedule): List<HomeTab> = buildList {
+private fun buildTabs(schedule: Schedule, now: Instant): List<HomeTab> = buildList {
     TIER_ORDER.forEach { t ->
         val hasTier = schedule.races.any {
-            (it.type == RaceType.DAILY || it.type == RaceType.WEEKLY) && it.difficulty.equals(t, ignoreCase = true)
+            (it.type == RaceType.DAILY || it.type == RaceType.WEEKLY) &&
+                it.difficulty.equals(t, ignoreCase = true) && it.nextStart(now) != null
         }
         if (hasTier) add(Tier(t))
     }
-    if (schedule.special.isNotEmpty()) add(SpecialTab)
-    if (schedule.championship.isNotEmpty()) add(ChampTab)
+    if (schedule.special.any { it.nextStart(now) != null }) add(SpecialTab)
+    if (schedule.championship.any { it.nextStart(now) != null }) add(ChampTab)
 }
 
 private data class Section(val label: String?, val races: List<Race>)
 
 @Composable
-private fun TabContent(tab: HomeTab, schedule: Schedule, heroHeight: Dp, onOpenRace: (Race) -> Unit) {
+private fun TabContent(
+    tab: HomeTab,
+    schedule: Schedule,
+    heroHeight: Dp,
+    isCurrentWeek: Boolean,
+    now: Instant,
+    onOpenRace: (Race) -> Unit,
+) {
     val sections: List<Section> = when (tab) {
         is Tier -> listOf(
             Section(stringResource(Res.string.section_daily), schedule.daily.filter { it.difficulty.equals(tab.name, true) }),
             Section(stringResource(Res.string.section_weekly), schedule.weekly.filter { it.difficulty.equals(tab.name, true) }),
-        ).filter { it.races.isNotEmpty() }
+        )
         SpecialTab -> listOf(Section(null, schedule.special))
         ChampTab -> listOf(Section(null, schedule.championship))
     }
+        // Only show races with an upcoming start — hide finished weeks/seasons and
+        // anything with no start times.
+        .map { sec -> sec.copy(races = sec.races.filter { it.nextStart(now) != null }) }
+        .filter { it.races.isNotEmpty() }
 
-    val now = remember { Clock.System.now() }
     fun nextKey(r: Race) = r.nextStart(now)?.toEpochMilliseconds() ?: Long.MAX_VALUE
     val all = sections.flatMap { it.races }
     val cols = rememberGridColumns()
@@ -169,18 +185,29 @@ private fun TabContent(tab: HomeTab, schedule: Schedule, heroHeight: Dp, onOpenR
         when {
             all.isEmpty() -> item { EmptyHint() }
 
-            // single event on this tab → just one bigger hero, no list
-            all.size == 1 -> item {
-                HeroRaceCard(all.first(), maxHeight = heroHeight * 1.5f) { onOpenRace(all.first()) }
+            // single event on this tab → hero + its start times in one card
+            all.size == 1 -> {
+                val race = all.first()
+                item {
+                    HeroRaceTimesCard(race, heroHeight = heroHeight, showCountdown = isCurrentWeek) {
+                        onOpenRace(race)
+                    }
+                }
             }
 
             else -> {
+                // "Next up" featured hero only makes sense for the live week AND when the
+                // top race is genuinely upcoming — never feature a finished one.
                 val hero = all.minByOrNull { nextKey(it) }!!
-                item { HeroRaceCard(hero, maxHeight = heroHeight) { onOpenRace(hero) } }
+                if (isCurrentWeek && hero.nextStart(now) != null) {
+                    item { HeroRaceCard(hero, maxHeight = heroHeight) { onOpenRace(hero) } }
+                }
                 sections.forEach { sec ->
                     val sorted = sec.races.sortedBy { nextKey(it) }
                     sec.label?.let { lbl -> item { SectionHeader(lbl) } }
-                    items(sorted.chunked(cols)) { row -> EqualHeightRaceRow(row, cols, onOpenRace) }
+                    items(sorted.chunked(cols)) { row ->
+                        EqualHeightRaceRow(row, cols, onOpenRace, showCountdown = isCurrentWeek)
+                    }
                 }
             }
         }

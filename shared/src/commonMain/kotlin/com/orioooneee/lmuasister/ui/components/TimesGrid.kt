@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,9 +37,18 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * The day's full start-time grid (like the in-game schedule cards): past slots
  * struck through, the next one highlighted, a "STARTS IN …" countdown up top.
+ *
+ * @param showCountdown live "STARTS IN …" badge — hide it for non-current weeks,
+ *   where a relative countdown from `now` would be misleading.
+ * @param centered center the header and time cells (single-event layout).
  */
 @Composable
-fun TimesGrid(times: List<Instant>, columns: Int = 3) {
+fun TimesGrid(
+    times: List<Instant>,
+    columns: Int = 3,
+    showCountdown: Boolean = true,
+    centered: Boolean = false,
+) {
     val now = rememberNow()
     val upcoming = times.filter { it >= now }
     if (upcoming.isEmpty()) return
@@ -47,33 +57,55 @@ fun TimesGrid(times: List<Instant>, columns: Int = 3) {
     val header = if (next.isToday(now)) stringResource(Res.string.times)
     else stringResource(Res.string.times_day, next.weekdayShort())
 
+    val cellAlign = if (centered) TextAlign.Center else TextAlign.Start
+
     Column(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(header, style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.SemiBold)
-            CountdownBadge(next, now)
+        if (showCountdown) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(header, style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.SemiBold)
+                CountdownBadge(next, now)
+            }
+        } else {
+            Text(
+                header,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = cellAlign,
+                style = MaterialTheme.typography.labelMedium,
+                color = TextMed,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
         Spacer(Modifier.height(8.dp))
         HorizontalDivider(color = Outline)
         Spacer(Modifier.height(8.dp))
 
         upcoming.chunked(columns).forEach { rowTimes ->
-            Row(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = if (centered) {
+                    Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally)
+                } else {
+                    Arrangement.Start
+                },
+            ) {
                 rowTimes.forEach { t ->
-                    val isNext = t == next
+                    val isNext = showCountdown && t == next
                     Text(
                         text = t.hhmm(),
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Start,
+                        // Centered: fixed-width cells kept as a tight, aligned cluster.
+                        // Default: weighted columns that span the card width.
+                        modifier = if (centered) Modifier.width(56.dp) else Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal,
                         color = if (isNext) TextHigh else TextMed,
                     )
                 }
-                repeat(columns - rowTimes.size) { Spacer(Modifier.weight(1f)) }
+                if (!centered) repeat(columns - rowTimes.size) { Spacer(Modifier.weight(1f)) }
             }
             Spacer(Modifier.height(7.dp))
         }
