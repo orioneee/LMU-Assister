@@ -41,13 +41,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.orioooneee.lmuasister.data.RaceRepository
+import com.orioooneee.lmuasister.data.model.Hotlap
 import com.orioooneee.lmuasister.data.model.LapEntry
 import com.orioooneee.lmuasister.data.model.Race
+import com.orioooneee.lmuasister.data.model.RaceDetail
 import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.SessionWeather
@@ -81,6 +85,12 @@ import lmuassister.shared.generated.resources.col_pos
 import lmuassister.shared.generated.resources.duration_race
 import lmuassister.shared.generated.resources.fastest_laps
 import lmuassister.shared.generated.resources.format
+import lmuassister.shared.generated.resources.hotlaps
+import lmuassister.shared.generated.resources.hl_col_car
+import lmuassister.shared.generated.resources.hl_col_driver
+import lmuassister.shared.generated.resources.hl_col_lap
+import lmuassister.shared.generated.resources.hl_col_ver
+import lmuassister.shared.generated.resources.hl_view
 import lmuassister.shared.generated.resources.length_km
 import lmuassister.shared.generated.resources.loading_times
 import lmuassister.shared.generated.resources.next_start_times
@@ -119,10 +129,12 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
     val upcoming = remember(race) { race.times.filter { it >= now } }
 
     val repo = koinInject<RaceRepository>()
-    val leaderboard by produceState<List<LapEntry>?>(null, race.id) {
-        // backend serves the leaderboard with the race detail, keyed by race id
-        value = if (race.leaderboardId != null) repo.leaderboard(race.id).getOrDefault(emptyList()) else emptyList()
+    // One request brings the leaderboard AND the track's YouTube hot-laps.
+    val detail by produceState<RaceDetail?>(null, race.id) {
+        value = repo.raceDetail(race.id).getOrDefault(RaceDetail())
     }
+    val leaderboard = detail?.leaderboard // null while loading
+    val hotlaps = detail?.hotlaps.orEmpty()
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 320.dp),
@@ -172,7 +184,7 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
         if (race.leaderboardId != null) {
             item(span = { GridItemSpan(maxLineSpan) }) { LeaderboardCard(leaderboard) }
         }
-        race.track?.let { item { TrackCard(it) } }
+        race.track?.let { item { TrackCard(it, hotlaps) } }
         race.weather?.let { item { WeatherCard(it) } }
         item {
             Card(stringResource(Res.string.format)) { DetailRows(settingRows(race.settings)) }
@@ -188,7 +200,7 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
 }
 
 @Composable
-private fun TrackCard(track: TrackInfo) {
+private fun TrackCard(track: TrackInfo, hotlaps: List<Hotlap> = emptyList()) {
     Card(track.name) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (!track.mapUrl.isNullOrBlank()) {
@@ -207,7 +219,109 @@ private fun TrackCard(track: TrackInfo) {
                     track.numTurns?.let { stringResource(Res.string.track_turns) to it.toString() },
                 ),
             )
+            if (hotlaps.isNotEmpty()) HotlapsTable(hotlaps)
         }
+    }
+}
+
+/** Compact "hot laps" table inside the track card: lap · car · driver · version. */
+@Composable
+private fun HotlapsTable(hotlaps: List<Hotlap>) {
+    val uri = LocalUriHandler.current
+    Column(Modifier.fillMaxWidth()) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(Res.string.hotlaps),
+            style = MaterialTheme.typography.labelMedium,
+            color = TextMed,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        // header
+        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp)) {
+            Text(stringResource(Res.string.hl_col_lap), Modifier.width(54.dp), style = MaterialTheme.typography.labelSmall, color = TextLow)
+            Text(stringResource(Res.string.hl_col_car), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
+            Text(stringResource(Res.string.hl_col_driver), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
+            Text(stringResource(Res.string.hl_col_ver), Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
+            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(58.dp)) // reserve the View-button column
+        }
+        hotlaps.forEachIndexed { i, h -> HotlapTableRow(i, h) { runCatching { uri.openUri(h.url) } } }
+    }
+}
+
+@Composable
+private fun HotlapTableRow(i: Int, h: Hotlap, onOpen: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (i % 2 == 1) Surface2 else Color.Transparent)
+            .padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            h.lapTime ?: "—",
+            Modifier.width(54.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (h.lapTime != null) MaterialTheme.colorScheme.primary else TextLow,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+        Text(
+            h.car ?: "—",
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = TextHigh,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            h.author ?: "—",
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = TextMed,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            h.gameVersion ?: "—",
+            Modifier.width(40.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = TextMed,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(8.dp))
+        ViewButton(onClick = onOpen)
+    }
+}
+
+/** Small accent "▶ View" pill that opens the YouTube video. */
+@Composable
+private fun ViewButton(onClick: () -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .width(58.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(accent.copy(alpha = 0.14f))
+            .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("▶", style = MaterialTheme.typography.labelSmall, color = accent)
+        Spacer(Modifier.width(4.dp))
+        Text(
+            stringResource(Res.string.hl_view),
+            style = MaterialTheme.typography.labelMedium,
+            color = accent,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
     }
 }
 

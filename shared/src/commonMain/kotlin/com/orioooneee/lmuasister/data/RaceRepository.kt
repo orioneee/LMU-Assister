@@ -1,8 +1,10 @@
 package com.orioooneee.lmuasister.data
 
 import com.orioooneee.lmuasister.data.model.ClassInfo
+import com.orioooneee.lmuasister.data.model.Hotlap
 import com.orioooneee.lmuasister.data.model.LapEntry
 import com.orioooneee.lmuasister.data.model.Race
+import com.orioooneee.lmuasister.data.model.RaceDetail
 import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.RaceWeather
@@ -10,8 +12,11 @@ import com.orioooneee.lmuasister.data.model.Schedule
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
 import com.orioooneee.lmuasister.data.model.WeatherSegment
+import com.orioooneee.lmuasister.data.cache.LocalCache
+import com.orioooneee.lmuasister.data.remote.AppJson
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.ClassInfoDto
+import com.orioooneee.lmuasister.data.remote.HotlapDto
 import com.orioooneee.lmuasister.data.remote.LeaderboardEntryDto
 import com.orioooneee.lmuasister.data.remote.RaceDto
 import com.orioooneee.lmuasister.data.remote.ScheduleResponse
@@ -19,7 +24,16 @@ import com.orioooneee.lmuasister.data.remote.SessionWeatherDto
 import com.orioooneee.lmuasister.data.remote.SettingsDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.data.remote.WeatherDto
+import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+
+private const val CACHE_KEY = "schedule_v1"
+
+/** On-disk schedule snapshot with the fetch time, for offline-first cold starts. */
+@Serializable
+private data class CachedSchedule(val ts: Long = 0, val data: ScheduleResponse = ScheduleResponse())
 
 /**
  * Thin client over the LmuAssister backend. The backend already merges every
@@ -28,17 +42,38 @@ import kotlin.time.Instant
  */
 class RaceRepository(private val api: BackendApi) {
 
-    /** The whole schedule arrives in one call; cache it so week switches are free. */
-    private var cache: ScheduleResponse? = null
+    // Offline-first: the whole schedule arrives in one call. We keep it in memory
+    // and persist it (1 wrapper with a timestamp) so a cold start can paint instantly
+    // from disk, then refresh from the network.
+    private var mem: ScheduleResponse? = null
 
-    private suspend fun full(refresh: Boolean): ScheduleResponse {
-        if (!refresh) cache?.let { return it }
-        return api.schedule(refresh = refresh).also { cache = it }
-    }
+    private fun disk(): ScheduleResponse? = runCatching {
+        LocalCache.read(CACHE_KEY)?.let { AppJson.decodeFromString<CachedSchedule>(it).data }
+    }.getOrNull()
+
+    private fun cached(): ScheduleResponse? = mem ?: disk()?.also { mem = it }
+
+    private suspend fun network(refresh: Boolean): ScheduleResponse =
+        api.schedule(refresh = refresh).also { resp ->
+            mem = resp
+            runCatching {
+                val wrapped = CachedSchedule(Clock.System.now().toEpochMilliseconds(), resp)
+                LocalCache.write(CACHE_KEY, AppJson.encodeToString(wrapped))
+            }
+        }
+
+    private suspend fun full(refresh: Boolean): ScheduleResponse =
+        if (refresh) network(refresh = true) else cached() ?: network(refresh = false)
+
+    /** Cache-only week keys (memory/disk, no network) — for an instant first paint. */
+    fun cachedWeeks(): List<String>? = cached()?.weeks?.map { it.key }
+
+    /** Force a network refetch; updates the in-memory + on-disk cache. */
+    suspend fun refreshSchedule(): Result<Unit> = runCatching { network(refresh = true); Unit }
 
     /** Week keys (current + upcoming), for the week picker. */
-    suspend fun availableWeeks(): List<String> =
-        runCatching { full(refresh = false).weeks.map { it.key } }.getOrDefault(emptyList())
+    suspend fun availableWeeks(refresh: Boolean = false): List<String> =
+        runCatching { full(refresh).weeks.map { it.key } }.getOrDefault(emptyList())
 
     suspend fun load(weekKeyOverride: String? = null, refresh: Boolean = false): Result<Schedule> = runCatching {
         val resp = full(refresh)
@@ -46,9 +81,13 @@ class RaceRepository(private val api: BackendApi) {
         Schedule(resp.schedules[key].orEmpty().map { it.toModel(api::imageUrl) })
     }
 
-    /** Fastest-lap leaderboard for a race (fetched with its detail payload). */
-    suspend fun leaderboard(raceId: String): Result<List<LapEntry>> = runCatching {
-        api.race(raceId).leaderboard.map { it.toModel() }
+    /** Leaderboard + hot-laps for a race — the whole detail payload in one request. */
+    suspend fun raceDetail(raceId: String): Result<RaceDetail> = runCatching {
+        val resp = api.race(raceId)
+        RaceDetail(
+            leaderboard = resp.leaderboard.map { it.toModel() },
+            hotlaps = resp.hotlaps.map { it.toModel() },
+        )
     }
 }
 
@@ -130,4 +169,17 @@ private fun LeaderboardEntryDto.toModel() = LapEntry(
     carClass = carClass,
     drRank = drRank,
     srRank = srRank,
+)
+
+private fun HotlapDto.toModel() = Hotlap(
+    title = title,
+    videoId = videoId,
+    url = url,
+    thumbnail = thumbnail,
+    author = author,
+    lapTime = lapTime,
+    car = car,
+    carClass = carClass,
+    gameVersion = gameVersion,
+    views = views,
 )

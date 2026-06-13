@@ -7,11 +7,14 @@
     <string name="tab_championship">Championship</string>
     <string name="section_daily">Daily</string>
     <string name="section_weekly">Weekly</string>
-    <string name="home_empty">No races parsed.\nPull down to refresh.</string>
 
     <!-- Loading / errors -->
     <string name="retry">Retry</string>
     <string name="couldnt_load">Couldn’t load</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="empty_title">No races scheduled</string>
+    <string name="empty_subtitle">Nothing here for now — try another week or refresh.</string>
+    <string name="error_title">Couldn’t load races</string>
 
     <!-- Cards -->
     <string name="next_up">NEXT UP</string>
@@ -39,6 +42,14 @@
     <string name="col_driver">DRIVER</string>
     <string name="col_best_lap">BEST LAP</string>
     <string name="col_gap">GAP</string>
+
+    <!-- Details: hot-laps -->
+    <string name="hotlaps">Hot laps</string>
+    <string name="hl_col_lap">LAP</string>
+    <string name="hl_col_car">CAR</string>
+    <string name="hl_col_driver">DRIVER</string>
+    <string name="hl_col_ver">VER</string>
+    <string name="hl_view">View</string>
 
     <!-- Details: track -->
     <string name="track_country">Country</string>

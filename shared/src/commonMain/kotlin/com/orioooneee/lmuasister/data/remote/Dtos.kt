@@ -19,11 +19,26 @@ data class WeekDto(
     val label: String = "",
 )
 
-/** GET /race/<id> — the race plus its fastest-lap leaderboard. */
+/** GET /race/<id> — the race, its fastest-lap leaderboard, and YouTube hot-laps. */
 @Serializable
 data class RaceDetailResponse(
     val race: RaceDto? = null,
     val leaderboard: List<LeaderboardEntryDto> = emptyList(),
+    val hotlaps: List<HotlapDto> = emptyList(),
+)
+
+@Serializable
+data class HotlapDto(
+    val title: String = "",
+    val videoId: String = "",
+    val url: String = "",
+    val thumbnail: String = "",
+    val author: String? = null,
+    val lapTime: String? = null,
+    val car: String? = null,
+    val carClass: String? = null,
+    val gameVersion: String? = null,
+    val views: Long = 0,
 )
 
 @Serializable

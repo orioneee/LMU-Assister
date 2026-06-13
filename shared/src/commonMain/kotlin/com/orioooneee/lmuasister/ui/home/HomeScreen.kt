@@ -43,6 +43,7 @@ import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.Schedule
 import com.orioooneee.lmuasister.ui.WeekTab
 import com.orioooneee.lmuasister.ui.IconFlag
+import com.orioooneee.lmuasister.ui.components.EmptyState
 import com.orioooneee.lmuasister.ui.components.HeroRaceCard
 import com.orioooneee.lmuasister.ui.components.HeroRaceTimesCard
 import com.orioooneee.lmuasister.ui.components.EqualHeightRaceRow
@@ -58,8 +59,10 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.launch
 import lmuassister.shared.generated.resources.Res
+import lmuassister.shared.generated.resources.action_refresh
 import lmuassister.shared.generated.resources.app_name
-import lmuassister.shared.generated.resources.home_empty
+import lmuassister.shared.generated.resources.empty_subtitle
+import lmuassister.shared.generated.resources.empty_title
 import lmuassister.shared.generated.resources.home_events
 import lmuassister.shared.generated.resources.section_daily
 import lmuassister.shared.generated.resources.section_weekly
@@ -74,6 +77,7 @@ fun HomeScreen(
     selectedWeek: String,
     onSelectWeek: (String) -> Unit,
     onOpenRace: (Race) -> Unit,
+    onRefresh: () -> Unit = {},
 ) {
     val now = remember { Clock.System.now() }
     val tabs = remember(schedule) { buildTabs(schedule, now) }
@@ -96,7 +100,7 @@ fun HomeScreen(
         }
 
         if (tabs.isEmpty()) {
-            EmptyHint()
+            NoRaces(Modifier.weight(1f), onRefresh)
             return@Column
         }
 
@@ -118,7 +122,7 @@ fun HomeScreen(
         val isCurrentWeek = weeks.isEmpty() || selectedWeek == weeks.first().key
 
         HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
-            TabContent(tabs[page], schedule, heroHeight, isCurrentWeek, now, onOpenRace)
+            TabContent(tabs[page], schedule, heroHeight, isCurrentWeek, now, onOpenRace, onRefresh)
         }
     }
 }
@@ -159,6 +163,7 @@ private fun TabContent(
     isCurrentWeek: Boolean,
     now: Instant,
     onOpenRace: (Race) -> Unit,
+    onRefresh: () -> Unit,
 ) {
     val sections: List<Section> = when (tab) {
         is Tier -> listOf(
@@ -183,7 +188,7 @@ private fun TabContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         when {
-            all.isEmpty() -> item { EmptyHint() }
+            all.isEmpty() -> item { NoRaces(Modifier.fillParentMaxSize(), onRefresh) }
 
             // single event on this tab → hero + its start times in one card
             all.size == 1 -> {
@@ -271,12 +276,12 @@ private fun HomeHeader(dailyCount: Int, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun EmptyHint() {
-    Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-        Text(
-            stringResource(Res.string.home_empty),
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextLow,
-        )
-    }
+private fun NoRaces(modifier: Modifier = Modifier, onRefresh: () -> Unit) {
+    EmptyState(
+        title = stringResource(Res.string.empty_title),
+        subtitle = stringResource(Res.string.empty_subtitle),
+        actionLabel = stringResource(Res.string.action_refresh),
+        onAction = onRefresh,
+        modifier = modifier,
+    )
 }

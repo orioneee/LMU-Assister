@@ -123,6 +123,26 @@ data class LapEntry(
     val srRank: String?,
 )
 
+/** A YouTube hot-lap video for a track (parsed server-side, no API key). */
+data class Hotlap(
+    val title: String,
+    val videoId: String,
+    val url: String,
+    val thumbnail: String,
+    val author: String?,
+    val lapTime: String?,
+    val car: String?,
+    val carClass: String?,
+    val gameVersion: String?,
+    val views: Long,
+)
+
+/** The /race/<id> payload: the leaderboard + hot-laps, fetched in one request. */
+data class RaceDetail(
+    val leaderboard: List<LapEntry> = emptyList(),
+    val hotlaps: List<Hotlap> = emptyList(),
+)
+
 data class Schedule(val races: List<Race>) {
     val daily: List<Race> get() = races.filter { it.type == RaceType.DAILY }
     val weekly: List<Race> get() = races.filter { it.type == RaceType.WEEKLY }

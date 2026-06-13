@@ -43,11 +43,24 @@ class ScheduleViewModel(
 
     init {
         viewModelScope.launch {
-            weeks = runCatching { repository.availableWeeks() }.getOrDefault(emptyList())
-            selected = weeks.firstOrNull()
-            _state.value = ScheduleUiState.Loading
-            fetchWeek(selected) // awaited — also warms the shared (track/class/image) cache
-            prefetchOtherWeeks()
+            // 1) Offline-first: paint instantly from the cached schedule (memory/disk), no network.
+            repository.cachedWeeks()?.let { cachedKeys ->
+                weeks = cachedKeys
+                selected = cachedKeys.firstOrNull()
+                fetchWeek(selected) // load() reads the cached response — instant
+            }
+            // 2) Refresh from the network, then update the cache + UI in place.
+            if (repository.refreshSchedule().isSuccess) {
+                weeks = repository.availableWeeks() // from the just-refreshed cache
+                val sel = selected
+                if (sel == null || sel !in weeks) selected = weeks.firstOrNull()
+                cache.clear() // drop the stale snapshot we may have shown in step 1
+                fetchWeek(selected)
+                prefetchOtherWeeks()
+            } else if (_state.value !is ScheduleUiState.Success) {
+                // nothing cached and the network failed → surface an error
+                _state.value = ScheduleUiState.Error("Network error — could not load schedule")
+            }
         }
     }
 
