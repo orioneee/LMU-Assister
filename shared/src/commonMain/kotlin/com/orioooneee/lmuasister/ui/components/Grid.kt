@@ -37,14 +37,35 @@ fun EqualHeightRaceRow(
     onOpenRace: (Race) -> Unit,
     spacing: Dp = 12.dp,
     showCountdown: Boolean = true,
+    nextRaceIds: Set<String> = emptySet(),
+    contentPadding: Dp = 32.dp, // LazyColumn horizontal padding (16dp each side)
 ) {
+    // Compute the time-grid column count from each card's width here — the cards live
+    // inside an IntrinsicSize row, so TimesGrid itself can't use BoxWithConstraints.
+    val timeColumns = rememberTimeColumns(columns, spacing, contentPadding)
     Row(
         modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
         horizontalArrangement = Arrangement.spacedBy(spacing),
     ) {
         races.forEach { race ->
-            RaceCard(race, Modifier.weight(1f).fillMaxHeight(), showCountdown = showCountdown) { onOpenRace(race) }
+            RaceCard(
+                race,
+                Modifier.weight(1f).fillMaxHeight(),
+                showCountdown = showCountdown,
+                isNext = race.id in nextRaceIds,
+                timeColumns = timeColumns,
+            ) { onOpenRace(race) }
         }
         repeat(columns - races.size) { Spacer(Modifier.weight(1f)) }
     }
+}
+
+/** Adaptive time-grid columns (3..6) for a card in a [columns]-wide grid. */
+@Composable
+private fun rememberTimeColumns(columns: Int, spacing: Dp, contentPadding: Dp, perCol: Dp = 36.dp): Int {
+    val widthDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+    if (widthDp.value <= 0f) return 3
+    val cardW = (widthDp - contentPadding - spacing * (columns - 1)) / columns
+    val innerW = cardW - 24.dp // RaceCard inner padding (12dp each side)
+    return (innerW.value / perCol.value).toInt().coerceIn(3, 7)
 }

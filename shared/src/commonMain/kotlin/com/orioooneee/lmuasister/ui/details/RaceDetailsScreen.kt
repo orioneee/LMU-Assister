@@ -57,6 +57,7 @@ import com.orioooneee.lmuasister.data.model.TrackInfo
 import com.orioooneee.lmuasister.ui.components.ClassChip
 import com.orioooneee.lmuasister.ui.components.CoverImage
 import com.orioooneee.lmuasister.ui.components.MetaChip
+import com.orioooneee.lmuasister.ui.components.onBadgeText
 import com.orioooneee.lmuasister.ui.components.SkillBadge
 import com.orioooneee.lmuasister.ui.components.ShimmerBar
 import com.orioooneee.lmuasister.ui.components.SrBadge
@@ -71,8 +72,10 @@ import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.theme.ClassGt3
+import com.orioooneee.lmuasister.ui.theme.ClassGte
 import com.orioooneee.lmuasister.ui.theme.ClassHyper
 import com.orioooneee.lmuasister.ui.theme.ClassLmp2
+import com.orioooneee.lmuasister.ui.theme.ClassLmp3
 import com.orioooneee.lmuasister.ui.theme.ClassMixed
 import com.orioooneee.lmuasister.ui.util.formatLap
 import com.orioooneee.lmuasister.ui.util.skyColor
@@ -229,7 +232,8 @@ private fun TrackCard(
     hotlapsLoading: Boolean = false,
     hotlapsSkeletonCount: Int = 6,
 ) {
-    Card(track.name) {
+    val flag = track.country?.let { flagUrl(it) }
+    Card(track.name, leading = flag?.let { url -> { FlagCircle(url) } }) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (!track.mapUrl.isNullOrBlank()) {
                 CoverImage(
@@ -361,7 +365,9 @@ private fun classBadgeColor(label: String): Color {
     return when {
         "hyper" in b || b == "hy" -> ClassHyper
         "gt3" in b -> ClassGt3
+        "gte" in b -> ClassGte
         "lmp2" in b -> ClassLmp2
+        "lmp3" in b -> ClassLmp3
         else -> ClassMixed
     }
 }
@@ -369,10 +375,11 @@ private fun classBadgeColor(label: String): Color {
 /** Solid class badge (HY / GT3 / LMP2 / LMP3) in its class colour. */
 @Composable
 private fun ClassBadgeChip(label: String) {
+    val c = classBadgeColor(label)
     Box(
-        Modifier.clip(RoundedCornerShape(6.dp)).background(classBadgeColor(label)).padding(horizontal = 7.dp, vertical = 3.dp),
+        Modifier.clip(RoundedCornerShape(6.dp)).background(c).padding(horizontal = 7.dp, vertical = 3.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Carbon, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = onBadgeText(c), maxLines = 1)
     }
 }
 
@@ -611,15 +618,59 @@ private fun settingRows(s: RaceSettings): List<Pair<String, String>> = listOfNot
 )
 
 @Composable
-private fun Card(title: String, content: @Composable () -> Unit) {
+private fun Card(title: String, leading: (@Composable () -> Unit)? = null, content: @Composable () -> Unit) {
     Column(
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(Surface1)
             .border(1.dp, Outline, MaterialTheme.shapes.large).padding(16.dp),
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (leading != null) {
+                leading()
+                Spacer(Modifier.width(12.dp))
+            }
+            Text(title, style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
+        }
         Spacer(Modifier.height(12.dp))
         content()
     }
+}
+
+/** Round country flag — uses circle-flags (already circular), not a square crop. */
+@Composable
+private fun FlagCircle(url: String) {
+    Box(
+        Modifier.size(34.dp).clip(CircleShape).background(Surface2).border(1.dp, Outline, CircleShape),
+    ) {
+        CoverImage(url = url, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+    }
+}
+
+/** Country name → circle-flags SVG URL (pre-cropped to a circle), null if unknown. */
+private fun flagUrl(country: String): String? {
+    val code = when (country.trim().lowercase()) {
+        "france" -> "fr"
+        "united states", "usa", "united states of america" -> "us"
+        "united kingdom", "uk", "great britain", "england" -> "gb"
+        "portugal" -> "pt"
+        "brazil" -> "br"
+        "italy" -> "it"
+        "belgium" -> "be"
+        "germany" -> "de"
+        "spain" -> "es"
+        "austria" -> "at"
+        "netherlands" -> "nl"
+        "bahrain" -> "bh"
+        "qatar" -> "qa"
+        "japan" -> "jp"
+        "saudi arabia" -> "sa"
+        "united arab emirates", "uae" -> "ae"
+        "australia" -> "au"
+        "canada" -> "ca"
+        "mexico" -> "mx"
+        "china" -> "cn"
+        else -> return null
+    }
+    return "https://cdn.jsdelivr.net/gh/HatScripts/circle-flags/flags/$code.svg"
 }
 
 /** Zebra-striped key/value rows for readability (alternating row shade). */

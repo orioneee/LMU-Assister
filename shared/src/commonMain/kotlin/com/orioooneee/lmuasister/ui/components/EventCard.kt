@@ -28,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -39,7 +41,6 @@ import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.Surface1
 import com.orioooneee.lmuasister.ui.theme.Surface2
-import com.orioooneee.lmuasister.ui.theme.Surface3
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
@@ -49,11 +50,15 @@ import com.orioooneee.lmuasister.ui.util.rememberNow
 import com.orioooneee.lmuasister.ui.util.startsInLabel
 import kotlin.time.Clock
 import lmuassister.shared.generated.resources.Res
+import lmuassister.shared.generated.resources.badge_next
 import lmuassister.shared.generated.resources.next_up
 import org.jetbrains.compose.resources.stringResource
 
 private fun Race.trackLabel(): String = track?.shortName?.takeIf { it.isNotBlank() } ?: circuit
 private fun Race.durationLabel(): String = if (raceLength > 0) "${raceLength}m" else ""
+
+/** Soft drop shadow so overlaid card text stays readable on bright covers. */
+private val CARD_TEXT_SHADOW = Shadow(color = Color.Black.copy(alpha = 0.7f), offset = Offset(0f, 2f), blurRadius = 6f)
 
 @Composable
 private fun Race.nextLabel(): String {
@@ -64,72 +69,97 @@ private fun Race.nextLabel(): String {
 /** Compact vertical card (fits two-up on phones) with the day's times grid. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RaceCard(race: Race, modifier: Modifier = Modifier, showCountdown: Boolean = true, onClick: () -> Unit = {}) {
+fun RaceCard(
+    race: Race,
+    modifier: Modifier = Modifier,
+    showCountdown: Boolean = true,
+    isNext: Boolean = false,
+    timeColumns: Int = 3,
+    onClick: () -> Unit = {},
+) {
+    // Difficulty colour-codes the whole card (green → yellow → orange/red) so the
+    // skill level reads at a glance: a tinted border + a faint wash.
+    val diff = difficultyColor(race.difficulty)
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(Surface1)
-            .border(1.dp, Outline, MaterialTheme.shapes.large)
+            .background(diff.copy(alpha = 0.07f))
+            .border(1.5.dp, diff.copy(alpha = 0.6f), MaterialTheme.shapes.large)
             .clickable(onClick = onClick),
     ) {
         Box(Modifier.fillMaxWidth().height(140.dp).background(Surface2)) {
             CoverImage(race.imageUrl, Modifier.fillMaxSize(), race.title)
-            if (race.classInfos.isNotEmpty()) {
-                Box(Modifier.align(Alignment.TopStart).padding(8.dp)) {
-                    ClassChips(race.classInfos, max = 4)
-                }
-            }
-        }
-        Column(Modifier.padding(12.dp)) {
-            Text(
-                race.title,
-                style = MaterialTheme.typography.titleSmall,
-                color = TextHigh,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            // scrim so the overlaid title/track stay readable on any cover
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.radialGradient(listOf(Carbon.copy(alpha = 0.70f), Carbon.copy(alpha = 0.30f))),
+                ),
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                race.trackLabel(),
-                style = MaterialTheme.typography.bodySmall,
-                color = TextMed,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(8.dp))
+            // top-left: NEXT first (if this is the next race), then the class badges —
+            // one wrapping flow so they never overlap when there are many classes
             FlowRow(
+                Modifier.align(Alignment.TopStart).fillMaxWidth().padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                itemVerticalAlignment = Alignment.CenterVertically,
             ) {
-                TypeTag(race.type.label, Modifier)
-                MetaChip(race.durationLabel())
-                race.settings.safetyRank?.let { SrBadge(it) }
-                if (race.completed) CompletedBadge(race)
+                if (isNext) NextBadge()
+                race.classInfos.take(4).forEach { ClassChip(it) }
             }
-            if (race.times.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
-                TimesGrid(race.times, showCountdown = showCountdown)
+            race.settings.safetyRank?.let {
+                Box(Modifier.align(Alignment.BottomStart).padding(8.dp)) { SrBadge(it) }
+            }
+            val duration = race.durationLabel()
+            if (duration.isNotBlank()) {
+                Box(Modifier.align(Alignment.BottomEnd).padding(8.dp)) { MetaChip(duration) }
+            }
+            // title + track over the cover (saves the vertical space of a text block):
+            // left-aligned, with a soft shadow for readability on any cover
+            Column(
+                Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(horizontal = 12.dp),
+                horizontalAlignment = Alignment.Start,
+            ) {
+                Text(
+                    race.title,
+                    style = MaterialTheme.typography.titleSmall.copy(shadow = CARD_TEXT_SHADOW),
+                    color = TextHigh,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    race.trackLabel(),
+                    style = MaterialTheme.typography.bodySmall.copy(shadow = CARD_TEXT_SHADOW),
+                    color = TextMed,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (race.times.isNotEmpty()) {
+            Column(Modifier.padding(12.dp)) {
+                TimesGrid(race.times, columns = timeColumns, showCountdown = showCountdown)
             }
         }
     }
 }
 
+/** Accent "NEXT" pill marking the soonest upcoming race (overlaid on the cover). */
 @Composable
-private fun TypeTag(label: String, modifier: Modifier) {
+private fun NextBadge() {
     Box(
-        modifier
+        Modifier
             .clip(RoundedCornerShape(7.dp))
-            .background(Surface3)
+            .background(MaterialTheme.colorScheme.primary)
             .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         Text(
-            label.uppercase(),
+            stringResource(Res.string.badge_next),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            color = TextMed,
+            color = Carbon,
             maxLines = 1,
         )
     }

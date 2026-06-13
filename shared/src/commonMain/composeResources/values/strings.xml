@@ -3,6 +3,7 @@
     <string name="app_name">Lmu Assister</string>
     <string name="home_events">Race Control · %1$d events</string>
     <string name="home_all_races">All %1$s races</string>
+    <string name="tab_races">Races</string>
     <string name="tab_special">Special</string>
     <string name="tab_championship">Championship</string>
     <string name="section_daily">Daily</string>
@@ -18,6 +19,7 @@
 
     <!-- Cards -->
     <string name="next_up">NEXT UP</string>
+    <string name="badge_next">NEXT</string>
     <string name="open">Open</string>
     <string name="live">LIVE</string>
     <string name="week_complete">Week complete</string>

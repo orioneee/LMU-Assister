@@ -56,12 +56,19 @@ fun ClassInfo.shortCode(): String {
     }
 }
 
-private fun srColor(sr: String): Color = when {
-    "bronze" in sr.lowercase() -> Color(0xFFCD7F32)
-    "silver" in sr.lowercase() -> Color(0xFFC9D1DA)
-    "gold" in sr.lowercase() -> Color(0xFFE6B422)
-    "platinum" in sr.lowercase() || "plat" in sr.lowercase() -> Color(0xFF6FE3F0)
+// FIA driver-category tier from the first letter (handles "Bronze" AND "B2"/"B3" etc.)
+private fun srColor(sr: String): Color = when (sr.trim().firstOrNull()?.lowercaseChar()) {
+    'b' -> Color(0xFFCD7F32) // bronze
+    's' -> Color(0xFFC9D1DA) // silver
+    'g' -> Color(0xFFE6B422) // gold
+    'p' -> Color(0xFF6FE3F0) // platinum
     else -> Color(0xFF8A93A6)
+}
+
+/** Readable text colour for a solid coloured badge — dark on light fills, white on dark. */
+fun onBadgeText(bg: Color): Color {
+    val lum = 0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue
+    return if (lum > 0.6f) Carbon else Color.White
 }
 
 fun difficultyColor(difficulty: String): Color = when {
@@ -87,7 +94,7 @@ fun ClassChip(classInfo: ClassInfo) {
             classInfo.shortCode(),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            color = Carbon,
+            color = onBadgeText(c),
             maxLines = 1,
         )
     }
@@ -96,7 +103,7 @@ fun ClassChip(classInfo: ClassInfo) {
 /** Official-style SR badge: a dark "SR" segment + the tier in its colour. */
 @Composable
 fun SrBadge(sr: String) {
-    if (sr.isBlank()) return
+    if (sr.isBlank() || sr.equals("none", ignoreCase = true)) return
     val tier = srColor(sr)
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -106,7 +113,7 @@ fun SrBadge(sr: String) {
             Text("SR", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextMed)
         }
         Box(Modifier.background(tier).padding(horizontal = 6.dp, vertical = 3.dp)) {
-            Text(sr.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Carbon, maxLines = 1)
+            Text(sr.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = onBadgeText(tier), maxLines = 1)
         }
     }
 }

@@ -21,9 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,9 +40,7 @@ import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.Schedule
 import com.orioooneee.lmuasister.ui.WeekTab
-import com.orioooneee.lmuasister.ui.IconFlag
 import com.orioooneee.lmuasister.ui.components.EmptyState
-import com.orioooneee.lmuasister.ui.components.HeroRaceCard
 import com.orioooneee.lmuasister.ui.components.HeroRaceTimesCard
 import com.orioooneee.lmuasister.ui.components.EqualHeightRaceRow
 import com.orioooneee.lmuasister.ui.components.SectionHeader
@@ -60,13 +56,12 @@ import kotlin.time.Instant
 import kotlinx.coroutines.launch
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.action_refresh
-import lmuassister.shared.generated.resources.app_name
 import lmuassister.shared.generated.resources.empty_subtitle
 import lmuassister.shared.generated.resources.empty_title
-import lmuassister.shared.generated.resources.home_events
 import lmuassister.shared.generated.resources.section_daily
 import lmuassister.shared.generated.resources.section_weekly
 import lmuassister.shared.generated.resources.tab_championship
+import lmuassister.shared.generated.resources.tab_races
 import lmuassister.shared.generated.resources.tab_special
 import org.jetbrains.compose.resources.stringResource
 
@@ -87,7 +82,7 @@ fun HomeScreen(
     val heroHeight = with(density) { windowInfo.containerSize.height.toDp() / 3 }.coerceIn(180.dp, 300.dp)
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
-        HomeHeader(dailyCount = schedule.races.size, modifier = Modifier.padding(16.dp))
+        Spacer(Modifier.height(12.dp))
 
         if (weeks.size > 1) {
             Row(
@@ -107,17 +102,20 @@ fun HomeScreen(
         val pager = rememberPagerState(pageCount = { tabs.size })
         val scope = rememberCoroutineScope()
 
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            tabs.forEachIndexed { i, tab ->
-                TierTab(tab.label(), pager.currentPage == i) {
-                    scope.launch { pager.animateScrollToPage(i) }
+        // Tabs only for Special / Championship — the main Daily+Weekly grid needs none.
+        if (tabs.size > 1) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                tabs.forEachIndexed { i, tab ->
+                    TierTab(tab.label(), pager.currentPage == i) {
+                        scope.launch { pager.animateScrollToPage(i) }
+                    }
                 }
             }
+            Spacer(Modifier.height(8.dp))
         }
-        Spacer(Modifier.height(8.dp))
 
         val isCurrentWeek = weeks.isEmpty() || selectedWeek == weeks.first().key
 
@@ -127,30 +125,34 @@ fun HomeScreen(
     }
 }
 
-private val TIER_ORDER = listOf("Beginner", "Intermediate", "Advanced")
-
 private sealed interface HomeTab
-private data class Tier(val name: String) : HomeTab
+private data object MainTab : HomeTab
 private data object SpecialTab : HomeTab
 private data object ChampTab : HomeTab
 
 @Composable
 private fun HomeTab.label(): String = when (this) {
-    is Tier -> name
+    MainTab -> stringResource(Res.string.tab_races)
     SpecialTab -> stringResource(Res.string.tab_special)
     ChampTab -> stringResource(Res.string.tab_championship)
 }
 
 private fun buildTabs(schedule: Schedule, now: Instant): List<HomeTab> = buildList {
-    TIER_ORDER.forEach { t ->
-        val hasTier = schedule.races.any {
-            (it.type == RaceType.DAILY || it.type == RaceType.WEEKLY) &&
-                it.difficulty.equals(t, ignoreCase = true) && it.nextStart(now) != null
-        }
-        if (hasTier) add(Tier(t))
+    val hasMain = schedule.races.any {
+        (it.type == RaceType.DAILY || it.type == RaceType.WEEKLY) && it.nextStart(now) != null
     }
+    if (hasMain) add(MainTab)
     if (schedule.special.any { it.nextStart(now) != null }) add(SpecialTab)
     if (schedule.championship.any { it.nextStart(now) != null }) add(ChampTab)
+}
+
+/** SR tier order for sorting: bronze(0) → silver(1) → gold(2) → platinum(3) → unranked(4). */
+private fun srRank(sr: String?): Int = when (sr?.trim()?.firstOrNull()?.lowercaseChar()) {
+    'b' -> 0
+    's' -> 1
+    'g' -> 2
+    'p' -> 3
+    else -> 4
 }
 
 private data class Section(val label: String?, val races: List<Race>)
@@ -166,9 +168,9 @@ private fun TabContent(
     onRefresh: () -> Unit,
 ) {
     val sections: List<Section> = when (tab) {
-        is Tier -> listOf(
-            Section(stringResource(Res.string.section_daily), schedule.daily.filter { it.difficulty.equals(tab.name, true) }),
-            Section(stringResource(Res.string.section_weekly), schedule.weekly.filter { it.difficulty.equals(tab.name, true) }),
+        MainTab -> listOf(
+            Section(stringResource(Res.string.section_daily), schedule.daily),
+            Section(stringResource(Res.string.section_weekly), schedule.weekly),
         )
         SpecialTab -> listOf(Section(null, schedule.special))
         ChampTab -> listOf(Section(null, schedule.championship))
@@ -201,17 +203,23 @@ private fun TabContent(
             }
 
             else -> {
-                // "Next up" featured hero only makes sense for the live week AND when the
-                // top race is genuinely upcoming — never feature a finished one.
-                val hero = all.minByOrNull { nextKey(it) }!!
-                if (isCurrentWeek && hero.nextStart(now) != null) {
-                    item { HeroRaceCard(hero, maxHeight = heroHeight) { onOpenRace(hero) } }
+                // Each schedule runs independently (Beginner/Intermediate/Advanced daily,
+                // and weekly), so "NEXT" is the soonest race PER (type + difficulty) group.
+                val nextRaceIds: Set<String> = if (isCurrentWeek) {
+                    all.groupBy { it.type to it.difficulty.lowercase() }
+                        .values.mapNotNull { g -> g.minByOrNull { nextKey(it) }?.id }
+                        .toSet()
+                } else {
+                    emptySet()
                 }
                 sections.forEach { sec ->
-                    val sorted = sec.races.sortedBy { nextKey(it) }
+                    // group by SR tier (bronze → silver → gold → platinum), each by start time
+                    val sorted = sec.races.sortedWith(
+                        compareBy({ srRank(it.settings.safetyRank) }, { nextKey(it) }),
+                    )
                     sec.label?.let { lbl -> item { SectionHeader(lbl) } }
                     items(sorted.chunked(cols)) { row ->
-                        EqualHeightRaceRow(row, cols, onOpenRace, showCountdown = isCurrentWeek)
+                        EqualHeightRaceRow(row, cols, onOpenRace, showCountdown = isCurrentWeek, nextRaceIds = nextRaceIds)
                     }
                 }
             }
@@ -249,29 +257,6 @@ private fun WeekPill(label: String, selected: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = if (selected) accent else TextMed, maxLines = 1)
-    }
-}
-
-@Composable
-private fun HomeHeader(dailyCount: Int, modifier: Modifier = Modifier) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth()) {
-        Box(
-            Modifier.size(40.dp).clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.primary),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(IconFlag, contentDescription = null, tint = Carbon, modifier = Modifier.size(22.dp))
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.titleLarge, color = TextHigh, fontWeight = FontWeight.Black)
-            Text(stringResource(Res.string.home_events, dailyCount), style = MaterialTheme.typography.bodySmall, color = TextMed)
-        }
-        Box(
-            Modifier.size(40.dp).clip(CircleShape).background(Surface1).border(1.dp, Outline, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("🏁", style = MaterialTheme.typography.titleMedium, color = TextLow)
-        }
     }
 }
 

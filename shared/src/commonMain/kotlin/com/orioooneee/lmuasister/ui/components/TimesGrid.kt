@@ -1,6 +1,7 @@
 package com.orioooneee.lmuasister.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -45,7 +46,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun TimesGrid(
     times: List<Instant>,
-    columns: Int = 3,
+    columns: Int? = null,
     showCountdown: Boolean = true,
     centered: Boolean = false,
 ) {
@@ -57,8 +58,31 @@ fun TimesGrid(
     val header = if (next.isToday(now)) stringResource(Res.string.times)
     else stringResource(Res.string.times_day, next.weekdayShort())
 
-    val cellAlign = if (centered) TextAlign.Center else TextAlign.Start
+    if (columns != null) {
+        // Explicit column count (e.g. inside an IntrinsicSize row, where BoxWithConstraints
+        // would crash). The caller has already sized it to the available width.
+        TimesContent(upcoming, next, now, header, columns, showCountdown, centered)
+    } else {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // As many time columns as comfortably fit (3..6) instead of a fixed 3.
+            val perCol = if (centered) 60.dp else 36.dp
+            val cols = (maxWidth / perCol).toInt().coerceIn(3, 7)
+            TimesContent(upcoming, next, now, header, cols, showCountdown, centered)
+        }
+    }
+}
 
+@Composable
+private fun TimesContent(
+    upcoming: List<Instant>,
+    next: Instant,
+    now: Instant,
+    header: String,
+    cols: Int,
+    showCountdown: Boolean,
+    centered: Boolean,
+) {
+    val cellAlign = if (centered) TextAlign.Center else TextAlign.Start
     Column(Modifier.fillMaxWidth()) {
         if (showCountdown) {
             Row(
@@ -83,7 +107,7 @@ fun TimesGrid(
         HorizontalDivider(color = Outline)
         Spacer(Modifier.height(8.dp))
 
-        upcoming.chunked(columns).forEach { rowTimes ->
+        upcoming.chunked(cols).forEach { rowTimes ->
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = if (centered) {
@@ -98,16 +122,16 @@ fun TimesGrid(
                         text = t.hhmm(),
                         // Centered: fixed-width cells kept as a tight, aligned cluster.
                         // Default: weighted columns that span the card width.
-                        modifier = if (centered) Modifier.width(56.dp) else Modifier.weight(1f),
+                        modifier = if (centered) Modifier.width(46.dp) else Modifier.weight(1f),
                         textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal,
                         color = if (isNext) TextHigh else TextMed,
                     )
                 }
-                if (!centered) repeat(columns - rowTimes.size) { Spacer(Modifier.weight(1f)) }
+                if (!centered) repeat(cols - rowTimes.size) { Spacer(Modifier.weight(1f)) }
             }
-            Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(4.dp))
         }
     }
 }
