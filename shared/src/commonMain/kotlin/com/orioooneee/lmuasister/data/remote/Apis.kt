@@ -39,6 +39,12 @@ class BackendApi(private val client: HttpClient) {
         return AppJson.decodeFromString(client.get(url).bodyAsText())
     }
 
+    /** Hot-laps for the race's track. May be "pending" (still building) — caller polls. */
+    suspend fun hotlaps(raceId: String, wait: Boolean = false): HotlapsResponse {
+        val url = "$API_BASE/race/${raceId.encodeURLPathPart()}/hotlaps" + if (wait) "?wait=1" else ""
+        return AppJson.decodeFromString(client.get(url).bodyAsText())
+    }
+
     /** Absolute URL for a proxied image path the backend returns ("/api/v1/img/…"). */
     fun imageUrl(path: String?): String? = when {
         path.isNullOrBlank() -> null

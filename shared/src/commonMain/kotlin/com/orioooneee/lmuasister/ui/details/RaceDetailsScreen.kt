@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,7 +50,6 @@ import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.model.Hotlap
 import com.orioooneee.lmuasister.data.model.LapEntry
 import com.orioooneee.lmuasister.data.model.Race
-import com.orioooneee.lmuasister.data.model.RaceDetail
 import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.SessionWeather
@@ -60,8 +58,10 @@ import com.orioooneee.lmuasister.ui.components.ClassChip
 import com.orioooneee.lmuasister.ui.components.CoverImage
 import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.SkillBadge
+import com.orioooneee.lmuasister.ui.components.ShimmerBar
 import com.orioooneee.lmuasister.ui.components.SrBadge
 import com.orioooneee.lmuasister.ui.components.TimesGrid
+import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import com.orioooneee.lmuasister.ui.components.accentColor
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
@@ -70,7 +70,10 @@ import com.orioooneee.lmuasister.ui.theme.Surface2
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
+import com.orioooneee.lmuasister.ui.theme.ClassGt3
+import com.orioooneee.lmuasister.ui.theme.ClassHyper
 import com.orioooneee.lmuasister.ui.theme.ClassLmp2
+import com.orioooneee.lmuasister.ui.theme.ClassMixed
 import com.orioooneee.lmuasister.ui.util.formatLap
 import com.orioooneee.lmuasister.ui.util.skyColor
 import com.orioooneee.lmuasister.ui.util.skyEmoji
@@ -90,9 +93,7 @@ import lmuassister.shared.generated.resources.hl_col_car
 import lmuassister.shared.generated.resources.hl_col_driver
 import lmuassister.shared.generated.resources.hl_col_lap
 import lmuassister.shared.generated.resources.hl_col_ver
-import lmuassister.shared.generated.resources.hl_view
 import lmuassister.shared.generated.resources.length_km
-import lmuassister.shared.generated.resources.loading_times
 import lmuassister.shared.generated.resources.next_start_times
 import lmuassister.shared.generated.resources.no
 import lmuassister.shared.generated.resources.no_lap_times
@@ -129,12 +130,14 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
     val upcoming = remember(race) { race.times.filter { it >= now } }
 
     val repo = koinInject<RaceRepository>()
-    // One request brings the leaderboard AND the track's YouTube hot-laps.
-    val detail by produceState<RaceDetail?>(null, race.id) {
-        value = repo.raceDetail(race.id).getOrDefault(RaceDetail())
+    // Leaderboard (fast) and hot-laps (async build) load in parallel — each resolves
+    // its own skeleton independently. null = still loading.
+    val leaderboard by produceState<List<LapEntry>?>(null, race.id) {
+        value = if (race.leaderboardId != null) repo.leaderboard(race.id).getOrDefault(emptyList()) else emptyList()
     }
-    val leaderboard = detail?.leaderboard // null while loading
-    val hotlaps = detail?.hotlaps.orEmpty()
+    val hotlaps by produceState<List<Hotlap>?>(null, race.id) {
+        value = repo.hotlaps(race.id).getOrDefault(emptyList())
+    }
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 320.dp),
@@ -182,9 +185,12 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
         }
 
         if (race.leaderboardId != null) {
-            item(span = { GridItemSpan(maxLineSpan) }) { LeaderboardCard(leaderboard) }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                val lb = leaderboard
+                if (lb == null) LeaderboardSkeletonCard() else LeaderboardCard(lb)
+            }
         }
-        race.track?.let { item { TrackCard(it, hotlaps) } }
+        race.track?.let { item { TrackCard(it, hotlaps.orEmpty(), hotlapsLoading = hotlaps == null) } }
         race.weather?.let { item { WeatherCard(it) } }
         item {
             Card(stringResource(Res.string.format)) { DetailRows(settingRows(race.settings)) }
@@ -200,7 +206,7 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
 }
 
 @Composable
-private fun TrackCard(track: TrackInfo, hotlaps: List<Hotlap> = emptyList()) {
+private fun TrackCard(track: TrackInfo, hotlaps: List<Hotlap> = emptyList(), hotlapsLoading: Boolean = false) {
     Card(track.name) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (!track.mapUrl.isNullOrBlank()) {
@@ -219,7 +225,10 @@ private fun TrackCard(track: TrackInfo, hotlaps: List<Hotlap> = emptyList()) {
                     track.numTurns?.let { stringResource(Res.string.track_turns) to it.toString() },
                 ),
             )
-            if (hotlaps.isNotEmpty()) HotlapsTable(hotlaps)
+            when {
+                hotlapsLoading -> HotlapsSkeleton()
+                hotlaps.isNotEmpty() -> HotlapsTable(hotlaps)
+            }
         }
     }
 }
@@ -239,12 +248,12 @@ private fun HotlapsTable(hotlaps: List<Hotlap>) {
         Spacer(Modifier.height(8.dp))
         // header
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp)) {
-            Text(stringResource(Res.string.hl_col_lap), Modifier.width(54.dp), style = MaterialTheme.typography.labelSmall, color = TextLow)
+            Text(stringResource(Res.string.hl_col_lap), Modifier.width(78.dp), style = MaterialTheme.typography.labelSmall, color = TextLow)
             Text(stringResource(Res.string.hl_col_car), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
             Text(stringResource(Res.string.hl_col_driver), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
-            Text(stringResource(Res.string.hl_col_ver), Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
+            Text(stringResource(Res.string.hl_col_ver), Modifier.width(36.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
             Spacer(Modifier.width(8.dp))
-            Spacer(Modifier.width(58.dp)) // reserve the View-button column
+            Spacer(Modifier.width(44.dp)) // reserve the class-badge column
         }
         hotlaps.forEachIndexed { i, h -> HotlapTableRow(i, h) { runCatching { uri.openUri(h.url) } } }
     }
@@ -257,12 +266,14 @@ private fun HotlapTableRow(i: Int, h: Hotlap, onOpen: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .background(if (i % 2 == 1) Surface2 else Color.Transparent)
+            .clickable(onClick = onOpen) // tap the row to open the video
             .padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // lap time is the headline value — give it room so it never truncates
         Text(
             h.lapTime ?: "—",
-            Modifier.width(54.dp),
+            Modifier.width(78.dp),
             style = MaterialTheme.typography.bodySmall,
             color = if (h.lapTime != null) MaterialTheme.colorScheme.primary else TextLow,
             fontFamily = FontFamily.Monospace,
@@ -278,7 +289,7 @@ private fun HotlapTableRow(i: Int, h: Hotlap, onOpen: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            h.author ?: "—",
+            h.driver ?: h.author ?: "—",
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodySmall,
             color = TextMed,
@@ -287,41 +298,109 @@ private fun HotlapTableRow(i: Int, h: Hotlap, onOpen: () -> Unit) {
         )
         Text(
             h.gameVersion ?: "—",
-            Modifier.width(40.dp),
+            Modifier.width(36.dp),
             style = MaterialTheme.typography.bodySmall,
             color = TextMed,
             textAlign = TextAlign.End,
             maxLines = 1,
         )
         Spacer(Modifier.width(8.dp))
-        ViewButton(onClick = onOpen)
+        Box(Modifier.width(44.dp), contentAlignment = Alignment.CenterEnd) {
+            h.classBadge?.let { ClassBadgeChip(it) }
+        }
     }
 }
 
-/** Small accent "▶ View" pill that opens the YouTube video. */
+private fun classBadgeColor(badge: String): Color {
+    val b = badge.lowercase()
+    return when {
+        "hy" in b || "hyper" in b -> ClassHyper
+        "gt3" in b -> ClassGt3
+        "lmp2" in b -> ClassLmp2
+        else -> ClassMixed
+    }
+}
+
+/** Solid class badge (HY / GT3 / LMP2 …) in its class colour. */
 @Composable
-private fun ViewButton(onClick: () -> Unit) {
-    val accent = MaterialTheme.colorScheme.primary
-    Row(
-        modifier = Modifier
-            .width(58.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(accent.copy(alpha = 0.14f))
-            .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+private fun ClassBadgeChip(badge: String) {
+    Box(
+        Modifier.clip(RoundedCornerShape(6.dp)).background(classBadgeColor(badge)).padding(horizontal = 7.dp, vertical = 3.dp),
     ) {
-        Text("▶", style = MaterialTheme.typography.labelSmall, color = accent)
-        Spacer(Modifier.width(4.dp))
-        Text(
-            stringResource(Res.string.hl_view),
-            style = MaterialTheme.typography.labelMedium,
-            color = accent,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-        )
+        Text(badge, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Carbon, maxLines = 1)
+    }
+}
+
+/**
+ * Full-card leaderboard skeleton matching the first-open state: a shimmer title,
+ * the column header, a single row, and the "show more" button — all shimmer.
+ */
+@Composable
+private fun LeaderboardSkeletonCard() {
+    val brush = shimmerBrush()
+    Column(
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(Surface1)
+            .border(1.dp, Outline, MaterialTheme.shapes.large).padding(16.dp),
+    ) {
+        // title
+        ShimmerBar(Modifier.width(130.dp).height(16.dp), brush)
+        Spacer(Modifier.height(16.dp))
+        // column header
+        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            ShimmerBar(Modifier.width(14.dp).height(8.dp), brush)
+            Spacer(Modifier.width(12.dp))
+            ShimmerBar(Modifier.width(46.dp).height(8.dp), brush)
+            Spacer(Modifier.weight(1f))
+            ShimmerBar(Modifier.width(52.dp).height(8.dp), brush)
+            Spacer(Modifier.width(12.dp))
+            ShimmerBar(Modifier.width(34.dp).height(8.dp), brush)
+        }
+        Spacer(Modifier.height(12.dp))
+        // single row
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ShimmerBar(Modifier.width(16.dp).height(13.dp), brush)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                ShimmerBar(Modifier.fillMaxWidth(0.45f).height(13.dp), brush)
+                Spacer(Modifier.height(6.dp))
+                ShimmerBar(Modifier.fillMaxWidth(0.28f).height(9.dp), brush)
+            }
+            Spacer(Modifier.width(12.dp))
+            ShimmerBar(Modifier.width(70.dp).height(13.dp), brush)
+            Spacer(Modifier.width(10.dp))
+            ShimmerBar(Modifier.width(44.dp).height(13.dp), brush)
+        }
+        Spacer(Modifier.height(12.dp))
+        // "show more" button
+        ShimmerBar(Modifier.fillMaxWidth().height(38.dp), brush, corner = 8.dp)
+    }
+}
+
+/** Shimmer placeholder shaped like the hot-laps table rows (incl. the View pill). */
+@Composable
+private fun HotlapsSkeleton() {
+    val brush = shimmerBrush()
+    Column(Modifier.fillMaxWidth()) {
+        Spacer(Modifier.height(4.dp))
+        ShimmerBar(Modifier.width(58.dp).height(11.dp), brush)
+        Spacer(Modifier.height(10.dp))
+        repeat(6) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ShimmerBar(Modifier.width(64.dp).height(11.dp), brush)
+                Spacer(Modifier.width(12.dp))
+                ShimmerBar(Modifier.weight(1f).height(11.dp), brush)
+                Spacer(Modifier.width(12.dp))
+                ShimmerBar(Modifier.weight(1f).height(11.dp), brush)
+                Spacer(Modifier.width(12.dp))
+                ShimmerBar(Modifier.width(40.dp).height(18.dp), brush)
+            }
+        }
     }
 }
 
@@ -374,19 +453,9 @@ private fun gapLabel(deltaMs: Long): String =
 private val SHOW_STEPS = listOf(1, 5, 30)
 
 @Composable
-private fun LeaderboardCard(entries: List<LapEntry>?) {
+private fun LeaderboardCard(entries: List<LapEntry>) {
     Card(stringResource(Res.string.fastest_laps)) {
         when {
-            entries == null -> Row(
-                Modifier.fillMaxWidth().padding(vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = TextLow)
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(Res.string.loading_times), style = MaterialTheme.typography.bodyMedium, color = TextLow)
-            }
-
             entries.isEmpty() -> Text(
                 stringResource(Res.string.no_lap_times),
                 style = MaterialTheme.typography.bodyMedium,
