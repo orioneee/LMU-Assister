@@ -10,376 +10,124 @@ import com.orioooneee.lmuasister.data.model.Schedule
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
 import com.orioooneee.lmuasister.data.model.WeatherSegment
-import com.orioooneee.lmuasister.data.remote.ChampionshipEventDto
-import com.orioooneee.lmuasister.data.remote.ChampionshipSeriesDto
-import com.orioooneee.lmuasister.data.remote.LmuCardImageApi
-import com.orioooneee.lmuasister.data.remote.LmuPortalApi
-import com.orioooneee.lmuasister.data.remote.PortalCarClassDto
-import com.orioooneee.lmuasister.data.remote.PortalTrackDto
-import com.orioooneee.lmuasister.data.remote.RaceSeriesDto
+import com.orioooneee.lmuasister.data.remote.BackendApi
+import com.orioooneee.lmuasister.data.remote.ClassInfoDto
+import com.orioooneee.lmuasister.data.remote.LeaderboardEntryDto
+import com.orioooneee.lmuasister.data.remote.RaceDto
+import com.orioooneee.lmuasister.data.remote.ScheduleResponse
+import com.orioooneee.lmuasister.data.remote.SessionWeatherDto
+import com.orioooneee.lmuasister.data.remote.SettingsDto
+import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.data.remote.WeatherDto
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atTime
-import kotlinx.datetime.isoDayNumber
-import kotlinx.datetime.plus
-import kotlinx.datetime.toInstant
-import kotlinx.datetime.toLocalDateTime
-
-private fun String.token(): String = lowercase().filter { it.isLetterOrDigit() }
-private fun String.baseToken(): String = substringBefore('(').token()
 
 /**
- * Builds one [Schedule] from lmuportal (primary) + the S3 cover bucket:
- *  - race_series      → daily / weekly / special (current week)
- *  - championship_*   → the championship category
- *  - tracks/car_class → track details + class colours
- *  - S3 card bucket   → cover images
+ * Thin client over the LmuAssister backend. The backend already merges every
+ * source into the unified race model, so this just fetches, caches the one
+ * `/schedule` payload, and maps DTOs → [Race]/[Schedule].
  */
-class RaceRepository(
-    private val portal: LmuPortalApi,
-    private val cards: LmuCardImageApi,
-) {
-    /** Current week + upcoming weeks (keys like "2026-06-09"), for the week picker. */
-    /** Fastest-lap leaderboard for a race (by its lmuportal leaderboard_id). */
-    suspend fun leaderboard(leaderboardId: String): Result<List<LapEntry>> = runCatching {
-        portal.leaderboard(leaderboardId).map { e ->
-            LapEntry(
-                rank = e.rank,
-                initials = e.initials ?: e.displayName ?: "—",
-                bestLapMs = e.scoreMs,
-                sectors = e.metadata?.sectors.orEmpty(),
-                car = e.metadata?.car,
-                carClass = e.metadata?.carClass,
-                drRank = e.metadata?.dr?.rank,
-                srRank = e.metadata?.sr?.rank,
-            )
-        }
+class RaceRepository(private val api: BackendApi) {
+
+    /** The whole schedule arrives in one call; cache it so week switches are free. */
+    private var cache: ScheduleResponse? = null
+
+    private suspend fun full(refresh: Boolean): ScheduleResponse {
+        if (!refresh) cache?.let { return it }
+        return api.schedule(refresh = refresh).also { cache = it }
     }
 
-    suspend fun availableWeeks(): List<String> {
-        val today = Clock.System.now().toLocalDateTime(TimeZone.UTC).date.toString()
-        val current = portal.currentWeekKey(today) ?: return emptyList()
-        return runCatching { portal.weekKeys(current) }.getOrDefault(listOf(current)).take(6)
+    /** Week keys (current + upcoming), for the week picker. */
+    suspend fun availableWeeks(): List<String> =
+        runCatching { full(refresh = false).weeks.map { it.key } }.getOrDefault(emptyList())
+
+    suspend fun load(weekKeyOverride: String? = null, refresh: Boolean = false): Result<Schedule> = runCatching {
+        val resp = full(refresh)
+        val key = weekKeyOverride ?: resp.weeks.firstOrNull()?.key ?: error("No race weeks available")
+        Schedule(resp.schedules[key].orEmpty().map { it.toModel(api::imageUrl) })
     }
 
-    suspend fun load(weekKeyOverride: String? = null): Result<Schedule> = runCatching {
-        val now = Clock.System.now()
-        val todayDate = now.toLocalDateTime(TimeZone.UTC).date
-        val weekKey = weekKeyOverride
-            ?: portal.currentWeekKey(todayDate.toString())
-            ?: error("Could not resolve the current race week")
-
-        val s = shared()
-        val series = portal.raceSeries(weekKey) // the only per-week network call
-        val weekStart = runCatching { LocalDate.parse(weekKey) }.getOrNull() ?: todayDate
-
-        val weekly = series.map { it.toRace(s.tracks, s.classes, s.images, todayDate, weekStart, now) }
-        val champ = s.champSeries.map { it.toRace(s.events, s.tracks, s.classes, s.images, now, s.seasonComplete) }
-        Schedule(weekly + champ)
-    }
-
-    // ── shared, week-independent data (tracks / classes / images / championships) ──
-    private class Shared(
-        val tracks: TrackIndex,
-        val classes: ClassIndex,
-        val images: ImageIndex,
-        val champSeries: List<ChampionshipSeriesDto>,
-        val events: List<ChampionshipEventDto>,
-        val seasonComplete: Boolean,
-    )
-
-    private var sharedCache: Shared? = null
-
-    private suspend fun shared(): Shared {
-        sharedCache?.let { return it }
-        return coroutineScope {
-            val tracksD = async { runCatching { portal.tracks() }.getOrDefault(emptyList()) }
-            val classesD = async { runCatching { portal.carClasses() }.getOrDefault(emptyList()) }
-            val imagesD = async { runCatching { cards.fetchCards() }.getOrDefault(emptyList()) }
-            val rcD = async { runCatching { cards.fetchRaceControlCovers() }.getOrDefault(emptyMap()) }
-            val seasonD = async { runCatching { portal.activeSeason() }.getOrNull() }
-            val eventsD = async { runCatching { portal.championshipEvents() }.getOrDefault(emptyList()) }
-
-            val season = seasonD.await()
-            val champSeries = season
-                ?.let { runCatching { portal.championshipSeries(it.seasonId) }.getOrDefault(emptyList()) }
-                .orEmpty()
-            val today = Clock.System.now().toLocalDateTime(TimeZone.UTC).date.toString()
-            // the lmuportal status field lies ("active" past end_date) — trust end_date
-            val seasonComplete = season?.endDate?.let { it < today } ?: false
-
-            Shared(
-                tracks = TrackIndex(tracksD.await()),
-                classes = ClassIndex(classesD.await()),
-                images = ImageIndex(imagesD.await(), rcD.await()),
-                champSeries = champSeries,
-                events = eventsD.await(),
-                seasonComplete = seasonComplete,
-            )
-        }.also { sharedCache = it }
+    /** Fastest-lap leaderboard for a race (fetched with its detail payload). */
+    suspend fun leaderboard(raceId: String): Result<List<LapEntry>> = runCatching {
+        api.race(raceId).leaderboard.map { it.toModel() }
     }
 }
 
-// ── mapping ───────────────────────────────────────────────────────────────────
+// ── mapping: backend DTOs → domain model ──────────────────────────────────────
 
-private fun timeAt(date: LocalDate, hhmmss: String): Instant? {
-    val p = hhmmss.split(":")
-    val h = p.getOrNull(0)?.toIntOrNull() ?: return null
-    val m = p.getOrNull(1)?.toIntOrNull() ?: 0
-    return runCatching { date.atTime(LocalTime(h, m)).toInstant(TimeZone.UTC) }.getOrNull()
-}
+private fun RaceDto.toModel(resolveImage: (String?) -> String?): Race = Race(
+    id = id,
+    type = RaceType.from(type),
+    series = series,
+    circuit = circuit,
+    difficulty = difficulty,
+    carClasses = carClasses,
+    classInfos = classInfos.map { it.toModel() },
+    times = times.mapNotNull { runCatching { Instant.parse(it) }.getOrNull() },
+    raceLength = raceLength,
+    settings = settings.toModel(),
+    track = track?.toModel(resolveImage),
+    imageUrl = resolveImage(imageUrl),
+    weather = weather?.toModel(),
+    leaderboardId = leaderboardId,
+    completed = completed,
+)
 
-/** All start times for the given race days within the week starting [weekStart] (0=Sun..6=Sat). */
-private fun weekSlots(weekStart: LocalDate, days: List<Int>, times: List<String>): List<Instant> {
-    if (days.isEmpty() || times.isEmpty()) return emptyList()
-    val out = ArrayList<Instant>()
-    for (offset in 0..6) {
-        val date = weekStart.plus(offset, DateTimeUnit.DAY)
-        if (date.dayOfWeek.isoDayNumber % 7 !in days) continue
-        times.forEach { t -> timeAt(date, t)?.let(out::add) }
-    }
-    return out.distinct().sorted()
-}
+private fun ClassInfoDto.toModel() = ClassInfo(id = id, name = name, colorHex = colorHex)
 
-private fun RaceSeriesDto.toRace(
-    tracks: TrackIndex,
-    classes: ClassIndex,
-    images: ImageIndex,
-    today: LocalDate,
-    weekStart: LocalDate,
-    now: Instant,
-): Race {
-    val displayCircuit = trackConfig?.takeIf { it.isNotBlank() }
-        ?.let { "$trackFriendly ($it)" } ?: trackFriendly
-    // Daily runs every day (today's slate). Weekly/Special run on fixed days *within their week*.
-    val isDaily = todaysStartTimes.isNotEmpty()
-    val times = if (isDaily) {
-        todaysStartTimes.mapNotNull { timeAt(today, it) }.sorted()
-    } else {
-        weekSlots(weekStart, raceDays, timesUtc)
-    }
-    // weekly/special whose race day already passed this week → "week complete"
-    val completed = !isDaily && times.isNotEmpty() && times.none { it >= now }
-    val track = tracks.lookup(trackSlug, trackFriendly)
-    return Race(
-        id = seriesId,
-        type = RaceType.from(type),
-        series = seriesName,
-        circuit = displayCircuit,
-        difficulty = tierName.replaceFirstChar { it.uppercase() },
-        carClasses = carClasses,
-        classInfos = carClasses.map { classes.lookup(it) },
-        times = times,
-        raceLength = raceDuration,
-        settings = RaceSettings(
-            setup = setup,
-            assists = null,
-            damage = null,
-            tireWear = null,
-            fuelUsage = fuelMultiplier?.toInt(),
-            safetyRank = srRequirement,
-            driverRank = null,
-            splitSize = splitSize,
-            qualifyingLength = qualifyingDuration,
-            practiceLength = practiceDuration,
-            driverSwaps = driverSwap,
-            trackLimits = null,
-            tireWarmers = tyreWarmers?.let { if (it) "On" else "Off" },
-            limitedTires = tyreAllowance?.toString(),
-        ),
-        track = track,
-        imageUrl = images.match(track?.shortName ?: trackFriendly, carClasses, seriesName),
-        weather = buildWeather(raceWeather, qualifyingWeather, practiceWeather),
-        leaderboardId = leaderboardId,
-        completed = completed,
-    )
-}
+private fun SettingsDto.toModel() = RaceSettings(
+    setup = setup,
+    assists = assists,
+    damage = damage,
+    tireWear = tireWear,
+    fuelUsage = fuelUsage,
+    safetyRank = safetyRank,
+    driverRank = driverRank,
+    splitSize = splitSize,
+    qualifyingLength = qualifyingLength,
+    practiceLength = practiceLength,
+    driverSwaps = driverSwaps,
+    trackLimits = trackLimits,
+    tireWarmers = tireWarmers,
+    limitedTires = limitedTires,
+)
 
-private fun WeatherDto?.toSession(): SessionWeather? {
-    if (this == null || weather.isEmpty()) return null
-    return SessionWeather(
-        timeOfDay = timeOfDay,
-        segments = weather.map { s ->
-            WeatherSegment(
-                sky = s.sky?.toIntOrNull() ?: 0,
-                tempC = s.temperature?.toIntOrNull(),
-                humidity = s.humidity?.toIntOrNull(),
-                windKmh = s.windSpeed?.toIntOrNull(),
-                rainChance = s.rainChange?.toIntOrNull(),
-                durationMin = s.durationMinutes,
-            )
-        },
-    )
-}
+private fun TrackDto.toModel(resolveImage: (String?) -> String?) = TrackInfo(
+    name = name,
+    shortName = shortName,
+    town = town,
+    country = country,
+    lengthKm = lengthKm,
+    numTurns = numTurns,
+    mapUrl = resolveImage(mapUrl),
+)
 
-private fun buildWeather(race: WeatherDto?, quali: WeatherDto?, practice: WeatherDto?): RaceWeather? {
-    val w = RaceWeather(practice.toSession(), quali.toSession(), race.toSession())
-    return if (w.isEmpty) null else w
-}
+private fun WeatherDto.toModel(): RaceWeather? = RaceWeather(
+    practice = practice?.toModel(),
+    qualifying = qualifying?.toModel(),
+    race = race?.toModel(),
+).takeUnless { it.isEmpty }
 
-private fun ChampionshipSeriesDto.toRace(
-    events: List<ChampionshipEventDto>,
-    tracks: TrackIndex,
-    classes: ClassIndex,
-    images: ImageIndex,
-    now: Instant,
-    seasonComplete: Boolean,
-): Race {
-    val mine = events.filter { it.seriesId == id }
-        .mapNotNull { e -> runCatching { Instant.parse(e.raceStartsAt) }.getOrNull()?.let { it to e } }
-    val upcoming = mine.filter { it.first >= now }.sortedBy { it.first }
-    // current round track from the next (or most recent) scheduled event
-    val round = (upcoming.firstOrNull() ?: mine.maxByOrNull { it.first })?.second?.roundName
-    val circuit = round?.substringAfter(':')?.trim()?.takeIf { it.isNotBlank() } ?: "Multi-round"
-    val track = tracks.lookup(null, circuit)
-    val completed = seasonComplete || (mine.isNotEmpty() && upcoming.isEmpty())
-
-    return Race(
-        id = id,
-        type = RaceType.CHAMPIONSHIP,
-        series = seriesName,
-        circuit = circuit,
-        difficulty = "Championship",
-        carClasses = carClasses,
-        classInfos = carClasses.map { classes.lookup(it) },
-        times = if (completed) emptyList() else upcoming.map { it.first },
-        raceLength = raceDuration,
-        settings = RaceSettings(
-            setup = setup,
-            assists = null,
-            damage = null,
-            tireWear = null,
-            fuelUsage = null,
-            safetyRank = srRequirement,
-            driverRank = null,
-            splitSize = splitSize,
-            qualifyingLength = qualifyingDuration,
-            practiceLength = practiceDuration,
-            driverSwaps = driverSwap,
-            trackLimits = null,
-            tireWarmers = null,
-            limitedTires = null,
-        ),
-        track = track,
-        imageUrl = images.match(track?.shortName ?: circuit, carClasses, seriesName),
-        completed = completed,
-    )
-}
-
-// ── indexes ─────────────────────────────────────────────────────────────────
-
-private class TrackIndex(dtos: List<PortalTrackDto>) {
-    private val bySlug = HashMap<String, TrackInfo>()
-    private val byToken = HashMap<String, TrackInfo>()
-
-    init {
-        dtos.forEach { dto ->
-            val info = TrackInfo(
-                name = dto.trackName,
-                shortName = dto.shortName,
-                town = dto.town,
-                country = dto.country,
-                lengthKm = dto.lengthKm,
-                numTurns = dto.numTurns,
-                // force https + encode spaces — Android blocks cleartext and the path has "Track Maps"
-                mapUrl = dto.trackMapUrl?.replace("http://", "https://")?.replace(" ", "%20"),
-            )
-            if (dto.slug.isNotBlank()) bySlug[dto.slug] = info
-            (listOf(dto.shortName, dto.trackName) + dto.aliases)
-                .map { it.token() }.filter { it.isNotEmpty() }
-                .forEach { byToken.putIfAbsent(it, info) }
-        }
-    }
-
-    fun lookup(slug: String?, name: String): TrackInfo? {
-        slug?.let { bySlug[it] }?.let { return it }
-        val key = name.baseToken()
-        if (key.isEmpty()) return null
-        byToken[key]?.let { return it }
-        return byToken.entries.firstOrNull { (t, _) -> t.contains(key) || key.contains(t) }?.value
-    }
-}
-
-private class ClassIndex(dtos: List<PortalCarClassDto>) {
-    private val byToken: Map<String, ClassInfo> = buildMap {
-        dtos.forEach { dto ->
-            val info = ClassInfo(dto.classId, dto.displayName.ifBlank { dto.portalName }, dto.badgeColour)
-            listOf(dto.classId, dto.displayName, dto.portalName)
-                .map { it.token() }.filter { it.isNotEmpty() }
-                .forEach { putIfAbsent(it, info) }
-        }
-    }
-
-    fun lookup(raw: String): ClassInfo {
-        val key = raw.baseToken()
-        byToken[key]?.let { return it }
-        byToken.entries.firstOrNull { (t, _) -> t.contains(key) || key.contains(t) }?.let { return it.value }
-        return ClassInfo(id = key, name = raw.substringBefore('(').trim(), colorHex = null)
-    }
-}
-
-private class ImageIndex(urls: List<String>, rcCovers: Map<String, String>) {
-    private data class Card(
-        val url: String,
-        val date: String,
-        val classTok: String,
-        val trackTok: String,
-        val fullTok: String,
-    )
-
-    // racecontrol.gg editorial cover keyed by series-name token (takes priority)
-    private val rcByName: Map<String, String> =
-        rcCovers.entries.associate { (title, url) -> title.token() to url }
-
-    private val cards: List<Card> = urls.map { url ->
-        val name = url.substringAfterLast('/').substringBeforeLast('.')
-        val parts = name.split('_')
-        val lmuIdx = parts.indexOfFirst { it.equals("LMU", ignoreCase = true) }
-        val hasMeta = lmuIdx >= 0 && parts.size > lmuIdx + 2
-        Card(
-            url = url,
-            date = parts.getOrElse(0) { "" },
-            classTok = if (hasMeta) parts[lmuIdx + 1].token() else "",
-            trackTok = if (hasMeta) parts.drop(lmuIdx + 2).joinToString("").token() else "",
-            fullTok = name.token(),
+private fun SessionWeatherDto.toModel() = SessionWeather(
+    timeOfDay = timeOfDay,
+    segments = segments.map {
+        WeatherSegment(
+            sky = it.sky,
+            tempC = it.tempC,
+            humidity = it.humidity,
+            windKmh = it.windKmh,
+            rainChance = it.rainChance,
+            durationMin = it.durationMin,
         )
-    }
+    },
+)
 
-    fun match(trackName: String, carClasses: List<String>, series: String): String? =
-        rcByName[series.token()] // exact racecontrol cover for this series
-            ?: byTrack(trackName, carClasses)
-            ?: bySeries(series)
-
-    private fun byTrack(trackName: String, carClasses: List<String>): String? {
-        val trackKey = trackName.baseToken()
-        if (trackKey.isEmpty()) return null
-        val classKeys = carClasses.map { it.baseToken() }.filter { it.isNotEmpty() }
-        val sameTrack = cards.filter {
-            it.trackTok.isNotEmpty() && (it.trackTok.contains(trackKey) || trackKey.contains(it.trackTok))
-        }.ifEmpty { return null }
-        return sameTrack
-            .sortedWith(
-                compareByDescending<Card> { c -> classKeys.any { c.classTok.contains(it) || it.contains(c.classTok) } }
-                    .thenByDescending { it.date },
-            )
-            .first().url
-    }
-
-    /** Fallback for promo events without a track-named card (e.g. "LMGC_Q3" for the G Challenge). */
-    private fun bySeries(series: String): String? {
-        val words = series.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() }
-        if (words.size < 2) return null
-        val acronym = words.joinToString("") { it.take(1) }            // "lmgcq"
-        val last = words.last()                                        // "q3"
-        val byAcr = cards.filter { it.fullTok.contains(acronym) }.ifEmpty { return null }
-        val refined = byAcr.filter { it.fullTok.contains(last) }.ifEmpty { byAcr }
-        return refined.maxByOrNull { it.fullTok }?.url
-    }
-}
+private fun LeaderboardEntryDto.toModel() = LapEntry(
+    rank = rank,
+    initials = initials,
+    bestLapMs = bestLapMs,
+    sectors = sectors,
+    car = car,
+    carClass = carClass,
+    drRank = drRank,
+    srRank = srRank,
+)

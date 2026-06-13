@@ -66,19 +66,19 @@ class ScheduleViewModel(
         }
     }
 
-    /** Pull-to-refresh / manual — force-reload the current week. */
+    /** Pull-to-refresh / manual — force-refetch from the backend. */
     fun refresh() {
         val key = selected
-        cache.remove(key ?: CURRENT)
+        cache.clear() // backend refetch updates every week — drop all stale copies
         _refreshing.value = true
         viewModelScope.launch {
-            fetchWeek(key)
+            fetchWeek(key, refresh = true)
             _refreshing.value = false
         }
     }
 
-    private suspend fun fetchWeek(key: String?) {
-        repository.load(key)
+    private suspend fun fetchWeek(key: String?, refresh: Boolean = false) {
+        repository.load(key, refresh)
             .onSuccess { schedule ->
                 cache[key ?: CURRENT] = schedule
                 emitSuccess(key, schedule)

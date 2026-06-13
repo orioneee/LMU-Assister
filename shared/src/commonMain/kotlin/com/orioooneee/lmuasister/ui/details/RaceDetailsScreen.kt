@@ -119,8 +119,9 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
     val upcoming = remember(race) { race.times.filter { it >= now } }
 
     val repo = koinInject<RaceRepository>()
-    val leaderboard by produceState<List<LapEntry>?>(null, race.leaderboardId) {
-        value = race.leaderboardId?.let { repo.leaderboard(it).getOrDefault(emptyList()) } ?: emptyList()
+    val leaderboard by produceState<List<LapEntry>?>(null, race.id) {
+        // backend serves the leaderboard with the race detail, keyed by race id
+        value = if (race.leaderboardId != null) repo.leaderboard(race.id).getOrDefault(emptyList()) else emptyList()
     }
 
     LazyVerticalGrid(

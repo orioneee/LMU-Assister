@@ -1,8 +1,7 @@
 package com.orioooneee.lmuasister.di
 
 import com.orioooneee.lmuasister.data.RaceRepository
-import com.orioooneee.lmuasister.data.remote.LmuCardImageApi
-import com.orioooneee.lmuasister.data.remote.LmuPortalApi
+import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
@@ -10,14 +9,11 @@ import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 /**
- * Wires the 3-source pipeline:
- *   HttpClient
- *     ├─ LmuScheduleApi   (schedule)
- *     ├─ LmuPortalApi     (track + class enrichment)
- *     └─ LmuCardImageApi  (cover images)
- *           → RaceRepository → ScheduleViewModel
+ * Wires the backend-backed pipeline:
+ *   HttpClient → BackendApi → RaceRepository → ScheduleViewModel
  *
  * HttpClient uses the platform's default engine (OkHttp/CIO/Darwin/Js).
+ * The backend base URL comes from BuildConfig.BACKEND_URL (local.properties).
  */
 val appModule = module {
     single {
@@ -29,8 +25,7 @@ val appModule = module {
             }
         }
     }
-    single { LmuPortalApi(get()) }
-    single { LmuCardImageApi(get()) }
-    single { RaceRepository(get(), get()) }
+    single { BackendApi(get()) }
+    single { RaceRepository(get()) }
     viewModelOf(::ScheduleViewModel)
 }

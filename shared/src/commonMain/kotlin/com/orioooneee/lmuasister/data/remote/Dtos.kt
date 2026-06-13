@@ -1,134 +1,117 @@
 package com.orioooneee.lmuasister.data.remote
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ── lmuportal Supabase: GET https://db.lmuportal.space/rest/v1/<table> ─────────
-// Anon key reads these reference + schedule tables (RLS allows anon read).
+// ── LmuAssister backend: GET {BACKEND_URL}/{schedule,race/<id>} ────────────────
+// JSON is snake_case; AppJson uses JsonNamingStrategy.SnakeCase, so property
+// names here are plain camelCase (carClasses ↔ car_classes, etc.).
 
-/** race_series — lmuportal's own weekly schedule (daily / weekly / special). */
+/** GET /schedule — every week + championships, fully merged. */
 @Serializable
-data class RaceSeriesDto(
-    @SerialName("series_id") val seriesId: String = "",
-    @SerialName("week_key") val weekKey: String = "",
+data class ScheduleResponse(
+    val weeks: List<WeekDto> = emptyList(),
+    val schedules: Map<String, List<RaceDto>> = emptyMap(),
+)
+
+@Serializable
+data class WeekDto(
+    val key: String = "",
+    val label: String = "",
+)
+
+/** GET /race/<id> — the race plus its fastest-lap leaderboard. */
+@Serializable
+data class RaceDetailResponse(
+    val race: RaceDto? = null,
+    val leaderboard: List<LeaderboardEntryDto> = emptyList(),
+)
+
+@Serializable
+data class RaceDto(
+    val id: String = "",
     val type: String = "",
-    @SerialName("tier_name") val tierName: String = "",
-    @SerialName("series_name") val seriesName: String = "",
-    @SerialName("leaderboard_id") val leaderboardId: String? = null,
-    @SerialName("sr_requirement") val srRequirement: String? = null,
-    @SerialName("track_friendly") val trackFriendly: String = "",
-    @SerialName("track_config") val trackConfig: String? = null,
-    @SerialName("track_slug") val trackSlug: String? = null,
-    @SerialName("car_classes") val carClasses: List<String> = emptyList(),
-    @SerialName("race_duration_minutes") val raceDuration: Int = 0,
-    @SerialName("practice_duration_minutes") val practiceDuration: Int? = null,
-    @SerialName("qualifying_duration_minutes") val qualifyingDuration: Int? = null,
+    val series: String = "",
+    val circuit: String = "",
+    val difficulty: String = "",
+    val carClasses: List<String> = emptyList(),
+    val classInfos: List<ClassInfoDto> = emptyList(),
+    val times: List<String> = emptyList(),
+    val raceLength: Int = 0,
+    val settings: SettingsDto = SettingsDto(),
+    val track: TrackDto? = null,
+    val imageUrl: String? = null,
+    val weather: WeatherDto? = null,
+    val leaderboardId: String? = null,
+    val completed: Boolean = false,
+)
+
+@Serializable
+data class ClassInfoDto(
+    val id: String = "",
+    val name: String = "",
+    val colorHex: String? = null,
+)
+
+@Serializable
+data class SettingsDto(
     val setup: String? = null,
-    @SerialName("split_size") val splitSize: Int? = null,
-    @SerialName("fuel_multiplier") val fuelMultiplier: Double? = null,
-    @SerialName("tyre_allowance") val tyreAllowance: Int? = null,
-    @SerialName("tyre_warmers") val tyreWarmers: Boolean? = null,
-    @SerialName("driver_swap_enabled") val driverSwap: Boolean? = null,
-    @SerialName("todays_start_times_utc") val todaysStartTimes: List<String> = emptyList(),
-    @SerialName("race_days") val raceDays: List<Int> = emptyList(),
-    @SerialName("times_utc") val timesUtc: List<String> = emptyList(),
-    @SerialName("race_weather") val raceWeather: WeatherDto? = null,
-    @SerialName("qualifying_weather") val qualifyingWeather: WeatherDto? = null,
-    @SerialName("practice_weather") val practiceWeather: WeatherDto? = null,
+    val assists: String? = null,
+    val damage: String? = null,
+    val tireWear: Int? = null,
+    val fuelUsage: Int? = null,
+    val safetyRank: String? = null,
+    val driverRank: String? = null,
+    val splitSize: Int? = null,
+    val qualifyingLength: Int? = null,
+    val practiceLength: Int? = null,
+    val driverSwaps: Boolean? = null,
+    val trackLimits: String? = null,
+    val tireWarmers: String? = null,
+    val limitedTires: String? = null,
+)
+
+@Serializable
+data class TrackDto(
+    val name: String = "",
+    val shortName: String = "",
+    val town: String? = null,
+    val country: String? = null,
+    val lengthKm: Double? = null,
+    val numTurns: Int? = null,
+    val mapUrl: String? = null,
 )
 
 @Serializable
 data class WeatherDto(
-    val weather: List<WeatherSegmentDto> = emptyList(),
-    @SerialName("time_of_day") val timeOfDay: String? = null,
-    @SerialName("real_road") val realRoad: String? = null,
+    val practice: SessionWeatherDto? = null,
+    val qualifying: SessionWeatherDto? = null,
+    val race: SessionWeatherDto? = null,
+)
+
+@Serializable
+data class SessionWeatherDto(
+    val timeOfDay: String? = null,
+    val segments: List<WeatherSegmentDto> = emptyList(),
 )
 
 @Serializable
 data class WeatherSegmentDto(
-    val sky: String? = null,
-    val humidity: String? = null,
-    val temperature: String? = null,
-    @SerialName("wind_speed") val windSpeed: String? = null,
-    @SerialName("rain_change") val rainChange: String? = null,
-    @SerialName("duration_minutes") val durationMinutes: Int? = null,
+    val sky: Int = 0,
+    val tempC: Int? = null,
+    val humidity: Int? = null,
+    val windKmh: Int? = null,
+    val rainChance: Int? = null,
+    val durationMin: Int? = null,
 )
 
-/** championship_series — recurring championships (the 4th category). */
-@Serializable
-data class ChampionshipSeriesDto(
-    @SerialName("championship_series_id") val id: String = "",
-    @SerialName("season_id") val seasonId: String = "",
-    @SerialName("series_name") val seriesName: String = "",
-    @SerialName("car_classes") val carClasses: List<String> = emptyList(),
-    @SerialName("race_duration_minutes") val raceDuration: Int = 0,
-    @SerialName("practice_duration_minutes") val practiceDuration: Int? = null,
-    @SerialName("qualifying_duration_minutes") val qualifyingDuration: Int? = null,
-    val setup: String? = null,
-    @SerialName("sr_requirement") val srRequirement: String? = null,
-    @SerialName("split_size") val splitSize: Int? = null,
-    @SerialName("drop_rounds") val dropRounds: Int? = null,
-    @SerialName("driver_swap_enabled") val driverSwap: Boolean? = null,
-    @SerialName("race_days") val raceDays: List<Int> = emptyList(),
-    @SerialName("race_times_utc") val raceTimesUtc: List<String> = emptyList(),
-    @SerialName("race_time_utc_next_day") val raceTimeNextDay: List<String> = emptyList(),
-)
-
-@Serializable
-data class ChampionshipEventDto(
-    @SerialName("championship_series_id") val seriesId: String = "",
-    @SerialName("round_name") val roundName: String = "",
-    @SerialName("week_number") val weekNumber: Int = 0,
-    @SerialName("race_starts_at") val raceStartsAt: String = "",
-)
-
-@Serializable
-data class ChampionshipSeasonDto(
-    @SerialName("season_id") val seasonId: String = "",
-    @SerialName("season_name") val seasonName: String = "",
-    val status: String = "",
-    @SerialName("end_date") val endDate: String? = null,
-)
-
-// ── leaderboard (race_series_leaderboard_entry) ───────────────────────────────
 @Serializable
 data class LeaderboardEntryDto(
     val rank: Int = 0,
-    @SerialName("display_name_public") val displayName: String? = null,
-    @SerialName("display_initials") val initials: String? = null,
-    @SerialName("score_ms") val scoreMs: Long = 0,
-    val metadata: LeaderboardMetaDto? = null,
-)
-
-@Serializable
-data class LeaderboardMetaDto(
-    val car: String? = null,
-    @SerialName("class") val carClass: String? = null,
+    val initials: String = "—",
+    val bestLapMs: Long = 0,
     val sectors: List<Double> = emptyList(),
-    val dr: RankDto? = null,
-    val sr: RankDto? = null,
-)
-
-@Serializable
-data class RankDto(val rank: String? = null)
-
-@Serializable
-data class PortalTrackDto(
-    val slug: String = "",
-    @SerialName("track_name") val trackName: String = "",
-    @SerialName("short_name") val shortName: String = "",
-    val town: String? = null,
-    val country: String? = null,
-    @SerialName("length_km") val lengthKm: Double? = null,
-    @SerialName("num_turns") val numTurns: Int? = null,
-    val aliases: List<String> = emptyList(),
-    @SerialName("track_map_url") val trackMapUrl: String? = null,
-)
-
-@Serializable
-data class PortalCarClassDto(
-    @SerialName("class_id") val classId: String = "",
-    @SerialName("display_name") val displayName: String = "",
-    @SerialName("portal_name") val portalName: String = "",
-    @SerialName("badge_colour") val badgeColour: String? = null,
+    val car: String? = null,
+    val carClass: String? = null,
+    val drRank: String? = null,
+    val srRank: String? = null,
 )
