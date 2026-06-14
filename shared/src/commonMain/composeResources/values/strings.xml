@@ -40,10 +40,18 @@
     <string name="loading_times">Loading times…</string>
     <string name="no_lap_times">No lap times yet.</string>
     <string name="show_top">Show top %1$d  ▾</string>
+    <string name="full_leaderboard">Full leaderboard  ›</string>
+    <string name="full_leaderboard_title">Leaderboard</string>
+    <string name="lb_load_error">Couldn\'t load the leaderboard.</string>
+    <string name="lb_end">— end of leaderboard —</string>
     <string name="col_pos">#</string>
     <string name="col_driver">DRIVER</string>
     <string name="col_best_lap">BEST LAP</string>
     <string name="col_gap">GAP</string>
+
+    <!-- Home: cars carousel -->
+    <string name="cars_section">Cars</string>
+    <string name="cars_count">%1$d models</string>
 
     <!-- Details: hot-laps -->
     <string name="hotlaps">Hot laps</string>
@@ -54,6 +62,8 @@
     <string name="hl_view">View</string>
 
     <!-- Details: track -->
+    <string name="track_name">Track</string>
+    <string name="track_official_name">Official name</string>
     <string name="track_country">Country</string>
     <string name="track_city">City</string>
     <string name="track_length">Length</string>

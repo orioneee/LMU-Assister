@@ -5,6 +5,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.encodeURLPathPart
+import io.ktor.http.encodeURLQueryComponent
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNamingStrategy
@@ -45,6 +46,23 @@ class BackendApi(private val client: HttpClient) {
         return AppJson.decodeFromString(client.get(url).bodyAsText())
     }
 
+    /** The full car roster (v2 reference data — static, cache aggressively). */
+    suspend fun cars(): CarsResponse =
+        AppJson.decodeFromString(client.get("$API_BASE/cars").bodyAsText())
+
+    /** One page of the full official leaderboard (cursor-paginated). */
+    suspend fun leaderboardPage(
+        leaderboardId: String,
+        cursor: String? = null,
+        limit: Int = 50,
+    ): LeaderboardPageResponse {
+        val url = buildString {
+            append("$API_BASE/leaderboard/${leaderboardId.encodeURLPathPart()}?limit=$limit")
+            if (!cursor.isNullOrBlank()) append("&cursor=${cursor.encodeURLQueryComponent()}")
+        }
+        return AppJson.decodeFromString(client.get(url).bodyAsText())
+    }
+
     /** Absolute URL for a proxied image path the backend returns ("/api/v1/img/…"). */
     fun imageUrl(path: String?): String? = when {
         path.isNullOrBlank() -> null
@@ -53,7 +71,8 @@ class BackendApi(private val client: HttpClient) {
     }
 
     private companion object {
-        val API_BASE = BuildConfig.BACKEND_URL.trimEnd('/')   // http://host/api/v1
-        val ORIGIN = API_BASE.removeSuffix("/api/v1")          // http://host
+        val API_BASE = BuildConfig.BACKEND_URL.trimEnd('/')   // http://host/api/v2
+        // Host root, version-agnostic: everything before "/api/" (falls back to API_BASE).
+        val ORIGIN = API_BASE.substringBefore("/api/", API_BASE)  // http://host
     }
 }

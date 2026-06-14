@@ -30,11 +30,30 @@ data class ClassInfo(
 data class TrackInfo(
     val name: String,
     val shortName: String,
+    /** Common/short name ("Le Mans") vs the official [name] ("Circuit de la Sarthe"). */
+    val simpleName: String? = null,
     val town: String?,
     val country: String?,
     val lengthKm: Double?,
     val numTurns: Int?,
     val mapUrl: String?,
+    /** Circuit emblem (logo) SVG — v2 asset. */
+    val logoUrl: String? = null,
+    /** Colored event card art (webp) — used as the track emblem banner. */
+    val cardUrl: String? = null,
+    /** ISO-3166 alpha-2 country code (for the flag), when the backend sends it. */
+    val countryCode: String? = null,
+)
+
+/** One car from the v2 roster (deduped to distinct models for the carousel). */
+data class CarModel(
+    val id: String,
+    val name: String,
+    val manufacturer: String?,
+    val model: String,
+    val carClass: String,
+    val series: String?,
+    val engine: String?,
 )
 
 /** One weather phase within a session. */

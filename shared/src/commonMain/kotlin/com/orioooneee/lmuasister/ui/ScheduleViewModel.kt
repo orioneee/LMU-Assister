@@ -3,6 +3,7 @@ package com.orioooneee.lmuasister.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.orioooneee.lmuasister.data.RaceRepository
+import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.Schedule
 import com.orioooneee.lmuasister.ui.util.weekKeyShort
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,30 +37,28 @@ class ScheduleViewModel(
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
+    /** Car roster for the Home carousel — loaded independently of the schedule. */
+    private val _cars = MutableStateFlow<List<CarModel>>(emptyList())
+    val cars: StateFlow<List<CarModel>> = _cars.asStateFlow()
+
     /** Loaded schedules per week key — makes switching weeks instant. */
     private val cache = mutableMapOf<String, Schedule>()
     private var weeks: List<String> = emptyList()
     private var selected: String? = null
 
     init {
+        // Cars: offline-first, independent of the schedule (static reference data).
         viewModelScope.launch {
-            // 1) Offline-first: paint instantly from the cached schedule (memory/disk), no network.
+            repository.cachedCars()?.let { _cars.value = it }
+            repository.cars().getOrNull()?.let { _cars.value = it }
+        }
+        // Offline-first: paint instantly from the cached schedule (memory/disk), no network.
+        // The network update is kicked from the Home screen's LaunchedEffect → refresh().
+        viewModelScope.launch {
             repository.cachedWeeks()?.let { cachedKeys ->
                 weeks = cachedKeys
                 selected = cachedKeys.firstOrNull()
                 fetchWeek(selected) // load() reads the cached response — instant
-            }
-            // 2) Refresh from the network, then update the cache + UI in place.
-            if (repository.refreshSchedule().isSuccess) {
-                weeks = repository.availableWeeks() // from the just-refreshed cache
-                val sel = selected
-                if (sel == null || sel !in weeks) selected = weeks.firstOrNull()
-                cache.clear() // drop the stale snapshot we may have shown in step 1
-                fetchWeek(selected)
-                prefetchOtherWeeks()
-            } else if (_state.value !is ScheduleUiState.Success) {
-                // nothing cached and the network failed → surface an error
-                _state.value = ScheduleUiState.Error("Network error — could not load schedule")
             }
         }
     }
@@ -79,13 +78,21 @@ class ScheduleViewModel(
         }
     }
 
-    /** Pull-to-refresh / manual — force-refetch from the backend. */
+    /** Launch update / pull-to-refresh — force-refetch the whole schedule from the backend. */
     fun refresh() {
-        val key = selected
-        cache.clear() // backend refetch updates every week — drop all stale copies
         _refreshing.value = true
         viewModelScope.launch {
-            fetchWeek(key, refresh = true)
+            if (repository.refreshSchedule().isSuccess) {
+                weeks = repository.availableWeeks() // from the just-refreshed cache
+                val sel = selected
+                if (sel == null || sel !in weeks) selected = weeks.firstOrNull()
+                cache.clear() // backend refetch updates every week — drop all stale copies
+                fetchWeek(selected)
+                prefetchOtherWeeks()
+            } else if (_state.value !is ScheduleUiState.Success) {
+                // nothing cached and the network failed → surface an error
+                _state.value = ScheduleUiState.Error("Network error — could not load schedule")
+            }
             _refreshing.value = false
         }
     }

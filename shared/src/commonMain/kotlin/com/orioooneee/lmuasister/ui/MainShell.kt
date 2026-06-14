@@ -7,6 +7,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.orioooneee.lmuasister.ui.components.EmptyState
 import com.orioooneee.lmuasister.ui.components.RefreshableContent
+import com.orioooneee.lmuasister.ui.details.FullLeaderboardScreen
 import com.orioooneee.lmuasister.ui.details.RaceDetailsScreen
 import com.orioooneee.lmuasister.ui.home.HomeScreen
 import com.orioooneee.lmuasister.ui.theme.Carbon
@@ -34,12 +36,21 @@ object HomeRoute
 @Serializable
 data class DetailsRoute(val raceId: String)
 
+@Serializable
+data class LeaderboardRoute(val leaderboardId: String, val title: String)
+
 /** Single-screen app with a NavHost (Home ⇄ race details + a real back stack). */
 @Composable
 fun MainShell(viewModel: ScheduleViewModel = koinViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+    val cars by viewModel.cars.collectAsStateWithLifecycle()
     val nav = rememberNavController()
+
+    // Kick a fresh schedule update once on launch (cache is already painted instantly by
+    // the VM). The loader shows as the centered spinner (cold start) or the pull-to-refresh
+    // indicator (warm start).
+    LaunchedEffect(Unit) { viewModel.refresh() }
 
     Scaffold(containerColor = Carbon) { insets ->
         Box(Modifier.fillMaxSize().padding(insets)) {
@@ -67,6 +78,7 @@ fun MainShell(viewModel: ScheduleViewModel = koinViewModel()) {
                                     onSelectWeek = viewModel::selectWeek,
                                     onOpenRace = { nav.navigate(DetailsRoute(it.id)) },
                                     onRefresh = viewModel::refresh,
+                                    cars = cars,
                                 )
                             }
                         }
@@ -74,8 +86,22 @@ fun MainShell(viewModel: ScheduleViewModel = koinViewModel()) {
                             val id = entry.toRoute<DetailsRoute>().raceId
                             val race = data.schedule.races.firstOrNull { it.id == id }
                             if (race != null) {
-                                RaceDetailsScreen(race, onBack = { nav.popBackStack() })
+                                RaceDetailsScreen(
+                                    race,
+                                    onBack = { nav.popBackStack() },
+                                    onOpenLeaderboard = { lbId, title ->
+                                        nav.navigate(LeaderboardRoute(lbId, title))
+                                    },
+                                )
                             }
+                        }
+                        composable<LeaderboardRoute> { entry ->
+                            val route = entry.toRoute<LeaderboardRoute>()
+                            FullLeaderboardScreen(
+                                leaderboardId = route.leaderboardId,
+                                title = route.title,
+                                onBack = { nav.popBackStack() },
+                            )
                         }
                     }
                 }

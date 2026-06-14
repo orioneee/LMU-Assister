@@ -1,6 +1,6 @@
 package com.orioooneee.lmuasister.ui.details
 
-import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,11 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImagePainter
+import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.model.Hotlap
 import com.orioooneee.lmuasister.data.model.LapEntry
@@ -113,8 +114,10 @@ import lmuassister.shared.generated.resources.set_split_size
 import lmuassister.shared.generated.resources.set_tire_warmers
 import lmuassister.shared.generated.resources.set_tire_wear
 import lmuassister.shared.generated.resources.set_track_limits
-import lmuassister.shared.generated.resources.show_top
+import lmuassister.shared.generated.resources.full_leaderboard
 import lmuassister.shared.generated.resources.track_city
+import lmuassister.shared.generated.resources.track_name
+import lmuassister.shared.generated.resources.track_official_name
 import lmuassister.shared.generated.resources.track_country
 import lmuassister.shared.generated.resources.track_length
 import lmuassister.shared.generated.resources.track_turns
@@ -124,7 +127,11 @@ import lmuassister.shared.generated.resources.yes
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
+fun RaceDetailsScreen(
+    race: Race,
+    onBack: () -> Unit,
+    onOpenLeaderboard: (leaderboardId: String, title: String) -> Unit = { _, _ -> },
+) {
     val now = remember { Clock.System.now() }
     val upcoming = remember(race) { race.times.filter { it >= now } }
 
@@ -195,10 +202,12 @@ fun RaceDetailsScreen(race: Race, onBack: () -> Unit) {
             }
         }
 
-        if (race.leaderboardId != null) {
+        val lbId = race.leaderboardId
+        if (lbId != null) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 val lb = leaderboard
-                if (lb == null) LeaderboardSkeletonCard() else LeaderboardCard(lb)
+                if (lb == null) LeaderboardSkeletonCard()
+                else LeaderboardCard(lb, onOpenFull = { onOpenLeaderboard(lbId, race.title) })
             }
         }
         race.track?.let {
@@ -232,9 +241,17 @@ private fun TrackCard(
     hotlapsLoading: Boolean = false,
     hotlapsSkeletonCount: Int = 6,
 ) {
-    val flag = track.country?.let { flagUrl(it) }
-    Card(track.name, leading = flag?.let { url -> { FlagCircle(url) } }) {
+    val flag = track.countryCode?.let { flagUrlFromCode(it) } ?: track.country?.let { flagUrl(it) }
+    Card {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Emblem (circuit logo) stands in for the track name; the country flag sits in
+            // the top-right corner of it — no title row needed.
+            if (track.logoUrl != null || flag != null) {
+                Box(Modifier.fillMaxWidth()) {
+                    track.logoUrl?.let { TrackEmblem(it) }
+                    flag?.let { Box(Modifier.align(Alignment.TopEnd)) { FlagCircle(it) } }
+                }
+            }
             if (!track.mapUrl.isNullOrBlank()) {
                 CoverImage(
                     url = track.mapUrl,
@@ -243,8 +260,12 @@ private fun TrackCard(
                     modifier = Modifier.fillMaxWidth().height(160.dp).clip(MaterialTheme.shapes.medium),
                 )
             }
+            val officialName = track.name.takeIf { it.isNotBlank() }
+            val primaryName = track.simpleName?.takeIf { it.isNotBlank() } ?: officialName
             DetailRows(
                 listOfNotNull(
+                    primaryName?.let { stringResource(Res.string.track_name) to it },
+                    officialName?.takeIf { it != primaryName }?.let { stringResource(Res.string.track_official_name) to it },
                     track.country?.let { stringResource(Res.string.track_country) to it },
                     track.town?.let { stringResource(Res.string.track_city) to it },
                     track.lengthKm?.let { stringResource(Res.string.track_length) to stringResource(Res.string.length_km, it.toString()) },
@@ -256,6 +277,21 @@ private fun TrackCard(
                 hotlaps.isNotEmpty() -> HotlapsFlow(hotlaps)
             }
         }
+    }
+}
+
+/** Circuit text logo (vector emblem) — shown only once Coil has it (missing asset = invisible). */
+@Composable
+private fun TrackEmblem(url: String) {
+    val painter = rememberAsyncImagePainter(model = url)
+    val state by painter.state.collectAsState()
+    if (state is AsyncImagePainter.State.Success) {
+        Image(
+            painter = painter,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxWidth().height(80.dp),
+        )
     }
 }
 
@@ -511,13 +547,27 @@ private fun WeatherSession(label: String, sw: SessionWeather) {
     }
 }
 
-private fun gapLabel(deltaMs: Long): String =
+internal fun gapLabel(deltaMs: Long): String =
     "+${deltaMs / 1000}.${(deltaMs % 1000).toString().padStart(3, '0')}"
 
-private val SHOW_STEPS = listOf(1, 5, 30)
+/** Wide enough for 4-digit ranks (full leaderboard goes into the thousands). */
+private val POS_COL_W = 44.dp
+
+/** Column header shared by the inline card and the full-leaderboard screen. */
+@Composable
+internal fun LeaderboardHeaderRow() {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)) {
+        Text(stringResource(Res.string.col_pos), Modifier.width(POS_COL_W), style = MaterialTheme.typography.labelSmall, color = TextLow)
+        Text(stringResource(Res.string.col_driver), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
+        Text(stringResource(Res.string.col_best_lap), Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
+        Text(stringResource(Res.string.col_gap), Modifier.width(60.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
+    }
+}
+
+private const val LB_PREVIEW = 5
 
 @Composable
-private fun LeaderboardCard(entries: List<LapEntry>) {
+private fun LeaderboardCard(entries: List<LapEntry>, onOpenFull: () -> Unit) {
     Card(stringResource(Res.string.fastest_laps)) {
         when {
             entries.isEmpty() -> Text(
@@ -527,36 +577,27 @@ private fun LeaderboardCard(entries: List<LapEntry>) {
             )
 
             else -> {
-                var shown by remember(entries) { mutableStateOf(1) }
                 val best = entries.first().bestLapMs
-                val visible = entries.take(shown)
+                val visible = entries.take(LB_PREVIEW)
 
-                Column(Modifier.fillMaxWidth().animateContentSize()) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)) {
-                        Text(stringResource(Res.string.col_pos), Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall, color = TextLow)
-                        Text(stringResource(Res.string.col_driver), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
-                        Text(stringResource(Res.string.col_best_lap), Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
-                        Text(stringResource(Res.string.col_gap), Modifier.width(60.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
-                    }
+                Column(Modifier.fillMaxWidth()) {
+                    LeaderboardHeaderRow()
                     visible.forEachIndexed { i, e -> LeaderboardRow(i, e, best) }
 
-                    if (shown < entries.size) {
-                        val next = (SHOW_STEPS.firstOrNull { it > shown } ?: entries.size).coerceAtMost(entries.size)
-                        Spacer(Modifier.height(6.dp))
-                        Box(
-                            Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { shown = next }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                stringResource(Res.string.show_top, next),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
+                    Spacer(Modifier.height(6.dp))
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClick = onOpenFull)
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            stringResource(Res.string.full_leaderboard),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }
@@ -565,7 +606,7 @@ private fun LeaderboardCard(entries: List<LapEntry>) {
 }
 
 @Composable
-private fun LeaderboardRow(i: Int, e: LapEntry, best: Long) {
+internal fun LeaderboardRow(i: Int, e: LapEntry, best: Long) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -574,7 +615,7 @@ private fun LeaderboardRow(i: Int, e: LapEntry, best: Long) {
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("${e.rank}", Modifier.width(24.dp), style = MaterialTheme.typography.bodyMedium, color = TextMed)
+        Text("${e.rank}", Modifier.width(POS_COL_W), style = MaterialTheme.typography.bodyMedium, color = TextMed, maxLines = 1)
         Column(Modifier.weight(1f)) {
             Text(e.initials, style = MaterialTheme.typography.bodyMedium, color = TextHigh, fontWeight = FontWeight.SemiBold, maxLines = 1)
             e.carClass?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = TextLow, maxLines = 1) }
@@ -618,19 +659,23 @@ private fun settingRows(s: RaceSettings): List<Pair<String, String>> = listOfNot
 )
 
 @Composable
-private fun Card(title: String, leading: (@Composable () -> Unit)? = null, content: @Composable () -> Unit) {
+private fun Card(title: String? = null, leading: (@Composable () -> Unit)? = null, content: @Composable () -> Unit) {
     Column(
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(Surface1)
             .border(1.dp, Outline, MaterialTheme.shapes.large).padding(16.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (leading != null) {
-                leading()
-                Spacer(Modifier.width(12.dp))
+        if (title != null || leading != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (leading != null) {
+                    leading()
+                    Spacer(Modifier.width(12.dp))
+                }
+                title?.let {
+                    Text(it, style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
+                }
             }
-            Text(title, style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
         }
-        Spacer(Modifier.height(12.dp))
         content()
     }
 }
@@ -643,6 +688,13 @@ private fun FlagCircle(url: String) {
     ) {
         CoverImage(url = url, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
     }
+}
+
+/** ISO-3166 alpha-2 code → circle-flags SVG URL (preferred when the backend sends it). */
+private fun flagUrlFromCode(code: String): String? {
+    val cc = code.trim().lowercase()
+    if (cc.length != 2 || cc.any { it !in 'a'..'z' }) return null
+    return "https://cdn.jsdelivr.net/gh/HatScripts/circle-flags/flags/$cc.svg"
 }
 
 /** Country name → circle-flags SVG URL (pre-cropped to a circle), null if unknown. */
@@ -694,7 +746,7 @@ private fun DetailRows(rows: List<Pair<String, String>>) {
 }
 
 @Composable
-private fun CircleButton(label: String, modifier: Modifier, onClick: () -> Unit) {
+internal fun CircleButton(label: String, modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier.size(38.dp).clip(CircleShape).background(Carbon.copy(alpha = 0.55f))
             .border(1.dp, Outline, CircleShape).clickable(onClick = onClick),

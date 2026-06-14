@@ -97,11 +97,46 @@ data class SettingsDto(
 data class TrackDto(
     val name: String = "",
     val shortName: String = "",
+    val simpleName: String? = null,
     val town: String? = null,
     val country: String? = null,
-    val lengthKm: Double? = null,
+    // v2 sends length as a string ("13.626"); parsed to Double in the mapper.
+    val lengthKm: String? = null,
     val numTurns: Int? = null,
     val mapUrl: String? = null,
+    // v2 asset URLs — sent by the backend once race.track is enriched; until then
+    // they're derived client-side from map_url (same /track/<id>/ path).
+    val logoUrl: String? = null,
+    val cardUrl: String? = null,
+    val backgroundUrl: String? = null,
+    val countryCode: String? = null,
+)
+
+/** GET /cars — the v2 roster (manufacturer / class / model / series). */
+@Serializable
+data class CarsResponse(
+    val count: Int = 0,
+    val classes: List<CarClassCountDto> = emptyList(),
+    val cars: List<CarDto> = emptyList(),
+)
+
+@Serializable
+data class CarClassCountDto(
+    val name: String = "",
+    val count: Int = 0,
+)
+
+@Serializable
+data class CarDto(
+    val id: String = "",
+    val name: String = "",
+    val manufacturer: String? = null,
+    val model: String = "",
+    val carClass: String = "",
+    val series: String? = null,
+    val engine: String? = null,
+    val dlcAppId: Long? = null,
+    val owned: Boolean = false,
 )
 
 @Serializable
@@ -137,4 +172,13 @@ data class LeaderboardEntryDto(
     val carClass: String? = null,
     val drRank: String? = null,
     val srRank: String? = null,
+)
+
+/** GET /leaderboard/<id>?limit=&cursor= — one paginated page of the full board. */
+@Serializable
+data class LeaderboardPageResponse(
+    val leaderboardId: String = "",
+    val total: Int? = null,
+    val nextCursor: String? = null,
+    val entries: List<LeaderboardEntryDto> = emptyList(),
 )

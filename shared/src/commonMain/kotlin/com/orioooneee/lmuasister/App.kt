@@ -5,7 +5,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.ktor3.KtorNetworkFetcherFactory
-import coil3.svg.SvgDecoder
+import com.orioooneee.lmuasister.data.image.SvgCssInlineDecoder
 import com.orioooneee.lmuasister.di.appModule
 import com.orioooneee.lmuasister.ui.MainShell
 import com.orioooneee.lmuasister.ui.theme.LmuTheme
@@ -20,7 +20,9 @@ fun App() {
         ImageLoader.Builder(context)
             .components {
                 add(KtorNetworkFetcherFactory())
-                add(SvgDecoder.Factory())
+                // SVG decoder that first inlines <style> CSS colours (Illustrator logos),
+                // then delegates to Coil's real SvgDecoder. Caching stays URL-keyed.
+                add(SvgCssInlineDecoder.Factory())
             }
             .build()
     }

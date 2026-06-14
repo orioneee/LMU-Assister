@@ -22,6 +22,7 @@ ksoup = "0.2.5"
 kotlinx-serialization = "1.8.0"
 kotlinx-datetime = "0.7.1"
 navigation = "2.9.2"
+paging = "3.5.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -65,6 +66,10 @@ ksoup = { module = "com.fleeksoft.ksoup:ksoup", version.ref = "ksoup" }
 kotlinx-serializationJson = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation" }
+
+# Paging (official androidx multiplatform — 3.5.0 ships js/wasm variants too)
+paging-common = { module = "androidx.paging:paging-common", version.ref = "paging" }
+paging-compose = { module = "androidx.paging:paging-compose", version.ref = "paging" }
 
 # Coil 3 (multiplatform image loading)
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }

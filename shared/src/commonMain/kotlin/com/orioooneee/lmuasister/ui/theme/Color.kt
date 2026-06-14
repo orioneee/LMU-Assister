@@ -21,12 +21,14 @@ val AmberDim     = Color(0xFF3A2410)
 val Lime         = Color(0xFF9BE600) // "live" / weekly accent
 val LimeDim      = Color(0xFF24300A)
 
-// ── Car-class colors (official lmuportal badge_colour) ───────────────────────────
-val ClassHyper   = Color(0xFFE11D48) // Hypercar
-val ClassLmp2    = Color(0xFF2563EB) // LMP2
-val ClassLmp3    = Color(0xFF6366F1) // LMP3
-val ClassGt3     = Color(0xFFF59E0B) // LMGT3
-val ClassGte     = Color(0xFF16A34A) // GTE
+// ── Car-class colors (official FIA WEC / ELMS class colours) ─────────────────────
+// WEC live-timing: Hypercar=red, LMP2=blue, LMGT3=green. ELMS: LMP3=purple.
+// GTE (legacy GT) has no current official colour → kept amber so it stays distinct.
+val ClassHyper   = Color(0xFFE2231A) // Hypercar — red
+val ClassLmp2    = Color(0xFF2563EB) // LMP2 — blue
+val ClassLmp3    = Color(0xFF7C3AED) // LMP3 — purple (ELMS)
+val ClassGt3     = Color(0xFF16A34A) // LMGT3 — green
+val ClassGte     = Color(0xFFF59E0B) // GTE — amber (legacy, no official colour)
 val ClassMixed   = Color(0xFFC792EA) // multi-class / other (fallback)
 
 // ── Skill levels ─────────────────────────────────────────────────────────────────

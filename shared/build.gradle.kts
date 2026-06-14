@@ -82,6 +82,8 @@ kotlin {
             implementation(libs.kotlinx.serializationJson)
             implementation(libs.kotlinx.datetime)
             implementation(libs.navigation.compose)
+            implementation(libs.paging.common)
+            implementation(libs.paging.compose)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -108,7 +110,7 @@ dependencies {
 
 // ── Backend base URL → generated BuildConfig (read from local.properties) ──
 val localPropsFile = rootProject.layout.projectDirectory.file("local.properties")
-val defaultBackendUrl = "http://localhost:8000/api/v1"
+val defaultBackendUrl = "http://localhost:8000/api/v2"
 
 val generateBuildConfig by tasks.registering {
     val outDir = layout.buildDirectory.dir("generated/buildconfig/kotlin")

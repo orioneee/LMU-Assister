@@ -27,6 +27,11 @@ import com.orioooneee.lmuasister.data.model.ClassInfo
 import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.Carbon
+import com.orioooneee.lmuasister.ui.theme.ClassGt3
+import com.orioooneee.lmuasister.ui.theme.ClassGte
+import com.orioooneee.lmuasister.ui.theme.ClassHyper
+import com.orioooneee.lmuasister.ui.theme.ClassLmp2
+import com.orioooneee.lmuasister.ui.theme.ClassLmp3
 import com.orioooneee.lmuasister.ui.theme.ClassMixed
 import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.Surface3
@@ -40,11 +45,26 @@ import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.parseHexColor
 
-/** Real class colour from lmuportal's badge_colour, or a neutral fallback. */
-fun ClassInfo.color(): Color = parseHexColor(colorHex) ?: ClassMixed
+/** Always the official LMU class colour, mapped from the class id/name. We ignore the
+ *  backend's badge colour so badges are consistent across versions (v2 doesn't send one). */
+fun ClassInfo.color(): Color = classColorFor("$id $name")
 
-/** Accent for borders/labels — first class colour, else brand amber. */
-fun Race.accentColor(): Color = classInfos.firstNotNullOfOrNull { parseHexColor(it.colorHex) } ?: Amber
+/** Official LMU class colour by id/name keyword (Hypercar/LMGT3/GTE/LMP2/LMP3). */
+fun classColorFor(key: String): Color {
+    val c = key.lowercase()
+    return when {
+        "hyper" in c -> ClassHyper
+        "gt3" in c -> ClassGt3
+        "gte" in c -> ClassGte
+        "lmp2" in c -> ClassLmp2
+        "lmp3" in c -> ClassLmp3
+        else -> ClassMixed
+    }
+}
+
+/** Accent for borders/labels — official colour of the first class, else brand amber. */
+fun Race.accentColor(): Color =
+    classInfos.firstOrNull()?.let { classColorFor("${it.id} ${it.name}") } ?: Amber
 
 /** LMU-style class code: only Hypercar -> HY and LMGT3 -> GT3 are shortened; the rest keep their name. */
 fun ClassInfo.shortCode(): String {

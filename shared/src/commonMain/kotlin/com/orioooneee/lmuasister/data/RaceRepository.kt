@@ -1,5 +1,6 @@
 package com.orioooneee.lmuasister.data
 
+import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.ClassInfo
 import com.orioooneee.lmuasister.data.model.Hotlap
 import com.orioooneee.lmuasister.data.model.LapEntry
@@ -11,9 +12,14 @@ import com.orioooneee.lmuasister.data.model.Schedule
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
 import com.orioooneee.lmuasister.data.model.WeatherSegment
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
 import com.orioooneee.lmuasister.data.cache.LocalCache
 import com.orioooneee.lmuasister.data.remote.AppJson
 import com.orioooneee.lmuasister.data.remote.BackendApi
+import com.orioooneee.lmuasister.data.remote.CarDto
 import com.orioooneee.lmuasister.data.remote.ClassInfoDto
 import com.orioooneee.lmuasister.data.remote.HotlapDto
 import com.orioooneee.lmuasister.data.remote.LeaderboardEntryDto
@@ -44,6 +50,17 @@ private data class LbCache(val ts: Long = 0, val data: List<LeaderboardEntryDto>
 
 @Serializable
 private data class HlCache(val ts: Long = 0, val data: List<HotlapDto> = emptyList())
+
+@Serializable
+private data class CarsCache(val ts: Long = 0, val data: List<CarDto> = emptyList())
+
+private const val CARS_KEY = "cars_v2"
+
+/** Distinct car models (collapse liveries/teams), sorted by class → manufacturer → model. */
+private fun dedupCars(dtos: List<CarDto>): List<CarModel> =
+    dtos.map { CarModel(it.id, it.name, it.manufacturer, it.model, it.carClass, it.series, it.engine) }
+        .distinctBy { "${it.manufacturer}|${it.model}|${it.carClass}" }
+        .sortedWith(compareBy({ it.carClass }, { it.manufacturer ?: "" }, { it.model }))
 
 /**
  * Thin client over the LmuAssister backend. The backend already merges every
@@ -138,6 +155,59 @@ class RaceRepository(private val api: BackendApi) {
 
     private inline fun <reified T> diskList(key: String): T? =
         runCatching { LocalCache.read(key)?.let { AppJson.decodeFromString<T>(it) } }.getOrNull()
+
+    // ── Cars (v2 roster) — static reference data, offline-first like the schedule ──
+    private var carsMem: List<CarModel>? = null
+
+    /** Memory, then disk — for an instant first paint of the car carousel. */
+    fun cachedCars(): List<CarModel>? =
+        carsMem ?: diskList<CarsCache>(CARS_KEY)?.data?.let { dedupCars(it) }?.also { carsMem = it }
+
+    /** Fetch + dedup the roster to distinct models; caches mem + disk. */
+    suspend fun cars(): Result<List<CarModel>> = runCatching {
+        val resp = api.cars()
+        val models = dedupCars(resp.cars)
+        carsMem = models
+        runCatching { LocalCache.write(CARS_KEY, AppJson.encodeToString(CarsCache(nowMs(), resp.cars))) }
+        models
+    }
+
+    /** Cursor-paginated full leaderboard, for the dedicated screen (Paging 3). */
+    fun leaderboardPager(leaderboardId: String): Pager<String, LapEntry> =
+        Pager(
+            PagingConfig(
+                pageSize = LB_PAGE_SIZE,
+                initialLoadSize = LB_PAGE_SIZE,
+                // load the next page well before the user reaches the edge → no visible loader
+                prefetchDistance = LB_PAGE_SIZE,
+                enablePlaceholders = false,
+            ),
+        ) {
+            LeaderboardPagingSource(api, leaderboardId)
+        }
+}
+
+// Backend caps a page at 100 rows; big page + big prefetch keeps the loader off-screen.
+private const val LB_PAGE_SIZE = 100
+
+/** Backs the full-leaderboard screen — keyed by the backend's opaque cursor. */
+private class LeaderboardPagingSource(
+    private val api: BackendApi,
+    private val leaderboardId: String,
+) : PagingSource<String, LapEntry>() {
+
+    override fun getRefreshKey(state: PagingState<String, LapEntry>): String? = null
+
+    override suspend fun load(params: LoadParams<String>): LoadResult<String, LapEntry> = try {
+        val page = api.leaderboardPage(leaderboardId, cursor = params.key, limit = params.loadSize)
+        LoadResult.Page(
+            data = page.entries.map { it.toModel() },
+            prevKey = null,                 // forward-only cursor
+            nextKey = page.nextCursor?.takeIf { it.isNotBlank() },
+        )
+    } catch (e: Exception) {
+        LoadResult.Error(e)
+    }
 }
 
 private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
@@ -181,15 +251,25 @@ private fun SettingsDto.toModel() = RaceSettings(
     limitedTires = limitedTires,
 )
 
-private fun TrackDto.toModel(resolveImage: (String?) -> String?) = TrackInfo(
-    name = name,
-    shortName = shortName,
-    town = town,
-    country = country,
-    lengthKm = lengthKm,
-    numTurns = numTurns,
-    mapUrl = resolveImage(mapUrl),
-)
+private fun TrackDto.toModel(resolveImage: (String?) -> String?): TrackInfo {
+    // Assets live at the same /track/<id>/ path as the minimap; if the backend doesn't
+    // send them yet, derive from map_url (…/map.svg → …/logo.svg | …/card.webp).
+    fun sibling(file: String): String? =
+        mapUrl?.takeIf { it.endsWith("/map.svg") }?.removeSuffix("map.svg")?.plus(file)
+    return TrackInfo(
+        name = name,
+        shortName = shortName,
+        simpleName = simpleName,
+        town = town,
+        country = country,
+        lengthKm = lengthKm?.toDoubleOrNull(),
+        numTurns = numTurns,
+        mapUrl = resolveImage(mapUrl),
+        logoUrl = resolveImage(logoUrl ?: sibling("logo.svg")),
+        cardUrl = resolveImage(cardUrl ?: sibling("card.webp")),
+        countryCode = countryCode,
+    )
+}
 
 private fun WeatherDto.toModel(): RaceWeather? = RaceWeather(
     practice = practice?.toModel(),

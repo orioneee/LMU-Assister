@@ -1,5 +1,6 @@
 package com.orioooneee.lmuasister.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,11 +17,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.ui.IconChevronRight
 import com.orioooneee.lmuasister.ui.theme.Carbon
@@ -89,37 +95,41 @@ fun RaceCard(
             .border(1.5.dp, diff.copy(alpha = 0.6f), MaterialTheme.shapes.large)
             .clickable(onClick = onClick),
     ) {
-        Box(Modifier.fillMaxWidth().height(140.dp).background(Surface2)) {
+        Box(Modifier.fillMaxWidth().height(175.dp).background(Surface2)) {
             CoverImage(race.imageUrl, Modifier.fillMaxSize(), race.title)
-            // scrim so the overlaid title/track stay readable on any cover
+            // scrim so the overlaid title/track stay readable — stronger on the left where
+            // the text sits, lighter on the right so the corner emblem still reads
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.radialGradient(listOf(Carbon.copy(alpha = 0.70f), Carbon.copy(alpha = 0.30f))),
+                    Brush.horizontalGradient(
+                        listOf(
+                            Carbon.copy(alpha = 0.88f),
+                            Carbon.copy(alpha = 0.58f),
+                            Carbon.copy(alpha = 0.32f),
+                        ),
+                    ),
                 ),
             )
-            // top-left: NEXT first (if this is the next race), then the class badges —
-            // one wrapping flow so they never overlap when there are many classes
-            FlowRow(
-                Modifier.align(Alignment.TopStart).fillMaxWidth().padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (isNext) NextBadge()
-                race.classInfos.take(4).forEach { ClassChip(it) }
-            }
-            race.settings.safetyRank?.let {
-                Box(Modifier.align(Alignment.BottomStart).padding(8.dp)) { SrBadge(it) }
-            }
-            val duration = race.durationLabel()
-            if (duration.isNotBlank()) {
-                Box(Modifier.align(Alignment.BottomEnd).padding(8.dp)) { MetaChip(duration) }
-            }
-            // title + track over the cover (saves the vertical space of a text block):
-            // left-aligned, with a soft shadow for readability on any cover
-            Column(
-                Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(horizontal = 12.dp),
-                horizontalAlignment = Alignment.Start,
-            ) {
+            // Vertical layout so the title always sits BELOW the badges (never overlaps,
+            // however many class chips wrap): badges → spacer → title/track → SR + duration.
+            Column(Modifier.fillMaxSize().padding(8.dp)) {
+                // top: class badges flow from the left; the track emblem pins to the right
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                    FlowRow(
+                        Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (isNext) NextBadge()
+                        race.classInfos.take(4).forEach { ClassChip(it) }
+                    }
+                    race.track?.logoUrl?.let {
+                        Spacer(Modifier.width(8.dp))
+                        CardTrackEmblem(it)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                // title + track, with a soft shadow for readability on any cover
                 Text(
                     race.title,
                     style = MaterialTheme.typography.titleSmall.copy(shadow = CARD_TEXT_SHADOW),
@@ -136,6 +146,14 @@ fun RaceCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                Spacer(Modifier.height(8.dp))
+                // bottom: SR on the left, race duration on the right
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    race.settings.safetyRank?.let { SrBadge(it) }
+                    Spacer(Modifier.weight(1f))
+                    val duration = race.durationLabel()
+                    if (duration.isNotBlank()) MetaChip(duration)
+                }
             }
         }
         if (race.times.isNotEmpty()) {
@@ -143,6 +161,22 @@ fun RaceCard(
                 TimesGrid(race.times, columns = timeColumns, showCountdown = showCountdown)
             }
         }
+    }
+}
+
+/** Small circuit emblem (logo) for the card's top-right corner — shown only once Coil has
+ *  it, so a missing logo leaves no gap (mirrors the details screen). */
+@Composable
+private fun CardTrackEmblem(url: String) {
+    val painter = rememberAsyncImagePainter(model = url)
+    val state by painter.state.collectAsState()
+    if (state is AsyncImagePainter.State.Success) {
+        Image(
+            painter = painter,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.height(24.dp).widthIn(max = 68.dp),
+        )
     }
 }
 

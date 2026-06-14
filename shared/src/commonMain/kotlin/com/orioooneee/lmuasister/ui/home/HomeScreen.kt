@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.Schedule
@@ -73,6 +74,7 @@ fun HomeScreen(
     onSelectWeek: (String) -> Unit,
     onOpenRace: (Race) -> Unit,
     onRefresh: () -> Unit = {},
+    cars: List<CarModel> = emptyList(),
 ) {
     val now = remember { Clock.System.now() }
     val tabs = remember(schedule) { buildTabs(schedule, now) }
