@@ -1,9 +1,12 @@
 package com.orioooneee.lmuasister.data
 
+import com.orioooneee.lmuasister.data.model.CarGroup
 import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.ClassInfo
+import com.orioooneee.lmuasister.data.model.ClassLeaderboard
 import com.orioooneee.lmuasister.data.model.Hotlap
 import com.orioooneee.lmuasister.data.model.LapEntry
+import com.orioooneee.lmuasister.data.model.RaceLeaderboards
 import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceType
@@ -21,6 +24,7 @@ import com.orioooneee.lmuasister.data.remote.AppJson
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.CarDto
 import com.orioooneee.lmuasister.data.remote.ClassInfoDto
+import com.orioooneee.lmuasister.data.remote.ClassLeaderboardDto
 import com.orioooneee.lmuasister.data.remote.HotlapDto
 import com.orioooneee.lmuasister.data.remote.LeaderboardEntryDto
 import com.orioooneee.lmuasister.data.remote.RaceDto
@@ -46,7 +50,11 @@ private data class CachedSchedule(val ts: Long = 0, val data: ScheduleResponse =
 
 /** On-disk per-race detail snapshots (leaderboard / hot-laps). */
 @Serializable
-private data class LbCache(val ts: Long = 0, val data: List<LeaderboardEntryDto> = emptyList())
+private data class LbCache(
+    val ts: Long = 0,
+    val overall: ClassLeaderboardDto? = null,
+    val byClass: List<ClassLeaderboardDto> = emptyList(),
+)
 
 @Serializable
 private data class HlCache(val ts: Long = 0, val data: List<HotlapDto> = emptyList())
@@ -110,25 +118,34 @@ class RaceRepository(private val api: BackendApi) {
 
     // Per-race detail caches (offline-first, like the schedule): instant on reopen,
     // and they survive restarts via disk so hot-laps don't rebuild every time.
-    private val lbMem = mutableMapOf<String, List<LapEntry>>()
+    private val lbMem = mutableMapOf<String, RaceLeaderboards>()
     private val hlMem = mutableMapOf<String, List<Hotlap>>()
 
     /** In-memory only (safe to call during composition) — null if not loaded this session. */
-    fun peekLeaderboard(raceId: String): List<LapEntry>? = lbMem[raceId]
+    fun peekLeaderboards(raceId: String): RaceLeaderboards? = lbMem[raceId]
     fun peekHotlaps(raceId: String): List<Hotlap>? = hlMem[raceId]
 
     /** Memory, then disk — for the first paint before the network refresh. */
-    fun cachedLeaderboard(raceId: String): List<LapEntry>? =
-        lbMem[raceId] ?: diskList<LbCache>("lb_$raceId")?.data?.map { it.toModel() }?.also { lbMem[raceId] = it }
+    fun cachedLeaderboards(raceId: String): RaceLeaderboards? =
+        lbMem[raceId] ?: diskList<LbCache>("lb_$raceId")?.let { c ->
+            RaceLeaderboards(c.overall?.toModel(), c.byClass.map { it.toModel() })
+        }?.also { lbMem[raceId] = it }
 
     fun cachedHotlaps(raceId: String): List<Hotlap>? =
         hlMem[raceId] ?: diskList<HlCache>("hl_$raceId")?.data?.map { it.toModel() }?.also { hlMem[raceId] = it }
 
-    /** Fastest-lap leaderboard — the fast `/race/<id>` call. Caches mem + disk. */
-    suspend fun leaderboard(raceId: String): Result<List<LapEntry>> = runCatching {
-        val dtos = api.race(raceId).leaderboard
-        lbMem[raceId] = dtos.map { it.toModel() }
-        runCatching { LocalCache.write("lb_$raceId", AppJson.encodeToString(LbCache(nowMs(), dtos))) }
+    /**
+     * Fastest-lap boards — the fast `/race/<id>` call. Returns the overall board plus
+     * one board per car class (for the detail-screen tabs). Caches mem + disk; falls
+     * back to the legacy flat `leaderboard` field when the backend predates `leaderboards`.
+     */
+    suspend fun leaderboards(raceId: String): Result<RaceLeaderboards> = runCatching {
+        val resp = api.race(raceId)
+        val overall = resp.leaderboards?.overall
+            ?: ClassLeaderboardDto(leaderboardId = resp.race?.leaderboardId, entries = resp.leaderboard)
+        val byClass = resp.leaderboards?.byClass.orEmpty()
+        lbMem[raceId] = RaceLeaderboards(overall.toModel(), byClass.map { it.toModel() })
+        runCatching { LocalCache.write("lb_$raceId", AppJson.encodeToString(LbCache(nowMs(), overall, byClass))) }
         lbMem.getValue(raceId)
     }
 
@@ -222,6 +239,7 @@ private fun RaceDto.toModel(resolveImage: (String?) -> String?): Race = Race(
     difficulty = difficulty,
     carClasses = carClasses,
     classInfos = classInfos.map { it.toModel() },
+    carsByClass = carsByClass.map { CarGroup(it.carClass, it.cars) },
     times = times.mapNotNull { runCatching { Instant.parse(it) }.getOrNull() },
     raceLength = raceLength,
     settings = settings.toModel(),
@@ -289,6 +307,12 @@ private fun SessionWeatherDto.toModel() = SessionWeather(
             durationMin = it.durationMin,
         )
     },
+)
+
+private fun ClassLeaderboardDto.toModel() = ClassLeaderboard(
+    carClass = carClass ?: "—",
+    leaderboardId = leaderboardId,
+    entries = entries.map { it.toModel() },
 )
 
 private fun LeaderboardEntryDto.toModel() = LapEntry(

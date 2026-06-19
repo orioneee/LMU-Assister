@@ -23,6 +23,9 @@ kotlinx-serialization = "1.8.0"
 kotlinx-datetime = "0.7.1"
 navigation = "2.9.2"
 paging = "3.5.0"
+javasteam = "1.8.0"
+bouncycastle = "1.78.1"
+androidx-security = "1.1.0-alpha06"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -53,6 +56,8 @@ ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "kto
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
+ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 
 # Koin (DI)
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
@@ -70,6 +75,11 @@ navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-co
 # Paging (official androidx multiplatform — 3.5.0 ships js/wasm variants too)
 paging-common = { module = "androidx.paging:paging-common", version.ref = "paging" }
 paging-compose = { module = "androidx.paging:paging-compose", version.ref = "paging" }
+
+# JavaSteam — SteamKit2 port (Android-only Steam auth) + BouncyCastle for crypto on Android
+javasteam = { module = "in.dragonbra:javasteam", version.ref = "javasteam" }
+bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "androidx-security" }
 
 # Coil 3 (multiplatform image loading)
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }

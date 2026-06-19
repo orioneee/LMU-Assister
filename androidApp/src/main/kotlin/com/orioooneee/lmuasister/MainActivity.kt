@@ -8,9 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.orioooneee.lmuasister.data.steam.initSteamStorage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Wire the encrypted token store before any Steam login can run.
+        initSteamStorage(applicationContext)
+
         // Transparent status + navigation bars with light (white) icons in both,
         // to match the dark app background.
         enableEdgeToEdge(

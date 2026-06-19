@@ -2,6 +2,7 @@ package com.orioooneee.lmuasister.ui.details
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -31,8 +32,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,20 +45,23 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.data.RaceRepository
+import com.orioooneee.lmuasister.data.model.CarGroup
+import com.orioooneee.lmuasister.data.model.ClassLeaderboard
 import com.orioooneee.lmuasister.data.model.Hotlap
 import com.orioooneee.lmuasister.data.model.LapEntry
 import com.orioooneee.lmuasister.data.model.Race
+import com.orioooneee.lmuasister.data.model.RaceLeaderboards
 import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
 import com.orioooneee.lmuasister.ui.components.ClassChip
+import com.orioooneee.lmuasister.ui.components.carClassColor
 import com.orioooneee.lmuasister.ui.components.CoverImage
 import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.onBadgeText
@@ -79,16 +85,14 @@ import com.orioooneee.lmuasister.ui.theme.ClassLmp2
 import com.orioooneee.lmuasister.ui.theme.ClassLmp3
 import com.orioooneee.lmuasister.ui.theme.ClassMixed
 import com.orioooneee.lmuasister.ui.util.formatLap
+import com.orioooneee.lmuasister.ui.util.formatSector
 import com.orioooneee.lmuasister.ui.util.skyColor
 import com.orioooneee.lmuasister.ui.util.skyEmoji
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import kotlin.time.Clock
 import lmuassister.shared.generated.resources.Res
-import lmuassister.shared.generated.resources.col_best_lap
-import lmuassister.shared.generated.resources.col_driver
-import lmuassister.shared.generated.resources.col_gap
-import lmuassister.shared.generated.resources.col_pos
+import lmuassister.shared.generated.resources.cars_section
 import lmuassister.shared.generated.resources.duration_race
 import lmuassister.shared.generated.resources.fastest_laps
 import lmuassister.shared.generated.resources.format
@@ -139,17 +143,17 @@ fun RaceDetailsScreen(
     // Leaderboard (fast) and hot-laps (async build) load in parallel — each resolves
     // its own skeleton independently. Offline-first: paint cached (memory/disk) instantly,
     // then refresh from the network. null = nothing cached yet → skeleton.
-    val leaderboard by produceState<List<LapEntry>?>(
-        if (race.leaderboardId != null) repo.peekLeaderboard(race.id) else emptyList(),
+    val leaderboards by produceState<RaceLeaderboards?>(
+        if (race.leaderboardId != null) repo.peekLeaderboards(race.id) else RaceLeaderboards.EMPTY,
         race.id,
     ) {
         if (race.leaderboardId == null) {
-            value = emptyList()
+            value = RaceLeaderboards.EMPTY
             return@produceState
         }
-        if (value == null) repo.cachedLeaderboard(race.id)?.let { value = it }
-        val fresh = repo.leaderboard(race.id).getOrNull()
-        if (fresh != null) value = fresh else if (value == null) value = emptyList()
+        if (value == null) repo.cachedLeaderboards(race.id)?.let { value = it }
+        val fresh = repo.leaderboards(race.id).getOrNull()
+        if (fresh != null) value = fresh else if (value == null) value = RaceLeaderboards.EMPTY
     }
     val hotlaps by produceState<List<Hotlap>?>(repo.peekHotlaps(race.id), race.id) {
         if (value == null) repo.cachedHotlaps(race.id)?.let { value = it }
@@ -202,12 +206,15 @@ fun RaceDetailsScreen(
             }
         }
 
-        val lbId = race.leaderboardId
-        if (lbId != null) {
+        if (race.carsByClass.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) { CarsTicker(race.carsByClass) }
+        }
+
+        if (race.leaderboardId != null) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                val lb = leaderboard
-                if (lb == null) LeaderboardSkeletonCard()
-                else LeaderboardCard(lb, onOpenFull = { onOpenLeaderboard(lbId, race.title) })
+                val lbs = leaderboards
+                if (lbs == null) LeaderboardSkeletonCard()
+                else LeaderboardCard(lbs, raceTitle = race.title, onOpenFull = onOpenLeaderboard)
             }
         }
         race.track?.let {
@@ -419,6 +426,68 @@ private fun ClassBadgeChip(label: String) {
     }
 }
 
+/** Class display order for the cars ticker (Hypercar first, then LMP, GT). */
+private fun classRank(carClass: String): Int {
+    val c = carClass.lowercase()
+    return when {
+        "hyper" in c -> 0
+        "lmp2" in c -> 1
+        "lmp3" in c -> 2
+        "gt3" in c -> 3
+        "gte" in c -> 4
+        else -> 5
+    }
+}
+
+/**
+ * Auto-scrolling marquee of every car available in the race, sorted by class.
+ * Each chip carries a class-coloured dot so the classes stay readable while it scrolls.
+ */
+@Composable
+private fun CarsTicker(groups: List<CarGroup>) {
+    val ordered = remember(groups) { groups.sortedBy { classRank(it.carClass) } }
+    if (ordered.all { it.cars.isEmpty() }) return
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            stringResource(Res.string.cars_section).uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = TextLow,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        // The marquee measures its content unbounded, so the chips must live in a
+        // wrap-content Row inside a full-width Box (the Box is the visible viewport).
+        Box(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.basicMarquee(iterations = Int.MAX_VALUE),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ordered.forEach { g ->
+                    g.cars.forEach { car -> CarTickerChip(car, g.carClass) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CarTickerChip(car: String, carClass: String) {
+    val accent = carClassColor(carClass)
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Surface2)
+            .border(1.dp, Outline, RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(accent))
+        Spacer(Modifier.width(7.dp))
+        Text(car, style = MaterialTheme.typography.labelMedium, color = TextHigh, maxLines = 1)
+    }
+}
+
 /**
  * Full-card leaderboard skeleton matching the first-open state: a shimmer title,
  * the column header, a single row, and the "show more" button — all shimmer.
@@ -553,88 +622,206 @@ internal fun gapLabel(deltaMs: Long): String =
 /** Wide enough for 4-digit ranks (full leaderboard goes into the thousands). */
 private val POS_COL_W = 44.dp
 
-/** Column header shared by the inline card and the full-leaderboard screen. */
-@Composable
-internal fun LeaderboardHeaderRow() {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Text(stringResource(Res.string.col_pos), Modifier.width(POS_COL_W), style = MaterialTheme.typography.labelSmall, color = TextLow)
-        Text(stringResource(Res.string.col_driver), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextLow)
-        Text(stringResource(Res.string.col_best_lap), Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
-        Text(stringResource(Res.string.col_gap), Modifier.width(60.dp), style = MaterialTheme.typography.labelSmall, color = TextLow, textAlign = TextAlign.End)
-    }
-}
-
 private const val LB_PREVIEW = 5
 
 @Composable
-private fun LeaderboardCard(entries: List<LapEntry>, onOpenFull: () -> Unit) {
+private fun LeaderboardCard(
+    lbs: RaceLeaderboards,
+    raceTitle: String,
+    onOpenFull: (leaderboardId: String, title: String) -> Unit,
+) {
+    // One tab per class when the backend splits the board; otherwise the single overall board.
+    val tabs = remember(lbs) {
+        (lbs.byClass.takeIf { it.isNotEmpty() } ?: listOfNotNull(lbs.overall))
+            .filter { it.entries.isNotEmpty() }
+    }
     Card(stringResource(Res.string.fastest_laps)) {
-        when {
-            entries.isEmpty() -> Text(
-                stringResource(Res.string.no_lap_times),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextLow,
-            )
-
-            else -> {
-                val best = entries.first().bestLapMs
-                val visible = entries.take(LB_PREVIEW)
-
-                Column(Modifier.fillMaxWidth()) {
-                    LeaderboardHeaderRow()
-                    visible.forEachIndexed { i, e -> LeaderboardRow(i, e, best) }
-
-                    Spacer(Modifier.height(6.dp))
-                    Box(
-                        Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable(onClick = onOpenFull)
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            stringResource(Res.string.full_leaderboard),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+        if (tabs.isEmpty()) {
+            Text(stringResource(Res.string.no_lap_times), style = MaterialTheme.typography.bodyMedium, color = TextLow)
+            return@Card
+        }
+        var selected by remember(lbs) { mutableStateOf(0) }
+        val board = tabs[selected.coerceIn(0, tabs.lastIndex)]
+        Column(Modifier.fillMaxWidth()) {
+            when {
+                tabs.size > 1 -> {
+                    LeaderboardTabs(tabs, selected) { selected = it }
+                    Spacer(Modifier.height(10.dp))
+                }
+                board.carClass.isNotBlank() && board.carClass != "—" -> ClassSectionHeader(board.carClass)
+            }
+            val leader = board.entries.firstOrNull()?.bestLapMs ?: 0L
+            board.entries.take(LB_PREVIEW).forEach { e -> LeaderboardRow(e, leader) }
+            // "Full leaderboard" opens whichever class tab is selected.
+            board.leaderboardId?.let { id ->
+                Spacer(Modifier.height(10.dp))
+                FullLeaderboardButton {
+                    val suffix = board.carClass.takeIf { it.isNotBlank() && it != "—" }
+                        ?.let { " · ${classLabelFull(it)}" } ?: ""
+                    onOpenFull(id, raceTitle + suffix)
                 }
             }
         }
     }
 }
 
+/** Segmented class selector — one chip per class, the active one filled in its class colour. */
 @Composable
-internal fun LeaderboardRow(i: Int, e: LapEntry, best: Long) {
+private fun LeaderboardTabs(tabs: List<ClassLeaderboard>, selected: Int, onSelect: (Int) -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (i % 2 == 1) Surface2 else Color.Transparent)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        tabs.forEachIndexed { i, b ->
+            val active = i == selected
+            val c = carClassColor(b.carClass)
+            Box(
+                Modifier.clip(RoundedCornerShape(8.dp))
+                    .background(if (active) c else Surface2)
+                    .border(1.dp, if (active) c else Outline, RoundedCornerShape(8.dp))
+                    .clickable { onSelect(i) }
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
+            ) {
+                Text(
+                    classLabelFull(b.carClass),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (active) onBadgeText(c) else TextMed,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FullLeaderboardButton(onClick: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            stringResource(Res.string.full_leaderboard),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+/** Class divider above a group of rows: colour dot + class name + a hairline rule. */
+@Composable
+internal fun ClassSectionHeader(carClass: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp, start = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("${e.rank}", Modifier.width(POS_COL_W), style = MaterialTheme.typography.bodyMedium, color = TextMed, maxLines = 1)
-        Column(Modifier.weight(1f)) {
-            Text(e.initials, style = MaterialTheme.typography.bodyMedium, color = TextHigh, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            e.carClass?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = TextLow, maxLines = 1) }
+        Box(Modifier.size(8.dp).clip(CircleShape).background(carClassColor(carClass)))
+        Spacer(Modifier.width(8.dp))
+        Text(classLabelFull(carClass), style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.weight(1f).height(1.dp).background(Outline))
+    }
+}
+
+private fun classLabelFull(carClass: String): String {
+    val c = carClass.lowercase()
+    return when {
+        "hyper" in c -> "HYPERCAR"
+        "gt3" in c -> "GT3"
+        "gte" in c -> "GTE"
+        "lmp2" in c -> "LMP2"
+        "lmp3" in c -> "LMP3"
+        else -> carClass.uppercase()
+    }
+}
+
+/**
+ * One leaderboard row: rank (class-tinted) · driver + car · lap time + gap, with the
+ * sector splits underneath. The car name auto-scrolls as a marquee when it's too long
+ * to fit, so full livery/team names stay readable without truncation.
+ */
+@Composable
+internal fun LeaderboardRow(e: LapEntry, leaderMs: Long, alt: Boolean = false) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (alt) Surface2 else Color.Transparent)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "${e.rank}",
+                Modifier.width(POS_COL_W),
+                style = MaterialTheme.typography.titleSmall,
+                color = e.carClass?.let { carClassColor(it) } ?: TextMed,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    e.initials,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextHigh,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                e.car?.let { car ->
+                    Text(
+                        car,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextLow,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE),
+                    )
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    formatLap(e.bestLapMs),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextHigh,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+                Text(
+                    if (e.bestLapMs <= leaderMs) "—" else gapLabel(e.bestLapMs - leaderMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMed,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                )
+            }
         }
+        // Sector splits as a subtle, full-width detail line under the row — shown only
+        // for complete 3-sector entries, indented to align with the driver column.
+        if (e.sectors.size == 3) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = POS_COL_W, top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                e.sectors.forEachIndexed { idx, s -> SectorSplit(idx + 1, s) }
+            }
+        }
+    }
+}
+
+/** One "S1 32.575" sector split for the leaderboard detail line. */
+@Composable
+private fun SectorSplit(index: Int, seconds: Double) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("S$index", style = MaterialTheme.typography.labelSmall, color = TextLow)
+        Spacer(Modifier.width(4.dp))
         Text(
-            formatLap(e.bestLapMs),
-            Modifier.width(84.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextHigh,
-            fontFamily = FontFamily.Monospace,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-        )
-        Text(
-            if (i == 0) "—" else gapLabel(e.bestLapMs - best),
-            Modifier.width(60.dp),
-            style = MaterialTheme.typography.bodySmall,
+            formatSector(seconds),
+            style = MaterialTheme.typography.labelSmall,
             color = TextMed,
-            textAlign = TextAlign.End,
+            fontFamily = FontFamily.Monospace,
             maxLines = 1,
         )
     }
@@ -647,8 +834,8 @@ private fun settingRows(s: RaceSettings): List<Pair<String, String>> = listOfNot
     s.setup?.let { stringResource(Res.string.set_setup) to it },
     s.assists?.let { stringResource(Res.string.set_assists) to it },
     s.damage?.let { stringResource(Res.string.set_damage) to it },
-    s.tireWear?.let { stringResource(Res.string.set_tire_wear) to "${it}x" },
-    s.fuelUsage?.let { stringResource(Res.string.set_fuel_usage) to "${it}x" },
+    s.tireWear?.let { stringResource(Res.string.set_tire_wear) to it },
+    s.fuelUsage?.let { stringResource(Res.string.set_fuel_usage) to it },
     s.safetyRank?.let { stringResource(Res.string.set_safety_rank) to it },
     s.driverRank?.let { stringResource(Res.string.set_driver_rank) to it },
     s.splitSize?.let { stringResource(Res.string.set_split_size) to it.toString() },

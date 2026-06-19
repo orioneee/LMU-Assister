@@ -16,6 +16,11 @@ kotlin {
         optIn.add("kotlin.time.ExperimentalTime")
     }
 
+    // We add a custom intermediate source set (jvmAndroidMain) with manual dependsOn,
+    // which disables auto-application of the default hierarchy — re-apply it explicitly
+    // so iosMain/jsMain/etc. keep their standard link to commonMain.
+    applyDefaultHierarchyTemplate()
+
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -54,9 +59,26 @@ kotlin {
     }
     
     sourceSets {
-        androidMain.dependencies {
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.ktor.client.okhttp)
+        // Shared Steam device-tunnel (Ktor raw sockets + websockets) — used by the
+        // Android/JVM/iOS clients. NOT js/wasm (browsers can't do raw TCP).
+        val tunnelMain = create("tunnelMain") {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(libs.ktor.client.websockets)
+                implementation(libs.ktor.network)
+            }
+        }
+        androidMain {
+            dependsOn(tunnelMain)
+            dependencies {
+                implementation(libs.compose.uiToolingPreview)
+                implementation(libs.ktor.client.okhttp)
+                // Encrypted token storage for the persisted Steam session.
+                implementation(libs.androidx.security.crypto)
+                // On-device Steam auth (Android keeps JavaSteam for now).
+                implementation(libs.javasteam)
+                implementation(libs.bouncycastle.prov)
+            }
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -88,11 +110,19 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
-        jvmMain.dependencies {
-            implementation(libs.ktor.client.cio)
+        jvmMain {
+            dependsOn(tunnelMain)
+            dependencies {
+                implementation(libs.ktor.client.cio)
+                // OkHttp engine for the tunnel WebSocket (CIO's WS has Cloudflare quirks).
+                implementation(libs.ktor.client.okhttp)
+            }
         }
-        iosMain.dependencies {
-            implementation(libs.ktor.client.darwin)
+        iosMain {
+            dependsOn(tunnelMain)
+            dependencies {
+                implementation(libs.ktor.client.darwin)
+            }
         }
         jsMain.dependencies {
             implementation(libs.wrappers.browser)

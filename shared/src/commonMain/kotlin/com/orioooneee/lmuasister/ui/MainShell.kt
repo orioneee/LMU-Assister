@@ -4,28 +4,42 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.ui.components.EmptyState
 import com.orioooneee.lmuasister.ui.components.RefreshableContent
 import com.orioooneee.lmuasister.ui.details.FullLeaderboardScreen
 import com.orioooneee.lmuasister.ui.details.RaceDetailsScreen
 import com.orioooneee.lmuasister.ui.home.HomeScreen
+import com.orioooneee.lmuasister.ui.profile.ProfileScreen
 import com.orioooneee.lmuasister.ui.theme.Carbon
+import com.orioooneee.lmuasister.ui.theme.Surface1
+import com.orioooneee.lmuasister.ui.theme.TextMed
 import kotlinx.serialization.Serializable
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.error_title
+import lmuassister.shared.generated.resources.nav_profile
+import lmuassister.shared.generated.resources.nav_schedule
 import lmuassister.shared.generated.resources.retry
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -34,83 +48,155 @@ import org.koin.compose.viewmodel.koinViewModel
 object HomeRoute
 
 @Serializable
+object ProfileRoute
+
+@Serializable
 data class DetailsRoute(val raceId: String)
 
 @Serializable
 data class LeaderboardRoute(val leaderboardId: String, val title: String)
 
-/** Single-screen app with a NavHost (Home ⇄ race details + a real back stack). */
+/** Top-level tabs shown in the bottom navigation bar. */
+private enum class TopTab(val icon: ImageVector) {
+    Schedule(IconSchedule),
+    Profile(IconPerson),
+}
+
+/**
+ * App shell: a bottom-navigation bar switches between the Schedule and Profile
+ * top-level tabs, with race details + leaderboard pushed onto the same back stack
+ * (the bar hides on those detail screens).
+ */
 @Composable
 fun MainShell(viewModel: ScheduleViewModel = koinViewModel()) {
+    val nav = rememberNavController()
+    val backStack by nav.currentBackStackEntryAsState()
+    val currentDest = backStack?.destination
+
+    // Bottom bar only on the top-level destinations — hidden on details/leaderboard.
+    val onTopLevel = currentDest?.hierarchy?.any {
+        it.hasRoute(HomeRoute::class) || it.hasRoute(ProfileRoute::class)
+    } == true
+
+    // Kick a fresh schedule update once on launch (cache is already painted instantly
+    // by the VM).
+    LaunchedEffect(Unit) { viewModel.refresh() }
+
+    Scaffold(
+        containerColor = Carbon,
+        bottomBar = {
+            if (onTopLevel) {
+                val onProfile = currentDest?.hierarchy?.any { it.hasRoute(ProfileRoute::class) } == true
+                BottomBar(
+                    selected = if (onProfile) TopTab.Profile else TopTab.Schedule,
+                    onSelect = { tab ->
+                        val route = if (tab == TopTab.Profile) ProfileRoute else HomeRoute
+                        nav.navigate(route) {
+                            popUpTo(HomeRoute) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
+        },
+    ) { insets ->
+        NavHost(
+            navController = nav,
+            startDestination = HomeRoute,
+            modifier = Modifier.fillMaxSize().padding(insets),
+        ) {
+            composable<HomeRoute> {
+                ScheduleTab(viewModel, onOpenRace = { nav.navigate(DetailsRoute(it.id)) })
+            }
+            composable<ProfileRoute> {
+                ProfileScreen()
+            }
+            composable<DetailsRoute> { entry ->
+                val id = entry.toRoute<DetailsRoute>().raceId
+                val state by viewModel.state.collectAsStateWithLifecycle()
+                val race = (state as? ScheduleUiState.Success)?.data?.schedule?.races?.firstOrNull { it.id == id }
+                if (race != null) {
+                    RaceDetailsScreen(
+                        race,
+                        onBack = { nav.popBackStack() },
+                        onOpenLeaderboard = { lbId, title ->
+                            nav.navigate(LeaderboardRoute(lbId, title))
+                        },
+                    )
+                }
+            }
+            composable<LeaderboardRoute> { entry ->
+                val route = entry.toRoute<LeaderboardRoute>()
+                FullLeaderboardScreen(
+                    leaderboardId = route.leaderboardId,
+                    title = route.title,
+                    onBack = { nav.popBackStack() },
+                )
+            }
+        }
+    }
+}
+
+/** Schedule tab: loading / error / the actual home screen, with pull-to-refresh. */
+@Composable
+private fun ScheduleTab(viewModel: ScheduleViewModel, onOpenRace: (Race) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val cars by viewModel.cars.collectAsStateWithLifecycle()
-    val nav = rememberNavController()
 
-    // Kick a fresh schedule update once on launch (cache is already painted instantly by
-    // the VM). The loader shows as the centered spinner (cold start) or the pull-to-refresh
-    // indicator (warm start).
-    LaunchedEffect(Unit) { viewModel.refresh() }
+    when (val s = state) {
+        is ScheduleUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
 
-    Scaffold(containerColor = Carbon) { insets ->
-        Box(Modifier.fillMaxSize().padding(insets)) {
-            when (val s = state) {
-                is ScheduleUiState.Loading -> Center { CircularProgressIndicator() }
+        is ScheduleUiState.Error -> EmptyState(
+            title = stringResource(Res.string.error_title),
+            subtitle = s.message,
+            accent = MaterialTheme.colorScheme.error,
+            actionLabel = stringResource(Res.string.retry),
+            onAction = viewModel::refresh,
+            modifier = Modifier.fillMaxSize(),
+        )
 
-                is ScheduleUiState.Error -> EmptyState(
-                    title = stringResource(Res.string.error_title),
-                    subtitle = s.message,
-                    accent = MaterialTheme.colorScheme.error,
-                    actionLabel = stringResource(Res.string.retry),
-                    onAction = viewModel::refresh,
-                    modifier = Modifier.fillMaxSize(),
+        is ScheduleUiState.Success -> {
+            val data = s.data
+            RefreshableContent(refreshing, viewModel::refresh) {
+                HomeScreen(
+                    schedule = data.schedule,
+                    weeks = data.weeks,
+                    selectedWeek = data.selected,
+                    onSelectWeek = viewModel::selectWeek,
+                    onOpenRace = onOpenRace,
+                    onRefresh = viewModel::refresh,
+                    cars = cars,
                 )
-
-                is ScheduleUiState.Success -> {
-                    val data = s.data
-                    NavHost(navController = nav, startDestination = HomeRoute) {
-                        composable<HomeRoute> {
-                            RefreshableContent(refreshing, viewModel::refresh) {
-                                HomeScreen(
-                                    schedule = data.schedule,
-                                    weeks = data.weeks,
-                                    selectedWeek = data.selected,
-                                    onSelectWeek = viewModel::selectWeek,
-                                    onOpenRace = { nav.navigate(DetailsRoute(it.id)) },
-                                    onRefresh = viewModel::refresh,
-                                    cars = cars,
-                                )
-                            }
-                        }
-                        composable<DetailsRoute> { entry ->
-                            val id = entry.toRoute<DetailsRoute>().raceId
-                            val race = data.schedule.races.firstOrNull { it.id == id }
-                            if (race != null) {
-                                RaceDetailsScreen(
-                                    race,
-                                    onBack = { nav.popBackStack() },
-                                    onOpenLeaderboard = { lbId, title ->
-                                        nav.navigate(LeaderboardRoute(lbId, title))
-                                    },
-                                )
-                            }
-                        }
-                        composable<LeaderboardRoute> { entry ->
-                            val route = entry.toRoute<LeaderboardRoute>()
-                            FullLeaderboardScreen(
-                                leaderboardId = route.leaderboardId,
-                                title = route.title,
-                                onBack = { nav.popBackStack() },
-                            )
-                        }
-                    }
-                }
             }
         }
     }
 }
 
 @Composable
-private fun Center(content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
+private fun BottomBar(selected: TopTab, onSelect: (TopTab) -> Unit) {
+    NavigationBar(containerColor = Surface1) {
+        TopTab.entries.forEach { tab ->
+            val label = when (tab) {
+                TopTab.Schedule -> stringResource(Res.string.nav_schedule)
+                TopTab.Profile -> stringResource(Res.string.nav_profile)
+            }
+            NavigationBarItem(
+                selected = selected == tab,
+                onClick = { onSelect(tab) },
+                icon = { Icon(tab.icon, contentDescription = label) },
+                label = { Text(label) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = TextMed,
+                    unselectedTextColor = TextMed,
+                ),
+            )
+        }
+    }
 }

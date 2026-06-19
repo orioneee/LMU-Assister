@@ -1,5 +1,6 @@
 package com.orioooneee.lmuasister.data.remote
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 // ── LmuAssister backend: GET {BACKEND_URL}/{schedule,race/<id>} ────────────────
@@ -19,11 +20,29 @@ data class WeekDto(
     val label: String = "",
 )
 
-/** GET /race/<id> — the race + its fastest-lap leaderboard (fast; no hot-laps). */
+/** GET /race/<id> — the race + its fastest-lap leaderboards (fast; no hot-laps). */
 @Serializable
 data class RaceDetailResponse(
     val race: RaceDto? = null,
+    // Legacy flat top-5 (the overall board) — kept for backward compatibility.
     val leaderboard: List<LeaderboardEntryDto> = emptyList(),
+    // New: overall + per-class boards, each with its own leaderboard_id.
+    val leaderboards: LeaderboardsDto? = null,
+)
+
+@Serializable
+data class LeaderboardsDto(
+    val overall: ClassLeaderboardDto? = null,
+    val byClass: List<ClassLeaderboardDto> = emptyList(),
+)
+
+/** One class's board: top-N entries plus the id to open its full leaderboard. */
+@Serializable
+data class ClassLeaderboardDto(
+    val classId: String? = null,
+    @SerialName("class") val carClass: String? = null,
+    val leaderboardId: String? = null,
+    val entries: List<LeaderboardEntryDto> = emptyList(),
 )
 
 /** GET /race/<id>/hotlaps — async: "ready" with results, or "pending" (still building). */
@@ -58,6 +77,7 @@ data class RaceDto(
     val difficulty: String = "",
     val carClasses: List<String> = emptyList(),
     val classInfos: List<ClassInfoDto> = emptyList(),
+    val carsByClass: List<CarsByClassDto> = emptyList(),
     val times: List<String> = emptyList(),
     val raceLength: Int = 0,
     val settings: SettingsDto = SettingsDto(),
@@ -75,13 +95,23 @@ data class ClassInfoDto(
     val colorHex: String? = null,
 )
 
+/** One class bucket of `cars_by_class` — the car models available in that class. */
+@Serializable
+data class CarsByClassDto(
+    // JSON key is the Kotlin keyword "class"; @SerialName overrides the snake-case strategy.
+    @SerialName("class") val carClass: String = "",
+    val cars: List<String> = emptyList(),
+)
+
 @Serializable
 data class SettingsDto(
     val setup: String? = null,
     val assists: String? = null,
     val damage: String? = null,
-    val tireWear: Int? = null,
-    val fuelUsage: Int? = null,
+    // Backend sends these as either a multiplier int (1) or a label ("Realistic"),
+    // so they must be strings — a strict Int? here breaks the whole schedule decode.
+    val tireWear: String? = null,
+    val fuelUsage: String? = null,
     val safetyRank: String? = null,
     val driverRank: String? = null,
     val splitSize: Int? = null,

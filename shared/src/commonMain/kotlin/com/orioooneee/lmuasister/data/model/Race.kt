@@ -26,6 +26,12 @@ data class ClassInfo(
     val colorHex: String?,
 )
 
+/** Cars available in a race, grouped by their class (from `cars_by_class`). */
+data class CarGroup(
+    val carClass: String,
+    val cars: List<String>,
+)
+
 /** Track details enriched from lmuportal `tracks`. */
 data class TrackInfo(
     val name: String,
@@ -85,8 +91,8 @@ data class RaceSettings(
     val setup: String?,
     val assists: String?,
     val damage: String?,
-    val tireWear: Int?,
-    val fuelUsage: Int?,
+    val tireWear: String?,
+    val fuelUsage: String?,
     val safetyRank: String?,
     val driverRank: String?,
     val splitSize: Int?,
@@ -112,6 +118,7 @@ data class Race(
     val difficulty: String,
     val carClasses: List<String>,
     val classInfos: List<ClassInfo>,
+    val carsByClass: List<CarGroup> = emptyList(),
     val times: List<Instant>,
     val raceLength: Int,
     val settings: RaceSettings,
@@ -128,6 +135,25 @@ data class Race(
     val accentColorHex: String? get() = classInfos.firstOrNull { it.colorHex != null }?.colorHex
 
     fun nextStart(now: Instant): Instant? = times.firstOrNull { it >= now }
+}
+
+/** One class's fastest-lap board: top entries + the id to open the full leaderboard. */
+data class ClassLeaderboard(
+    val carClass: String,
+    val leaderboardId: String?,
+    val entries: List<LapEntry>,
+)
+
+/** All of a race's boards: an overall board plus one per car class (for the tabs). */
+data class RaceLeaderboards(
+    val overall: ClassLeaderboard? = null,
+    val byClass: List<ClassLeaderboard> = emptyList(),
+) {
+    val isEmpty: Boolean get() = overall == null && byClass.isEmpty()
+
+    companion object {
+        val EMPTY = RaceLeaderboards()
+    }
 }
 
 /** One leaderboard row (fastest-lap board) for a race. */

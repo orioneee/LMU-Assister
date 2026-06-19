@@ -71,15 +71,19 @@ fun FullLeaderboardScreen(leaderboardId: String, title: String, onBack: () -> Un
                 )
             }
         }
-        LeaderboardHeaderRow()
-
-        val best = if (entries.itemCount > 0) entries.peek(0)?.bestLapMs ?: 0L else 0L
+        // One leaderboard id is a single class, so a header derived from the first row
+        // labels the whole board; gaps are measured against that overall fastest lap.
+        val first = if (entries.itemCount > 0) entries.peek(0) else null
+        val best = first?.bestLapMs ?: 0L
+        first?.carClass?.let { cls ->
+            Column(Modifier.padding(horizontal = 12.dp)) { ClassSectionHeader(cls) }
+        }
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         ) {
             items(entries.itemCount) { index ->
-                entries[index]?.let { e -> LeaderboardRow(index, e, best) }
+                entries[index]?.let { e -> LeaderboardRow(e, best, alt = index % 2 == 1) }
             }
 
             when (val append = entries.loadState.append) {

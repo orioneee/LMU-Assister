@@ -6,6 +6,7 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import com.orioooneee.lmuasister.data.image.SvgCssInlineDecoder
+import com.orioooneee.lmuasister.data.steam.steamModule
 import com.orioooneee.lmuasister.di.appModule
 import com.orioooneee.lmuasister.ui.MainShell
 import com.orioooneee.lmuasister.ui.theme.LmuTheme
@@ -27,7 +28,7 @@ fun App() {
             .build()
     }
 
-    KoinApplication(application = { modules(appModule) }) {
+    KoinApplication(application = { modules(appModule, steamModule()) }) {
         LmuTheme {
             MainShell()
         }

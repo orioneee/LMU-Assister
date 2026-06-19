@@ -2,7 +2,9 @@ package com.orioooneee.lmuasister.di
 
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.remote.BackendApi
+import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
+import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import org.koin.core.module.dsl.viewModelOf
@@ -26,6 +28,9 @@ val appModule = module {
         }
     }
     single { BackendApi(get()) }
+    single { SteamBackendApi(get()) }
     single { RaceRepository(get()) }
     viewModelOf(::ScheduleViewModel)
+    // SteamAuthClient itself is bound per-platform via steamModule().
+    viewModelOf(::SteamLoginViewModel)
 }

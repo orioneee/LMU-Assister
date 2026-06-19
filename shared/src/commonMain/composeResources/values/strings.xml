@@ -9,6 +9,18 @@
     <string name="section_daily">Daily</string>
     <string name="section_weekly">Weekly</string>
 
+    <!-- Bottom navigation -->
+    <string name="nav_schedule">Schedule</string>
+    <string name="nav_profile">My Profile</string>
+
+    <!-- Profile / Steam login -->
+    <string name="profile_login_title">Sign in through Steam</string>
+    <string name="profile_login_subtitle">Use your Steam account credentials.</string>
+    <string name="profile_field_login">Login</string>
+    <string name="profile_field_password">Password</string>
+    <string name="profile_field_2fa">2FA code</string>
+    <string name="profile_sign_in">Sign in</string>
+
     <!-- Loading / errors -->
     <string name="retry">Retry</string>
     <string name="couldnt_load">Couldn’t load</string>
