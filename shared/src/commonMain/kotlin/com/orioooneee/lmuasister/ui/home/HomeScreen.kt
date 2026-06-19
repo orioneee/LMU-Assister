@@ -22,7 +22,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +42,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -50,6 +53,7 @@ import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.Schedule
+import com.orioooneee.lmuasister.ui.IconGithub
 import com.orioooneee.lmuasister.ui.WeekTab
 import com.orioooneee.lmuasister.ui.components.EmptyState
 import com.orioooneee.lmuasister.ui.components.HeroRaceTimesCard
@@ -76,6 +80,8 @@ import lmuassister.shared.generated.resources.tab_races
 import lmuassister.shared.generated.resources.tab_special
 import org.jetbrains.compose.resources.stringResource
 
+private const val REPO_URL = "https://github.com/orioneee/LMU-Assister"
+
 @Composable
 fun HomeScreen(
     schedule: Schedule,
@@ -92,15 +98,15 @@ fun HomeScreen(
     val density = LocalDensity.current
     val windowInfo = LocalWindowInfo.current
     val heroHeight = with(density) { windowInfo.containerSize.height.toDp() / 3 }.coerceIn(180.dp, 300.dp)
+    val uriHandler = LocalUriHandler.current
+    val openRepo = { uriHandler.openUri(REPO_URL) }
 
     // No upcoming races at all → just the (optional) week pills + empty state.
     if (tabs.isEmpty()) {
         Column(Modifier.fillMaxSize().background(Carbon)) {
             Spacer(Modifier.height(12.dp))
-            if (weeks.size > 1) {
-                WeekPillsRow(weeks, selectedWeek, onSelectWeek)
-                Spacer(Modifier.height(12.dp))
-            }
+            ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo)
+            Spacer(Modifier.height(12.dp))
             NoRaces(Modifier.weight(1f), onRefresh)
         }
         return
@@ -143,10 +149,8 @@ fun HomeScreen(
                 .background(Carbon),
         ) {
             Spacer(Modifier.height(12.dp))
-            if (weeks.size > 1) {
-                WeekPillsRow(weeks, selectedWeek, onSelectWeek)
-                Spacer(Modifier.height(12.dp))
-            }
+            ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo)
+            Spacer(Modifier.height(12.dp))
             // Tabs only for Special / Championship — the main Daily+Weekly grid needs none.
             if (tabs.size > 1) {
                 Row(
@@ -161,6 +165,30 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.height(8.dp))
             }
+        }
+    }
+}
+
+/** Top bar of the schedule: week tabs on the left, a GitHub-repo link in the top-right. */
+@Composable
+private fun ScheduleTopBar(
+    weeks: List<WeekTab>,
+    selectedWeek: String,
+    onSelectWeek: (String) -> Unit,
+    onOpenRepo: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(end = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.weight(1f)) {
+            if (weeks.size > 1) WeekPillsRow(weeks, selectedWeek, onSelectWeek)
+        }
+        Box(
+            Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onOpenRepo),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(IconGithub, contentDescription = "Open GitHub repository", tint = TextMed, modifier = Modifier.size(22.dp))
         }
     }
 }

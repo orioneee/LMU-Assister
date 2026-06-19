@@ -34,6 +34,12 @@
 
 > Steam login runs through a backend **sidecar** that egresses via the device's own IP over a SOCKS-over-WebSocket tunnel — no on-device Steam client, identical flow on every platform. Tokens are persisted securely per platform (Android `EncryptedSharedPreferences`, iOS **Keychain**, JVM a local file).
 
+## 🔐 Security & privacy
+
+- **Your Steam login, password and 2FA code are never stored or logged.** They travel to the server **only** to mint a Steam session ticket — the credential needed to talk to the game's backend — and are discarded the moment that exchange completes. They are never written to disk, a database, or any log on either side.
+- **Steam refresh/access tokens stay on your device, encrypted.** What's kept for staying signed in (the refresh token & friends) lives **only locally** — encrypted at rest via Android `EncryptedSharedPreferences` / iOS Keychain. The backend never persists them.
+- **Why Android doesn't bundle JavaSteam (SteamKit).** Doing Steam auth on-device would pull in JavaSteam + BouncyCastle, noticeably **bloating the APK** and forcing a **separate, Android-only login code path** to maintain. Instead Android uses the same device-tunnel flow as iOS/Desktop — one sign-in path, smaller binary.
+
 ## 🧱 Tech stack
 
 | Concern | Library |
@@ -46,28 +52,6 @@
 | Images | Coil 3 (+ SVG) |
 | Pagination | AndroidX Paging 3 (multiplatform) |
 | Secure storage | `androidx.security.crypto` / iOS Keychain |
-
-## 🏗️ Architecture
-
-```
-HttpClient → BackendApi / SteamBackendApi → RaceRepository → ViewModels → Compose UI
-```
-
-- **Offline-first**: every screen paints from a local cache instantly, then revalidates over the network and keeps the cache on failure.
-- **`expect`/`actual`** isolates platform code (secure storage, dial resolver, WS client) behind common interfaces; a shared `tunnelMain` source set carries the Steam tunnel for Android/JVM/iOS.
-- All upstream merging (schedule, assets, weather, leaderboards) happens server-side; the client talks to one stable REST surface and never scrapes.
-
-## 📂 Project structure
-
-```
-shared/        Kotlin Multiplatform module (all business logic + Compose UI)
-  src/commonMain   shared code (UI, data, DI)
-  src/androidMain  · iosMain · jvmMain   platform actuals
-  src/tunnelMain   shared Steam device-tunnel (Android/JVM/iOS)
-androidApp/    Android entry point
-iosApp/        iOS entry point (Xcode project + SwiftUI host)
-desktopApp/    Desktop (JVM) entry point
-```
 
 ## 🚀 Running the apps
 
