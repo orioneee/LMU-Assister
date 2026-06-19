@@ -3,7 +3,9 @@ package com.orioooneee.lmuasister.data.remote
 import com.orioooneee.lmuasister.config.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
 import io.ktor.http.encodeURLPathPart
 import io.ktor.http.encodeURLQueryComponent
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -15,6 +17,9 @@ import kotlinx.serialization.json.JsonNamingStrategy
 val AppJson: Json = Json {
     ignoreUnknownKeys = true
     isLenient = true
+    // Explicit JSON null on a non-null field → fall back to its default (e.g. position: null
+    // on a no-result race would otherwise break the whole decode).
+    coerceInputValues = true
     namingStrategy = JsonNamingStrategy.SnakeCase
 }
 
@@ -50,17 +55,22 @@ class BackendApi(private val client: HttpClient) {
     suspend fun cars(): CarsResponse =
         AppJson.decodeFromString(client.get("$API_BASE/cars").bodyAsText())
 
-    /** One page of the full official leaderboard (cursor-paginated). */
+    /** One page of the full official leaderboard (cursor-paginated). When [token] is
+     *  supplied, the response also carries the caller's own row + rank (`me`). */
     suspend fun leaderboardPage(
         leaderboardId: String,
         cursor: String? = null,
         limit: Int = 50,
+        token: String? = null,
     ): LeaderboardPageResponse {
         val url = buildString {
             append("$API_BASE/leaderboard/${leaderboardId.encodeURLPathPart()}?limit=$limit")
             if (!cursor.isNullOrBlank()) append("&cursor=${cursor.encodeURLQueryComponent()}")
         }
-        return AppJson.decodeFromString(client.get(url).bodyAsText())
+        val body = client.get(url) {
+            if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
+        }.bodyAsText()
+        return AppJson.decodeFromString(body)
     }
 
     /** Absolute URL for a proxied image path the backend returns ("/api/v1/img/…"). */

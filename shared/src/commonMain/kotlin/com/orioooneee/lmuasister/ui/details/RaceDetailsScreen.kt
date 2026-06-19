@@ -640,7 +640,9 @@ private fun LeaderboardCard(
             Text(stringResource(Res.string.no_lap_times), style = MaterialTheme.typography.bodyMedium, color = TextLow)
             return@Card
         }
-        var selected by remember(lbs) { mutableStateOf(0) }
+        // Key on the class set (not the whole data) so a cache→fresh refresh keeps the
+        // user's selected class instead of snapping back to the first tab.
+        var selected by remember(tabs.map { it.carClass }) { mutableStateOf(0) }
         val board = tabs[selected.coerceIn(0, tabs.lastIndex)]
         Column(Modifier.fillMaxWidth()) {
             when {
@@ -651,6 +653,16 @@ private fun LeaderboardCard(
                 board.carClass.isNotBlank() && board.carClass != "—" -> ClassSectionHeader(board.carClass)
             }
             val leader = board.entries.firstOrNull()?.bestLapMs ?: 0L
+            // Where the signed-in player sits on this class's board (token-gated; waits
+            // briefly for the token, null when not signed in / no entry).
+            val repo = koinInject<RaceRepository>()
+            val me by produceState<LapEntry?>(null, board.leaderboardId) {
+                value = board.leaderboardId?.let { runCatching { repo.leaderboardMe(it) }.getOrNull() }
+            }
+            me?.let { m ->
+                YourPositionRow(m, leader)
+                Spacer(Modifier.height(10.dp))
+            }
             board.entries.take(LB_PREVIEW).forEach { e -> LeaderboardRow(e, leader) }
             // "Full leaderboard" opens whichever class tab is selected.
             board.leaderboardId?.let { id ->
@@ -661,6 +673,28 @@ private fun LeaderboardCard(
                     onOpenFull(id, raceTitle + suffix)
                 }
             }
+        }
+    }
+}
+
+/** The signed-in player's own row, tinted and labelled, above the board preview. */
+@Composable
+private fun YourPositionRow(entry: LapEntry, leader: Long) {
+    val accent = MaterialTheme.colorScheme.primary
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            "YOUR POSITION",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMed,
+            fontWeight = FontWeight.Bold,
+        )
+        Box(
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(accent.copy(alpha = 0.12f))
+                .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+        ) {
+            LeaderboardRow(entry, leader)
         }
     }
 }

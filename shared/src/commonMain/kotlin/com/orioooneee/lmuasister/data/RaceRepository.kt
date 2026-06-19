@@ -21,6 +21,7 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.orioooneee.lmuasister.data.cache.LocalCache
 import com.orioooneee.lmuasister.data.remote.AppJson
+import com.orioooneee.lmuasister.data.remote.AppTokenHolder
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.CarDto
 import com.orioooneee.lmuasister.data.remote.ClassInfoDto
@@ -75,7 +76,10 @@ private fun dedupCars(dtos: List<CarDto>): List<CarModel> =
  * source into the unified race model, so this just fetches, caches the one
  * `/schedule` payload, and maps DTOs → [Race]/[Schedule].
  */
-class RaceRepository(private val api: BackendApi) {
+class RaceRepository(
+    private val api: BackendApi,
+    private val tokenHolder: AppTokenHolder,
+) {
 
     // Offline-first: the whole schedule arrives in one call. We keep it in memory
     // and persist it (1 wrapper with a timestamp) so a cold start can paint instantly
@@ -202,10 +206,25 @@ class RaceRepository(private val api: BackendApi) {
         ) {
             LeaderboardPagingSource(api, leaderboardId)
         }
+
+    /**
+     * The signed-in player's own row on a board (rank + lap), or null. Waits a short
+     * moment for the app token (the session restores async at launch); if it isn't there
+     * in time, returns null and the screen just renders the public board.
+     */
+    suspend fun leaderboardMe(leaderboardId: String): LapEntry? {
+        val token = tokenHolder.await(LB_TOKEN_WAIT_MS) ?: return null
+        return runCatching {
+            api.leaderboardPage(leaderboardId, limit = 1, token = token).me?.toModel()
+        }.getOrNull()
+    }
 }
 
 // Backend caps a page at 100 rows; big page + big prefetch keeps the loader off-screen.
 private const val LB_PAGE_SIZE = 100
+
+// How long to wait for the app token before fetching the board without "me".
+private const val LB_TOKEN_WAIT_MS = 2500L
 
 /** Backs the full-leaderboard screen — keyed by the backend's opaque cursor. */
 private class LeaderboardPagingSource(

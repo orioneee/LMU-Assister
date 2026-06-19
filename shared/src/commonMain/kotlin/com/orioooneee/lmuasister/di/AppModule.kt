@@ -1,6 +1,7 @@
 package com.orioooneee.lmuasister.di
 
 import com.orioooneee.lmuasister.data.RaceRepository
+import com.orioooneee.lmuasister.data.remote.AppTokenHolder
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
@@ -29,8 +30,9 @@ val appModule = module {
     }
     single { BackendApi(get()) }
     single { SteamBackendApi(get()) }
-    single { RaceRepository(get()) }
+    single { AppTokenHolder() }
+    single { RaceRepository(get(), get()) }
     viewModelOf(::ScheduleViewModel)
-    // SteamAuthClient itself is bound per-platform via steamModule().
+    // SteamSignIn / SteamSessionStore are bound per-platform via steamModule().
     viewModelOf(::SteamLoginViewModel)
 }

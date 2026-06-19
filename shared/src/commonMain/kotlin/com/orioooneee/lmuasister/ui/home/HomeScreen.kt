@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,16 +27,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.data.model.RaceType
@@ -83,47 +93,85 @@ fun HomeScreen(
     val windowInfo = LocalWindowInfo.current
     val heroHeight = with(density) { windowInfo.containerSize.height.toDp() / 3 }.coerceIn(180.dp, 300.dp)
 
-    Column(Modifier.fillMaxSize().background(Carbon)) {
-        Spacer(Modifier.height(12.dp))
-
-        if (weeks.size > 1) {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                weeks.forEach { w -> WeekPill(w.label, w.key == selectedWeek) { onSelectWeek(w.key) } }
-            }
+    // No upcoming races at all → just the (optional) week pills + empty state.
+    if (tabs.isEmpty()) {
+        Column(Modifier.fillMaxSize().background(Carbon)) {
             Spacer(Modifier.height(12.dp))
-        }
-
-        if (tabs.isEmpty()) {
+            if (weeks.size > 1) {
+                WeekPillsRow(weeks, selectedWeek, onSelectWeek)
+                Spacer(Modifier.height(12.dp))
+            }
             NoRaces(Modifier.weight(1f), onRefresh)
-            return@Column
         }
+        return
+    }
 
-        val pager = rememberPagerState(pageCount = { tabs.size })
-        val scope = rememberCoroutineScope()
+    val pager = rememberPagerState(pageCount = { tabs.size })
+    val scope = rememberCoroutineScope()
+    val isCurrentWeek = weeks.isEmpty() || selectedWeek == weeks.first().key
 
-        // Tabs only for Special / Championship — the main Daily+Weekly grid needs none.
-        if (tabs.size > 1) {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                tabs.forEachIndexed { i, tab ->
-                    TierTab(tab.label(), pager.currentPage == i) {
-                        scope.launch { pager.animateScrollToPage(i) }
+    // Collapsing header: the week pills + tier tabs translate up with the list as it
+    // scrolls (enter-always), instead of staying pinned at the top.
+    val headerHeight = remember { mutableStateOf(0f) }
+    val headerOffset = remember { mutableStateOf(0f) }
+    val connection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val h = headerHeight.value
+                if (h <= 0f) return Offset.Zero
+                val old = headerOffset.value
+                val new = (old + available.y).coerceIn(-h, 0f)
+                headerOffset.value = new
+                return Offset(0f, new - old) // consume the part used to move the header
+            }
+        }
+    }
+
+    Box(Modifier.fillMaxSize().clipToBounds().background(Carbon).nestedScroll(connection)) {
+        // Pager content, pushed down by the currently-visible header height.
+        Box(Modifier.fillMaxSize().offset { IntOffset(0, (headerHeight.value + headerOffset.value).roundToInt()) }) {
+            HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+                TabContent(tabs[page], schedule, heroHeight, isCurrentWeek, now, onOpenRace, onRefresh)
+            }
+        }
+        // The header itself, translating up as the user scrolls.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(0, headerOffset.value.roundToInt()) }
+                .onSizeChanged { headerHeight.value = it.height.toFloat() }
+                .background(Carbon),
+        ) {
+            Spacer(Modifier.height(12.dp))
+            if (weeks.size > 1) {
+                WeekPillsRow(weeks, selectedWeek, onSelectWeek)
+                Spacer(Modifier.height(12.dp))
+            }
+            // Tabs only for Special / Championship — the main Daily+Weekly grid needs none.
+            if (tabs.size > 1) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    tabs.forEachIndexed { i, tab ->
+                        TierTab(tab.label(), pager.currentPage == i) {
+                            scope.launch { pager.animateScrollToPage(i) }
+                        }
                     }
                 }
+                Spacer(Modifier.height(8.dp))
             }
-            Spacer(Modifier.height(8.dp))
         }
+    }
+}
 
-        val isCurrentWeek = weeks.isEmpty() || selectedWeek == weeks.first().key
-
-        HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
-            TabContent(tabs[page], schedule, heroHeight, isCurrentWeek, now, onOpenRace, onRefresh)
-        }
+@Composable
+private fun WeekPillsRow(weeks: List<WeekTab>, selectedWeek: String, onSelectWeek: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        weeks.forEach { w -> WeekPill(w.label, w.key == selectedWeek) { onSelectWeek(w.key) } }
     }
 }
 

@@ -3,9 +3,9 @@ package com.orioooneee.lmuasister.data.steam
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import org.koin.dsl.module
 
-// Android keeps on-device JavaSteam (ready to switch to the tunnel later if needed).
+// Android uses the device-tunnel mechanism (sidecar logs into Steam through the phone's
+// IP) — same path as JVM/iOS. No on-device Steam client.
 actual fun steamModule() = module {
-    single<SteamAuthClient> { JavaSteamAuthClient() }
     single<SteamSessionStore> { steamSessionStore() }
-    single<SteamSignIn> { AndroidSteamSignIn(get(), get<SteamBackendApi>(), get()) }
+    single<SteamSignIn> { TunnelSteamSignIn(get<SteamBackendApi>(), get()) }
 }

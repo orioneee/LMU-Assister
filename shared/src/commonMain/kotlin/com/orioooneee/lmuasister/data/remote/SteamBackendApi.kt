@@ -13,12 +13,10 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
+import io.ktor.http.encodeURLPathPart
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-
-@Serializable
-data class SteamAuthResponse(val token: String, val uid: String)
 
 /** Steam refresh creds handed back to the device by /auth/steam/login — device-only secret. */
 @Serializable
@@ -68,24 +66,24 @@ class SteamGuardNeeded(val kind: String) : Exception("need_guard:$kind")
  */
 class SteamBackendApi(private val client: HttpClient) {
 
-    /** Exchanges a Steam Web API ticket (hex) for our token. */
-    suspend fun authSteam(ticketHex: String): SteamAuthResponse {
-        val resp = client.post("$API_BASE/auth/steam") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"ticket":"$ticketHex"}""") // hex is [0-9a-f], no escaping needed
-        }
-        return when (resp.status.value) {
-            in 200..299 -> AppJson.decodeFromString(resp.bodyAsText())
-            else -> throw resp.toError()
-        }
-    }
-
     suspend fun profile(token: String): SteamProfile =
         AppJson.decodeFromString(getAuthed("$API_BASE/profile", token))
 
     suspend fun stats(token: String): String = getAuthed("$API_BASE/profile/stats", token)
-    suspend fun races(token: String, limit: Int = 20): String =
-        getAuthed("$API_BASE/profile/races?limit=$limit", token)
+
+    /** One paginated page (5/page) of the player's full race history. */
+    suspend fun racesPage(token: String, page: Int): RacesPageDto =
+        AppJson.decodeFromString(getAuthed("$API_BASE/profile/races?page=$page", token))
+
+    /** Full race-page detail by eventId (split disambiguates which split you raced). */
+    suspend fun raceDetail(token: String, eventId: String, split: Int?, page: Int?): RaceDetailDto {
+        val qs = buildList {
+            split?.let { add("split=$it") }
+            page?.let { add("page=$it") }
+        }.joinToString("&")
+        val url = "$API_BASE/profile/race/${eventId.encodeURLPathPart()}" + if (qs.isEmpty()) "" else "?$qs"
+        return AppJson.decodeFromString(getAuthed(url, token))
+    }
 
     // ── tunnel-based credential auth (JVM/iOS) ────────────────────────────────────
 

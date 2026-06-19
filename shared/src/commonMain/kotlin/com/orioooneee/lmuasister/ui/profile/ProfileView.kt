@@ -4,9 +4,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,11 +44,11 @@ import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SessionSummaryDto
 import com.orioooneee.lmuasister.data.remote.SteamProfile
 import com.orioooneee.lmuasister.ui.IconFlag
+import com.orioooneee.lmuasister.ui.TrackLogoIndex
 import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.SectionHeader
 import com.orioooneee.lmuasister.ui.components.ShimmerBar
 import com.orioooneee.lmuasister.ui.components.classColorFor
-import com.orioooneee.lmuasister.ui.components.difficultyColor
 import com.orioooneee.lmuasister.ui.components.onBadgeText
 import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import androidx.compose.material3.Icon
@@ -84,8 +87,16 @@ private fun roman(n: Int): String = when (n) {
 private fun prettyBadge(badge: String): String =
     badge.split('-', '_').joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) }
 
+/** How many recent races to show inline before the "See more" button. */
+private const val RECENT_PREVIEW = 3
+
 @Composable
-fun ProfileView(profile: SteamProfile, accountName: String) {
+fun ProfileView(
+    profile: SteamProfile,
+    accountName: String,
+    onSeeAllRaces: () -> Unit = {},
+    onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
+) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         ProfileHeader(profile, accountName)
         RatingsRow(profile.driverRating, profile.safetyRating)
@@ -93,9 +104,44 @@ fun ProfileView(profile: SteamProfile, accountName: String) {
         if (profile.recentRaces.isNotEmpty()) {
             SectionHeader("Recent races")
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                profile.recentRaces.forEach { RaceHistoryRow(it) }
+                profile.recentRaces.take(RECENT_PREVIEW).forEach { race ->
+                    Box(
+                        Modifier.clip(RoundedCornerShape(12.dp))
+                            .clickable(enabled = race.eventId != null) {
+                                race.eventId?.let { onOpenRace(it, race.split) }
+                            },
+                    ) {
+                        RaceHistoryRow(race)
+                    }
+                }
+                if (profile.recentRaces.size > RECENT_PREVIEW) {
+                    SeeMoreButton(onSeeAllRaces)
+                }
             }
         }
+    }
+}
+
+/** "See all" CTA under the recent-races preview → opens the full paginated history. */
+@Composable
+private fun SeeMoreButton(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface1)
+            .border(1.dp, Outline, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "See all races",
+            style = MaterialTheme.typography.labelLarge,
+            color = Amber,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -122,6 +168,7 @@ fun ProfileSkeleton() {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProfileHeader(profile: SteamProfile, accountName: String) {
     val accent = rankColor(profile.driverRating?.rank.orEmpty())
@@ -137,12 +184,15 @@ private fun ProfileHeader(profile: SteamProfile, accountName: String) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            // One row: licence badge(s) + in-game-style DR / SR rating badges.
             val badges = profile.badges.ifEmpty { listOfNotNull(profile.badge) }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                profile.nationality?.let {
-                    Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = TextMed)
-                }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 badges.take(3).forEach { OutlinePill(prettyBadge(it), Amber) }
+                RatingPill("DR", profile.driverRating)
+                RatingPill("SR", profile.safetyRating)
             }
             SuspensionStatus(profile.activeSuspensions)
         }
@@ -170,6 +220,33 @@ private fun CountryFlag(nationality: String?, accent: Color) {
         contentScale = ContentScale.Crop, // fill the circle
         modifier = box,
     )
+}
+
+/** Two-segment rating badge in the same style as the schedule's SrBadge: "DR | Bronze III". */
+@Composable
+private fun RatingPill(label: String, rating: RatingDto?) {
+    if (rating == null || rating.rank.isBlank()) return
+    val color = rankColor(rating.rank)
+    // Compact in-game style: first letter of the rank + tier number, e.g. "B3", "S2".
+    val letter = rating.rank.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty()
+    val value = letter + if (rating.tier > 0) rating.tier.toString() else ""
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Outline, RoundedCornerShape(6.dp)),
+    ) {
+        Box(Modifier.background(Surface3).padding(horizontal = 6.dp, vertical = 3.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextMed)
+        }
+        Box(Modifier.background(color).padding(horizontal = 6.dp, vertical = 3.dp)) {
+            Text(
+                value.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = onBadgeText(color),
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 @Composable
@@ -243,7 +320,7 @@ private fun ProgressBar(fraction: Float, color: Color) {
 }
 
 @Composable
-private fun RaceHistoryRow(race: RecentRaceDto) {
+internal fun RaceHistoryRow(race: RecentRaceDto) {
     // Non-finish (DNF/DQ/DNS): the race result itself is meaningless, so hide the
     // race-session line and the grid→finish delta (quali + rating deltas still apply).
     val finished = statusLabel(race.finishStatus) == null
@@ -267,35 +344,53 @@ private fun RaceHistoryRow(race: RecentRaceDto) {
                 maxLines = 1,
                 modifier = Modifier.fillMaxWidth().basicMarquee(), // scroll long titles instead of truncating
             )
-            (race.carName ?: race.car)?.takeIf { it.isNotBlank() }?.let { car ->
-                Text(
-                    car,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMed,
-                    maxLines = 1,
-                    modifier = Modifier.fillMaxWidth().basicMarquee(),
-                )
-            }
+            CarLine(race.carClass, race.carName ?: race.car)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TrackLogo(race.trackLogo)
+                TrackLogo(race.trackLogo, race.track)
                 race.track?.let {
                     Text(it, style = MaterialTheme.typography.labelMedium, color = TextMed, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                race.carClass?.let { ClassPill(it) }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                race.tier?.let { DifficultyDot(it) }
-                race.eventType?.let { MetaChip(it.replaceFirstChar(Char::uppercaseChar)) }
-                race.split?.let { MetaChip(splitLabel(it, race.totalSplits)) }
                 // Lap chip only when there's no per-session breakdown to show it in.
                 if (race.sessions == null) race.bestLapMs?.let { MetaChip("⏱ ${formatLap(it)}") }
             }
             SessionsBreakdown(race.sessions, includeRace = finished)
         }
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            if (finished) GridToFinish(race.gridPosition, race.position)
-            DeltaText("DR", race.drChange)
-            DeltaText("SR", race.srChange)
+        // Right rail, in-flow (no overlap with the times block): event-type on top,
+        // rating deltas in the middle, split at the bottom.
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            race.eventType?.takeIf { it.isNotBlank() }?.let { MetaChip(it.replaceFirstChar(Char::uppercaseChar)) }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                if (finished) GridToFinish(race.gridPosition, race.position)
+                DeltaText("DR", race.drChange)
+                DeltaText("SR", race.srChange)
+            }
+            race.split?.let { MetaChip(splitLabel(it, race.totalSplits)) }
+        }
+    }
+}
+
+/** Car-class badge first, then the model name (scrolls when it doesn't fit). */
+@Composable
+private fun CarLine(carClass: String?, carName: String?) {
+    val name = carName?.takeIf { it.isNotBlank() }
+    if (carClass == null && name == null) return
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        carClass?.let { ClassPill(it) }
+        name?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMed,
+                maxLines = 1,
+                modifier = Modifier.weight(1f).basicMarquee(),
+            )
         }
     }
 }
@@ -353,8 +448,10 @@ private fun SessionLine(label: String, s: SessionSummaryDto) {
 /** Track emblem (SVG) — same approach as the race-details screen: only shown once Coil
  *  has it (a missing/failed asset just leaves no gap). */
 @Composable
-private fun TrackLogo(url: String?) {
-    val abs = absUrl(url) ?: return
+private fun TrackLogo(url: String?, trackName: String? = null) {
+    // Profile cards often come back with no track_logo → fall back to the schedule's
+    // cached emblem for the same track (matched by normalised name).
+    val abs = absUrl(url) ?: TrackLogoIndex.lookup(trackName) ?: return
     val painter = rememberAsyncImagePainter(model = abs)
     val state by painter.state.collectAsState()
     if (state is AsyncImagePainter.State.Success) {
@@ -462,19 +559,6 @@ private fun ClassPill(carClass: String) {
             style = MaterialTheme.typography.labelMedium,
             color = onBadgeText(c),
             fontWeight = FontWeight.Bold,
-            maxLines = 1,
-        )
-    }
-}
-
-@Composable
-private fun DifficultyDot(tier: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Box(Modifier.size(7.dp).clip(CircleShape).background(difficultyColor(tier)))
-        Text(
-            tier.replaceFirstChar(Char::uppercaseChar),
-            style = MaterialTheme.typography.labelMedium,
-            color = TextMed,
             maxLines = 1,
         )
     }

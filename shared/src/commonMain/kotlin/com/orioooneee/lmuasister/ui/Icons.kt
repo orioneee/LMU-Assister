@@ -2,6 +2,8 @@ package com.orioooneee.lmuasister.ui
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.vector.path
@@ -61,6 +63,43 @@ val IconSchedule: ImageVector by lazy {
             moveTo(4f, 5f); lineTo(20f, 5f); lineTo(20f, 8f); lineTo(4f, 8f); close()
             moveTo(4f, 10.5f); lineTo(20f, 10.5f); lineTo(20f, 13.5f); lineTo(4f, 13.5f); close()
             moveTo(4f, 16f); lineTo(14f, 16f); lineTo(14f, 19f); lineTo(4f, 19f); close()
+        }
+    }
+}
+
+/** Outlined calendar — bottom-nav Schedule tab. */
+val IconCalendarOutline: ImageVector by lazy {
+    icon("CalendarOutline") {
+        // body
+        path(stroke = white, strokeLineWidth = 1.8f, strokeLineJoin = StrokeJoin.Round, strokeLineCap = StrokeCap.Round) {
+            moveTo(4f, 6f); lineTo(20f, 6f); lineTo(20f, 20f); lineTo(4f, 20f); close()
+        }
+        // header divider
+        path(stroke = white, strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round) {
+            moveTo(4f, 9.5f); lineTo(20f, 9.5f)
+        }
+        // hanger legs
+        path(stroke = white, strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round) {
+            moveTo(8f, 4f); lineTo(8f, 7f)
+            moveTo(16f, 4f); lineTo(16f, 7f)
+        }
+    }
+}
+
+/** Outlined person — bottom-nav Profile tab. */
+val IconPersonOutline: ImageVector by lazy {
+    icon("PersonOutline") {
+        // head
+        path(stroke = white, strokeLineWidth = 1.8f, strokeLineJoin = StrokeJoin.Round) {
+            moveTo(15.2f, 8f)
+            arcToRelative(3.2f, 3.2f, 0f, true, true, -6.4f, 0f)
+            arcToRelative(3.2f, 3.2f, 0f, true, true, 6.4f, 0f)
+            close()
+        }
+        // shoulders (open arc)
+        path(stroke = white, strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round) {
+            moveTo(5.5f, 19.5f)
+            arcToRelative(6.5f, 6.5f, 0f, false, true, 13f, 0f)
         }
     }
 }

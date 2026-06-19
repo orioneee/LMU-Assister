@@ -120,6 +120,12 @@ class ScheduleViewModel(
     }
 
     private fun emitSuccess(key: String?, schedule: Schedule) {
+        // Cache the (working) schedule track logos so the profile can fall back to them.
+        TrackLogoIndex.populate(
+            schedule.races.flatMap { r ->
+                listOf(r.track?.name to r.track?.logoUrl, r.circuit to r.track?.logoUrl)
+            },
+        )
         val sel = key ?: weeks.firstOrNull() ?: ""
         _state.value = ScheduleUiState.Success(
             ScheduleData(

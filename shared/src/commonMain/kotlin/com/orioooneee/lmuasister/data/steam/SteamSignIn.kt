@@ -11,12 +11,11 @@ sealed interface SignInOutcome {
 }
 
 /**
- * Platform sign-in strategy. Two implementations exist:
- *  - **TunnelSteamSignIn** (JVM + iOS): credentials go to the backend sidecar, whose Steam
- *    login egresses through the device via a SOCKS-over-WebSocket tunnel (residential IP).
- *  - **AndroidSteamSignIn**: on-device JavaSteam mints a ticket, exchanged at /auth/steam.
+ * Platform sign-in strategy. The real impl is **TunnelSteamSignIn** (Android + JVM + iOS):
+ * credentials go to the backend sidecar, whose Steam login egresses through the device via
+ * a SOCKS-over-WebSocket tunnel (residential IP). js/wasm get [UnsupportedSteamSignIn].
  *
- * Both end with our backend app token, which [SteamBackendApi] uses for profile calls.
+ * It ends with our backend app token, which [SteamBackendApi] uses for profile calls.
  */
 interface SteamSignIn {
     suspend fun signIn(username: String, password: String, guardCode: String?): SignInOutcome

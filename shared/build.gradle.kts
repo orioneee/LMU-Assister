@@ -1,4 +1,3 @@
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
@@ -16,9 +15,9 @@ kotlin {
         optIn.add("kotlin.time.ExperimentalTime")
     }
 
-    // We add a custom intermediate source set (jvmAndroidMain) with manual dependsOn,
+    // We add a custom intermediate source set (tunnelMain) with manual dependsOn,
     // which disables auto-application of the default hierarchy — re-apply it explicitly
-    // so iosMain/jsMain/etc. keep their standard link to commonMain.
+    // so iosMain/jvmMain/etc. keep their standard link to commonMain.
     applyDefaultHierarchyTemplate()
 
     listOf(
@@ -32,16 +31,7 @@ kotlin {
     }
     
     jvm()
-    
-    js {
-        browser()
-    }
-    
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-        browser()
-    }
-    
+
     androidLibrary {
        namespace = "com.orioooneee.lmuasister.shared"
        compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -59,8 +49,8 @@ kotlin {
     }
     
     sourceSets {
-        // Shared Steam device-tunnel (Ktor raw sockets + websockets) — used by the
-        // Android/JVM/iOS clients. NOT js/wasm (browsers can't do raw TCP).
+        // Shared Steam device-tunnel (Ktor raw sockets + websockets) — used by all
+        // (Android/JVM/iOS) clients.
         val tunnelMain = create("tunnelMain") {
             dependsOn(commonMain.get())
             dependencies {
@@ -75,9 +65,6 @@ kotlin {
                 implementation(libs.ktor.client.okhttp)
                 // Encrypted token storage for the persisted Steam session.
                 implementation(libs.androidx.security.crypto)
-                // On-device Steam auth (Android keeps JavaSteam for now).
-                implementation(libs.javasteam)
-                implementation(libs.bouncycastle.prov)
             }
         }
         commonMain.dependencies {
@@ -124,13 +111,6 @@ kotlin {
                 implementation(libs.ktor.client.darwin)
             }
         }
-        jsMain.dependencies {
-            implementation(libs.wrappers.browser)
-            implementation(libs.ktor.client.js)
-        }
-        wasmJsMain.dependencies {
-            implementation(libs.ktor.client.js)
-        }
     }
 }
 
@@ -140,6 +120,8 @@ dependencies {
 
 // ── Backend base URL → generated BuildConfig (read from local.properties) ──
 val localPropsFile = rootProject.layout.projectDirectory.file("local.properties")
+// Non-secret fallback only — the real (deployed) backend URL lives in local.properties
+// (git-ignored) as `backend.url=…`, so the host is never committed.
 val defaultBackendUrl = "http://localhost:8000/api/v2"
 
 val generateBuildConfig by tasks.registering {

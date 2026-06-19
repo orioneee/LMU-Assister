@@ -31,7 +31,10 @@ import com.orioooneee.lmuasister.ui.components.RefreshableContent
 import com.orioooneee.lmuasister.ui.details.FullLeaderboardScreen
 import com.orioooneee.lmuasister.ui.details.RaceDetailsScreen
 import com.orioooneee.lmuasister.ui.home.HomeScreen
+import com.orioooneee.lmuasister.ui.profile.AllRacesScreen
 import com.orioooneee.lmuasister.ui.profile.ProfileScreen
+import com.orioooneee.lmuasister.ui.profile.RaceProfileDetailScreen
+import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Surface1
 import com.orioooneee.lmuasister.ui.theme.TextMed
@@ -56,10 +59,16 @@ data class DetailsRoute(val raceId: String)
 @Serializable
 data class LeaderboardRoute(val leaderboardId: String, val title: String)
 
+@Serializable
+object AllRacesRoute
+
+@Serializable
+data class ProfileRaceDetailRoute(val eventId: String, val split: Int = -1)
+
 /** Top-level tabs shown in the bottom navigation bar. */
 private enum class TopTab(val icon: ImageVector) {
-    Schedule(IconSchedule),
-    Profile(IconPerson),
+    Schedule(IconCalendarOutline),
+    Profile(IconPersonOutline),
 }
 
 /**
@@ -68,7 +77,10 @@ private enum class TopTab(val icon: ImageVector) {
  * (the bar hides on those detail screens).
  */
 @Composable
-fun MainShell(viewModel: ScheduleViewModel = koinViewModel()) {
+fun MainShell(
+    viewModel: ScheduleViewModel = koinViewModel(),
+    profileViewModel: SteamLoginViewModel = koinViewModel(),
+) {
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val currentDest = backStack?.destination
@@ -110,7 +122,31 @@ fun MainShell(viewModel: ScheduleViewModel = koinViewModel()) {
                 ScheduleTab(viewModel, onOpenRace = { nav.navigate(DetailsRoute(it.id)) })
             }
             composable<ProfileRoute> {
-                ProfileScreen()
+                ProfileScreen(
+                    viewModel = profileViewModel,
+                    onSeeAllRaces = { nav.navigate(AllRacesRoute) },
+                    onOpenRace = { eventId, split ->
+                        nav.navigate(ProfileRaceDetailRoute(eventId, split ?: -1))
+                    },
+                )
+            }
+            composable<AllRacesRoute> {
+                AllRacesScreen(
+                    viewModel = profileViewModel,
+                    onBack = { nav.popBackStack() },
+                    onOpenRace = { eventId, split ->
+                        nav.navigate(ProfileRaceDetailRoute(eventId, split ?: -1))
+                    },
+                )
+            }
+            composable<ProfileRaceDetailRoute> { entry ->
+                val route = entry.toRoute<ProfileRaceDetailRoute>()
+                RaceProfileDetailScreen(
+                    viewModel = profileViewModel,
+                    eventId = route.eventId,
+                    split = route.split.takeIf { it >= 0 },
+                    onBack = { nav.popBackStack() },
+                )
             }
             composable<DetailsRoute> { entry ->
                 val id = entry.toRoute<DetailsRoute>().raceId

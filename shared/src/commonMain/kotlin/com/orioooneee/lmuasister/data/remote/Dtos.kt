@@ -211,4 +211,6 @@ data class LeaderboardPageResponse(
     val total: Int? = null,
     val nextCursor: String? = null,
     val entries: List<LeaderboardEntryDto> = emptyList(),
+    // The caller's own row + rank — present only when a valid app token was sent.
+    val me: LeaderboardEntryDto? = null,
 )

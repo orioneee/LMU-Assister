@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.orioooneee.lmuasister.data.steam.SteamGuardKind
 import com.orioooneee.lmuasister.ui.IconSteam
+import com.orioooneee.lmuasister.ui.components.RefreshableContent
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.ClassGt3
 import com.orioooneee.lmuasister.ui.theme.Outline
@@ -72,7 +73,11 @@ private val SteamLogoBg = Color(0xFF1B2838)
  * Talks to [SteamLoginViewModel]; the 2FA field unlocks only once Steam asks for it.
  */
 @Composable
-fun ProfileScreen(viewModel: SteamLoginViewModel = koinViewModel()) {
+fun ProfileScreen(
+    viewModel: SteamLoginViewModel = koinViewModel(),
+    onSeeAllRaces: () -> Unit = {},
+    onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     var login by remember { mutableStateOf("") }
@@ -81,8 +86,48 @@ fun ProfileScreen(viewModel: SteamLoginViewModel = koinViewModel()) {
 
     val loading = state is SteamLoginUiState.Loading
     val guardRequired = state is SteamLoginUiState.GuardRequired
+    val restoring = state is SteamLoginUiState.Restoring
     val signedIn = state as? SteamLoginUiState.SignedIn
 
+    // Startup: while a saved session is being restored, show a loader (not the login form).
+    if (restoring) {
+        Box(Modifier.fillMaxSize().background(Carbon), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        }
+        return
+    }
+
+    // ── Signed in: the player profile (pull-to-refresh) ─────────────────────────────
+    if (signedIn != null) {
+        val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+        RefreshableContent(refreshing, viewModel::refresh) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Carbon)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(Modifier.height(24.dp))
+                ProfileContent(signedIn.backend, onSeeAllRaces, onOpenRace)
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    "Sign out",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextMed,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { viewModel.signOut() }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                Spacer(Modifier.height(32.dp))
+            }
+        }
+        return
+    }
+
+    // ── Signed out: Steam credential form ───────────────────────────────────────────
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -91,90 +136,81 @@ fun ProfileScreen(viewModel: SteamLoginViewModel = koinViewModel()) {
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(if (signedIn == null) 48.dp else 24.dp))
-
-        if (signedIn == null) {
-            // ── Signed out: Steam credential form ───────────────────────────────
-            Box(
-                Modifier.size(96.dp).clip(CircleShape).background(SteamLogoBg),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(IconSteam, contentDescription = null, tint = Color.White, modifier = Modifier.size(52.dp))
-            }
-            Spacer(Modifier.height(20.dp))
-            Text(
-                stringResource(Res.string.profile_login_title),
-                style = MaterialTheme.typography.headlineSmall,
-                color = TextHigh,
-                fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(Res.string.profile_login_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextMed,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(32.dp))
-
-            Field(
-                value = login,
-                onValueChange = { login = it },
-                label = stringResource(Res.string.profile_field_login),
-                keyboardType = KeyboardType.Text,
-                enabled = !loading,
-            )
-            Spacer(Modifier.height(14.dp))
-            Field(
-                value = password,
-                onValueChange = { password = it },
-                label = stringResource(Res.string.profile_field_password),
-                keyboardType = KeyboardType.Password,
-                isPassword = true,
-                enabled = !loading,
-            )
-            Spacer(Modifier.height(14.dp))
-            Field(
-                value = code,
-                onValueChange = { code = it },
-                label = stringResource(Res.string.profile_field_2fa),
-                keyboardType = KeyboardType.Number,
-                // 2FA stays locked until Steam actually asks for a Guard code.
-                enabled = guardRequired && !loading,
-            )
-
-            StatusLine(state)
-
-            Spacer(Modifier.height(24.dp))
-
-            SignInButton(
-                loading = loading,
-                onClick = { viewModel.login(login, password, code) },
-            )
-        } else {
-            // ── Signed in: the player profile ──────────────────────────────────
-            ProfileContent(signedIn.backend)
-            Spacer(Modifier.height(20.dp))
-            Text(
-                "Sign out",
-                style = MaterialTheme.typography.labelLarge,
-                color = TextMed,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { viewModel.signOut() }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+        Spacer(Modifier.height(48.dp))
+        Box(
+            Modifier.size(96.dp).clip(CircleShape).background(SteamLogoBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(IconSteam, contentDescription = null, tint = Color.White, modifier = Modifier.size(52.dp))
         }
+        Spacer(Modifier.height(20.dp))
+        Text(
+            stringResource(Res.string.profile_login_title),
+            style = MaterialTheme.typography.headlineSmall,
+            color = TextHigh,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            stringResource(Res.string.profile_login_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextMed,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(32.dp))
 
+        Field(
+            value = login,
+            onValueChange = { login = it },
+            label = stringResource(Res.string.profile_field_login),
+            keyboardType = KeyboardType.Text,
+            enabled = !loading,
+        )
+        Spacer(Modifier.height(14.dp))
+        Field(
+            value = password,
+            onValueChange = { password = it },
+            label = stringResource(Res.string.profile_field_password),
+            keyboardType = KeyboardType.Password,
+            isPassword = true,
+            enabled = !loading,
+        )
+        Spacer(Modifier.height(14.dp))
+        Field(
+            value = code,
+            onValueChange = { code = it },
+            label = stringResource(Res.string.profile_field_2fa),
+            keyboardType = KeyboardType.Number,
+            // 2FA stays locked until Steam actually asks for a Guard code.
+            enabled = guardRequired && !loading,
+        )
+
+        StatusLine(state)
+
+        Spacer(Modifier.height(24.dp))
+
+        SignInButton(
+            loading = loading,
+            onClick = { viewModel.login(login, password, code) },
+        )
         Spacer(Modifier.height(32.dp))
     }
 }
 
 @Composable
-private fun ProfileContent(backend: BackendState) {
+private fun ProfileContent(
+    backend: BackendState,
+    onSeeAllRaces: () -> Unit,
+    onOpenRace: (eventId: String, split: Int?) -> Unit,
+) {
     when (backend) {
-        is BackendState.Ok -> ProfileView(backend.profile, accountName = "")
+        is BackendState.Ok -> ProfileView(
+            backend.profile,
+            accountName = "",
+            onSeeAllRaces = onSeeAllRaces,
+            onOpenRace = onOpenRace,
+        )
         BackendState.Loading -> ProfileSkeleton()
         is BackendState.AuthFailed -> ProfileMessage("Couldn't load profile", backend.message)
         is BackendState.Error -> ProfileMessage("Couldn't load profile", backend.message)
