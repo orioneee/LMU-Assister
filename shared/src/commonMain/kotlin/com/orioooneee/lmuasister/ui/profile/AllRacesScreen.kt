@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +31,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
+import com.orioooneee.lmuasister.ui.components.RaceRowSkeleton
+import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import com.orioooneee.lmuasister.ui.details.CircleButton
 import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.Carbon
@@ -111,6 +112,7 @@ fun AllRacesScreen(
             }
         }
 
+        val brush = shimmerBrush()
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -127,32 +129,29 @@ fun AllRacesScreen(
                     RaceHistoryRow(race)
                 }
             }
-            item {
-                Footer(loading, error, races.isEmpty(), onRetry = {
-                    error = null
-                    scope.launch { loadNext() }
-                })
+            when {
+                // Initial load → a screen of skeleton rows.
+                races.isEmpty() && loading -> items(7) { RaceRowSkeleton(brush) }
+                // Loading the next page → one skeleton row as the footer.
+                loading -> item { RaceRowSkeleton(brush) }
+                error != null -> item {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            error!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Amber,
+                            modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                .clickable { error = null; scope.launch { loadNext() } }
+                                .padding(8.dp),
+                        )
+                    }
+                }
+                races.isEmpty() -> item {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                        Text("No races yet", style = MaterialTheme.typography.bodyMedium, color = TextMed)
+                    }
+                }
             }
-        }
-    }
-}
-
-@Composable
-private fun Footer(loading: Boolean, error: String?, empty: Boolean, onRetry: () -> Unit) {
-    Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-        when {
-            loading -> CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.primary,
-                strokeWidth = 2.dp,
-                modifier = Modifier.padding(4.dp),
-            )
-            error != null -> Text(
-                error,
-                style = MaterialTheme.typography.bodySmall,
-                color = Amber,
-                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onRetry).padding(8.dp),
-            )
-            empty -> Text("No races yet", style = MaterialTheme.typography.bodyMedium, color = TextMed)
         }
     }
 }

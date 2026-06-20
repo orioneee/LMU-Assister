@@ -47,6 +47,9 @@ sealed interface SteamLoginUiState {
 
 private const val PROFILE_CACHE_KEY = "steam_profile_v2"
 
+// How long a token-gated call waits for the session to finish restoring before giving up.
+private const val AUTH_WAIT_MS = 60_000L
+
 /**
  * Drives the Steam login form via the platform [SteamSignIn] (device tunnel on
  * Android/JVM/iOS), then loads the profile with the resulting app token.
@@ -173,7 +176,11 @@ class SteamLoginViewModel(
 
     /** Runs [block] with the app token; on a 401 does one silent reauth + retry. */
     private suspend fun <T> withReauth(block: suspend (token: String) -> T): T {
-        val token = appToken ?: throw IllegalStateException("not signed in")
+        // Auth may still be restoring at launch (Render cold start). Wait for the token
+        // instead of failing instantly with "not signed in" — callers paint a loader
+        // meanwhile. Only give up if it genuinely never arrives.
+        val token = appToken ?: tokenHolder.await(AUTH_WAIT_MS)
+            ?: throw IllegalStateException("not signed in")
         return try {
             block(token)
         } catch (e: BackendReauthRequired) {

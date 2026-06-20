@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +33,8 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.model.LapEntry
+import com.orioooneee.lmuasister.ui.components.LeaderboardRowSkeleton
+import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
@@ -105,6 +106,7 @@ fun FullLeaderboardScreen(leaderboardId: String, title: String, onBack: () -> Un
                 }
             }
         }
+        val skeletonBrush = shimmerBrush()
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
@@ -114,25 +116,18 @@ fun FullLeaderboardScreen(leaderboardId: String, title: String, onBack: () -> Un
             }
 
             when (val append = entries.loadState.append) {
-                is LoadState.Loading -> item { FooterSpinner() }
+                is LoadState.Loading -> items(2) { LeaderboardRowSkeleton(skeletonBrush) }
                 is LoadState.Error -> item { FooterRetry { entries.retry() } }
                 is LoadState.NotLoading ->
                     if (append.endOfPaginationReached && entries.itemCount > 0) item { FooterEnd() }
             }
 
             when (val refresh = entries.loadState.refresh) {
-                is LoadState.Loading -> if (entries.itemCount == 0) item { FooterSpinner() }
+                is LoadState.Loading -> if (entries.itemCount == 0) items(12) { LeaderboardRowSkeleton(skeletonBrush) }
                 is LoadState.Error -> if (entries.itemCount == 0) item { FooterRetry { entries.retry() } }
                 else -> {}
             }
         }
-    }
-}
-
-@Composable
-private fun FooterSpinner() {
-    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = TextLow)
     }
 }
 

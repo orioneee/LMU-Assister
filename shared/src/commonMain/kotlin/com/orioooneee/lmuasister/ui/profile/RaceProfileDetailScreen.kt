@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,7 +44,9 @@ import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
+import com.orioooneee.lmuasister.ui.components.BlockSkeleton
 import com.orioooneee.lmuasister.ui.components.MetaChip
+import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import com.orioooneee.lmuasister.ui.components.classColorFor
 import com.orioooneee.lmuasister.ui.components.onBadgeText
 import com.orioooneee.lmuasister.ui.details.CircleButton
@@ -100,9 +101,7 @@ fun RaceProfileDetailScreen(
         }
 
         when (val res = result) {
-            null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
+            null -> DetailSkeleton()
             else -> res.fold(
                 onSuccess = { DetailContent(it) },
                 onFailure = {
@@ -116,6 +115,20 @@ fun RaceProfileDetailScreen(
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun DetailSkeleton() {
+    val brush = shimmerBrush()
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        BlockSkeleton(brush, 180.dp) // track card
+        BlockSkeleton(brush, 120.dp) // summary
+        BlockSkeleton(brush, 160.dp) // qualifying
+        BlockSkeleton(brush, 200.dp) // race
     }
 }
 

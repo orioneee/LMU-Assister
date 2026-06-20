@@ -89,10 +89,14 @@ fun ProfileScreen(
     val restoring = state is SteamLoginUiState.Restoring
     val signedIn = state as? SteamLoginUiState.SignedIn
 
-    // Startup: while a saved session is being restored, show a loader (not the login form).
+    // Startup: while a saved session is being restored, show the profile skeleton (not the
+    // login form, not a bare spinner).
     if (restoring) {
-        Box(Modifier.fillMaxSize().background(Carbon), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        Column(
+            Modifier.fillMaxSize().background(Carbon).padding(horizontal = 16.dp),
+        ) {
+            Spacer(Modifier.height(24.dp))
+            ProfileSkeleton()
         }
         return
     }
@@ -106,7 +110,7 @@ fun ProfileScreen(
                     .fillMaxSize()
                     .background(Carbon)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Spacer(Modifier.height(24.dp))
@@ -133,7 +137,7 @@ fun ProfileScreen(
             .fillMaxSize()
             .background(Carbon)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(48.dp))
