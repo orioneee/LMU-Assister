@@ -171,7 +171,6 @@ fun RaceDetailsScreen(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // ── Header image with title + back (full width) ──
         item(span = { GridItemSpan(maxLineSpan) }) {
             Box(Modifier.fillMaxWidth().height(220.dp).clip(MaterialTheme.shapes.large)) {
                 CoverImage(

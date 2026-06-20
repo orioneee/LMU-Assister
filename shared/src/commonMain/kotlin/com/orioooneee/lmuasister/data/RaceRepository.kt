@@ -177,7 +177,6 @@ class RaceRepository(
     private inline fun <reified T> diskList(key: String): T? =
         runCatching { LocalCache.read(key)?.let { AppJson.decodeFromString<T>(it) } }.getOrNull()
 
-    // ── Cars (v2 roster) — static reference data, offline-first like the schedule ──
     private var carsMem: List<CarModel>? = null
 
     /** Memory, then disk — for an instant first paint of the car carousel. */
@@ -248,7 +247,6 @@ private class LeaderboardPagingSource(
 
 private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
 
-// ── mapping: backend DTOs → domain model ──────────────────────────────────────
 
 private fun RaceDto.toModel(resolveImage: (String?) -> String?): Race = Race(
     id = id,

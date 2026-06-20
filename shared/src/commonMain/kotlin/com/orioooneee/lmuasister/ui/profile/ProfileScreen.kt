@@ -104,7 +104,6 @@ fun ProfileScreen(
         return
     }
 
-    // ── Signed in: the player profile (pull-to-refresh) ─────────────────────────────
     if (signedIn != null) {
         val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
         RefreshableContent(refreshing, viewModel::refresh) {
@@ -134,7 +133,6 @@ fun ProfileScreen(
         return
     }
 
-    // ── Signed out: Steam credential form ───────────────────────────────────────────
     Column(
         modifier = Modifier
             .fillMaxSize()

@@ -1,5 +1,12 @@
 package com.orioooneee.lmuasister.ui
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -18,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -99,10 +107,21 @@ fun MainShell(
     // by the VM).
     LaunchedEffect(Unit) { viewModel.refresh() }
 
+    // Pushed (detail) screens slide up from the bottom and slide back down on close; the
+    // nav bar slides down with them. Top-level tab switches are instant.
+    val slideUp: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
+        { slideInVertically(tween(280)) { it } }
+    val slideDown: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
+        { slideOutVertically(tween(280)) { it } }
+
     Scaffold(
         containerColor = Carbon,
         bottomBar = {
-            if (onTopLevel) {
+            AnimatedVisibility(
+                visible = onTopLevel,
+                enter = slideInVertically(tween(280)) { it },
+                exit = slideOutVertically(tween(280)) { it },
+            ) {
                 BottomBar(
                     selected = if (onProfile) TopTab.Profile else TopTab.Schedule,
                     onSelect = { tab ->
@@ -121,6 +140,10 @@ fun MainShell(
             navController = nav,
             startDestination = HomeRoute,
             modifier = Modifier.fillMaxSize().padding(insets),
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None },
         ) {
             composable<HomeRoute> {
                 ScheduleTab(viewModel, onOpenRace = { nav.navigate(DetailsRoute(it.id)) })
@@ -135,10 +158,10 @@ fun MainShell(
                     onOpenPrivacy = { nav.navigate(PrivacyRoute) },
                 )
             }
-            composable<PrivacyRoute> {
+            composable<PrivacyRoute>(enterTransition = slideUp, popExitTransition = slideDown) {
                 PrivacyPolicyScreen(onBack = { nav.popBackStack() })
             }
-            composable<AllRacesRoute> {
+            composable<AllRacesRoute>(enterTransition = slideUp, popExitTransition = slideDown) {
                 AllRacesScreen(
                     viewModel = profileViewModel,
                     onBack = { nav.popBackStack() },
@@ -147,7 +170,7 @@ fun MainShell(
                     },
                 )
             }
-            composable<ProfileRaceDetailRoute> { entry ->
+            composable<ProfileRaceDetailRoute>(enterTransition = slideUp, popExitTransition = slideDown) { entry ->
                 val route = entry.toRoute<ProfileRaceDetailRoute>()
                 RaceProfileDetailScreen(
                     viewModel = profileViewModel,
@@ -156,7 +179,7 @@ fun MainShell(
                     onBack = { nav.popBackStack() },
                 )
             }
-            composable<DetailsRoute> { entry ->
+            composable<DetailsRoute>(enterTransition = slideUp, popExitTransition = slideDown) { entry ->
                 val id = entry.toRoute<DetailsRoute>().raceId
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 val race = (state as? ScheduleUiState.Success)?.data?.schedule?.races?.firstOrNull { it.id == id }
@@ -170,7 +193,7 @@ fun MainShell(
                     )
                 }
             }
-            composable<LeaderboardRoute> { entry ->
+            composable<LeaderboardRoute>(enterTransition = slideUp, popExitTransition = slideDown) { entry ->
                 val route = entry.toRoute<LeaderboardRoute>()
                 FullLeaderboardScreen(
                     leaderboardId = route.leaderboardId,

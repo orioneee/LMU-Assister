@@ -147,8 +147,6 @@ internal class JavaSteamAuthClient : SteamAuthClient {
         }
     }
 
-    // ── helpers ─────────────────────────────────────────────────────────────────
-
     private fun humanError(t: Throwable): String =
         (t.cause ?: t).message ?: t::class.simpleName ?: "Steam login failed"
 

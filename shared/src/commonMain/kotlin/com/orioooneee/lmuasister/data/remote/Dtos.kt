@@ -3,7 +3,6 @@ package com.orioooneee.lmuasister.data.remote
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ── LmuAssister backend: GET {BACKEND_URL}/{schedule,race/<id>} ────────────────
 // JSON is snake_case; AppJson uses JsonNamingStrategy.SnakeCase, so property
 // names here are plain camelCase (carClasses ↔ car_classes, etc.).
 

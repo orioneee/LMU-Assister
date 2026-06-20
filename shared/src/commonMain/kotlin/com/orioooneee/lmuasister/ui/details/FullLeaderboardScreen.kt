@@ -55,7 +55,6 @@ fun FullLeaderboardScreen(leaderboardId: String, title: String, onBack: () -> Un
         .collectAsLazyPagingItems()
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
-        // top bar
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,

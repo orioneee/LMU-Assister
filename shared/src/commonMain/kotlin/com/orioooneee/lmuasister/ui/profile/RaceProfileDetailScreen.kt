@@ -150,7 +150,6 @@ private fun DetailContent(d: RaceDetailDto) {
     }
 }
 
-// ── Track card (mirrors the schedule's track card, from the detail's trackInfo) ──────
 
 @Composable
 private fun TrackCard(t: TrackDto) {
@@ -191,7 +190,6 @@ private fun TrackCard(t: TrackDto) {
     }
 }
 
-// ── Summary: car, meta, start/finish, deltas ─────────────────────────────────────────
 
 @Composable
 private fun SummaryCard(d: RaceDetailDto) {
@@ -253,7 +251,6 @@ private fun DeltaStat(label: String, delta: Double?) {
     StatColored(label, "$arrow ${r / 10}.${r % 10}", color)
 }
 
-// ── Per-session classification with a window around the player + expand/collapse ─────
 
 @Composable
 private fun SessionCard(label: String, rows: List<ClassificationRowDto>) {
@@ -338,7 +335,6 @@ private fun ClassificationLine(r: ClassificationRowDto) {
     }
 }
 
-// ── small shared bits ────────────────────────────────────────────────────────────────
 
 @Composable
 private fun SvgImage(url: String, modifier: Modifier) {

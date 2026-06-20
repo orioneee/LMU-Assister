@@ -101,7 +101,6 @@ class SteamBackendApi(private val client: HttpClient) {
         return AppJson.decodeFromString(getAuthed(url, token))
     }
 
-    // ── tunnel-based credential auth (JVM/iOS) ────────────────────────────────────
 
     /** A short-lived token + agent URL for the device to open its egress tunnel. */
     suspend fun tunnelTicket(): TunnelTicket {

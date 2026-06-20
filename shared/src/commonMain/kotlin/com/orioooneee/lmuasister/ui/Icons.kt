@@ -70,7 +70,6 @@ val IconSchedule: ImageVector by lazy {
 /** Outlined calendar — bottom-nav Schedule tab. */
 val IconCalendarOutline: ImageVector by lazy {
     icon("CalendarOutline") {
-        // body
         path(stroke = white, strokeLineWidth = 1.8f, strokeLineJoin = StrokeJoin.Round, strokeLineCap = StrokeCap.Round) {
             moveTo(4f, 6f); lineTo(20f, 6f); lineTo(20f, 20f); lineTo(4f, 20f); close()
         }
