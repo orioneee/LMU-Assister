@@ -87,6 +87,19 @@ class SteamBackendApi(private val client: HttpClient) {
 
     suspend fun stats(token: String): String = getAuthed("$API_BASE/profile/stats", token)
 
+    /**
+     * Drops the server-side session and every piece of data we hold for the user.
+     * Idempotent on the backend; treated as best-effort by callers (the device clears its
+     * own state regardless). Backs both "Sign out" and "Clear my data".
+     */
+    suspend fun signOut(token: String) {
+        val resp = client.post("$API_BASE/auth/sign-out") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        SteamLog.d("backend: POST /auth/sign-out → ${resp.status.value}")
+        if (resp.status.value !in 200..299) throw resp.toError()
+    }
+
     /** One paginated page (5/page) of the player's full race history. */
     suspend fun racesPage(token: String, page: Int): RacesPageDto =
         AppJson.decodeFromString(getAuthed("$API_BASE/profile/races?page=$page", token))

@@ -58,6 +58,9 @@ sealed class AnalyticsEvent(
 
     data object ProfileSignedOut : AnalyticsEvent("profile_sign_out")
 
+    /** User explicitly deleted their server-side data (App Review 5.1.1(v) flow). */
+    data object ProfileDataCleared : AnalyticsEvent("profile_data_cleared")
+
     data object AllRacesOpened : AnalyticsEvent("all_races_opened")
 
     class SuspensionsOpened(active: Boolean) :

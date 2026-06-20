@@ -50,6 +50,9 @@ sealed interface SteamLoginUiState {
     data class Error(val message: String) : SteamLoginUiState
 }
 
+/** Which exit action is currently running — drives the two profile buttons' loaders. */
+enum class ExitAction { NONE, SIGNING_OUT, CLEARING }
+
 /** Paginated full race history for the "See all races" screen (kept in the VM). */
 data class AllRacesUi(
     val races: List<RecentRaceDto> = emptyList(),
@@ -79,6 +82,11 @@ class SteamLoginViewModel(
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
+    // Which of the two exit buttons is mid-flight (so each can show its own loader and both
+    // can be disabled while one runs).
+    private val _exiting = MutableStateFlow(ExitAction.NONE)
+    val exiting: StateFlow<ExitAction> = _exiting.asStateFlow()
 
     // Full race-history pagination, held here (not in the screen) so it survives navigating
     // into a race and back — the screen's own state would be lost when it leaves the back stack.
@@ -185,15 +193,32 @@ class SteamLoginViewModel(
         }
     }
 
-    fun signOut() {
-        Telemetry.log(AnalyticsEvent.ProfileSignedOut)
-        Telemetry.setUserId(null)
-        Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "false")
-        signIn.signOut()
-        appToken = null
-        runCatching { LocalCache.write(PROFILE_CACHE_KEY, "") }
-        _allRaces.value = AllRacesUi()
-        _state.value = SteamLoginUiState.Idle
+    /** Plain sign out: tells the backend to drop our session/data, then clears the device. */
+    fun signOut() = exit(ExitAction.SIGNING_OUT, AnalyticsEvent.ProfileSignedOut)
+
+    /** "Clear my data" (App Review 5.1.1(v)): same backend call, shown behind a confirm popup. */
+    fun clearMyData() = exit(ExitAction.CLEARING, AnalyticsEvent.ProfileDataCleared)
+
+    private fun exit(action: ExitAction, event: AnalyticsEvent) {
+        if (_exiting.value != ExitAction.NONE) return
+        _exiting.value = action
+        Telemetry.log(event)
+        viewModelScope.launch {
+            // Best-effort: the endpoint is idempotent and wipes all server-side data we hold.
+            // Whatever happens, the device still clears its own state below.
+            appToken?.let { token ->
+                runCatching { backend.signOut(token) }
+                    .onFailure { SteamLog.e("vm: backend sign-out failed", it) }
+            }
+            Telemetry.setUserId(null)
+            Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "false")
+            signIn.signOut()
+            appToken = null
+            runCatching { LocalCache.write(PROFILE_CACHE_KEY, "") }
+            _allRaces.value = AllRacesUi()
+            _exiting.value = ExitAction.NONE
+            _state.value = SteamLoginUiState.Idle
+        }
     }
 
     /** Loads the next page of the full race history (no-op while loading / at the end). */

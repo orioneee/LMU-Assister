@@ -22,12 +22,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +71,7 @@ import org.koin.compose.viewmodel.koinViewModel
 private val SteamTop = Color(0xFF2A475E)
 private val SteamBottom = Color(0xFF171A21)
 private val SteamLogoBg = Color(0xFF1B2838)
+private val DangerRed = Color(0xFFE5484D)
 
 /**
  * Steam sign-in form — custom credential auth (login / password / optional 2FA).
@@ -110,6 +113,9 @@ fun ProfileScreen(
 
     if (signedIn != null) {
         val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+        val exiting by viewModel.exiting.collectAsStateWithLifecycle()
+        var showClearConfirm by remember { mutableStateOf(false) }
+
         RefreshableContent(refreshing, viewModel::refresh) {
             Column(
                 modifier = Modifier
@@ -121,17 +127,29 @@ fun ProfileScreen(
             ) {
                 Spacer(Modifier.height(topInset + 24.dp))
                 ProfileContent(signedIn.backend, onSeeAllRaces, onOpenRace, onOpenSuspensions)
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    "Sign out",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = TextMed,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { viewModel.signOut() }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ExitButton(
+                        text = "Sign out",
+                        loading = exiting == ExitAction.SIGNING_OUT,
+                        enabled = exiting == ExitAction.NONE,
+                        destructive = false,
+                        modifier = Modifier.weight(1f),
+                        onClick = { viewModel.signOut() },
+                    )
+                    ExitButton(
+                        text = "Clear my data",
+                        loading = exiting == ExitAction.CLEARING,
+                        enabled = exiting == ExitAction.NONE,
+                        destructive = true,
+                        modifier = Modifier.weight(1f),
+                        onClick = { showClearConfirm = true },
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
                 Text(
                     "Privacy Policy",
                     style = MaterialTheme.typography.labelSmall,
@@ -143,6 +161,16 @@ fun ProfileScreen(
                 )
                 Spacer(Modifier.height(32.dp + bottomInset))
             }
+        }
+
+        if (showClearConfirm) {
+            ClearDataDialog(
+                onConfirm = {
+                    showClearConfirm = false
+                    viewModel.clearMyData()
+                },
+                onDismiss = { showClearConfirm = false },
+            )
         }
         return
     }
@@ -242,6 +270,80 @@ private fun ConsentNote(onOpenPrivacy: () -> Unit) {
             modifier = Modifier.clickable(onClick = onOpenPrivacy),
         )
     }
+}
+
+/**
+ * Pill button for the two profile exit actions. [destructive] tints it red ("Clear my data");
+ * otherwise it's a neutral outlined button. Shows an inline spinner while [loading].
+ */
+@Composable
+private fun ExitButton(
+    text: String,
+    loading: Boolean,
+    enabled: Boolean,
+    destructive: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val accent = if (destructive) DangerRed else TextMed
+    val border = if (destructive) DangerRed.copy(alpha = 0.45f) else Outline
+    val bg = if (destructive) DangerRed.copy(alpha = 0.10f) else Surface1
+    val alpha = if (enabled) 1f else 0.5f
+
+    Row(
+        modifier = modifier
+            .height(48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg.copy(alpha = bg.alpha * alpha))
+            .border(1.dp, border.copy(alpha = border.alpha * alpha), RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled && !loading, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(color = accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+        } else {
+            Text(
+                text,
+                style = MaterialTheme.typography.labelLarge,
+                color = accent.copy(alpha = accent.alpha * alpha),
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** Confirmation popup for "Clear my data" — the App Review 5.1.1(v) deletion flow. */
+@Composable
+private fun ClearDataDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Surface1,
+        titleContentColor = TextHigh,
+        textContentColor = TextMed,
+        title = { Text("Clear your data?", fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                "This clears the data we store for you on our server. " +
+                    "Don't worry — all your race, profile and rating data lives on the game's " +
+                    "own servers and is independent of us. Next time you sign in, everything " +
+                    "loads back automatically.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Clear", color = DangerRed, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextMed)
+            }
+        },
+    )
 }
 
 @Composable
