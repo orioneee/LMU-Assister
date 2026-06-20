@@ -8,10 +8,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.orioooneee.lmuasister.analytics.initTelemetry
 import com.orioooneee.lmuasister.data.steam.initSteamStorage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Wire Firebase Analytics + Crashlytics into the shared Telemetry facade.
+        initTelemetry(applicationContext)
+
         // Wire the encrypted token store before any Steam login can run.
         initSteamStorage(applicationContext)
 

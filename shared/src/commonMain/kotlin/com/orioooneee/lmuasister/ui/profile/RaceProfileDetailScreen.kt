@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
@@ -74,6 +75,7 @@ private const val WINDOW = 3
 @Composable
 fun RaceProfileDetailScreen(
     viewModel: SteamLoginViewModel,
+    insets: PaddingValues,
     eventId: String,
     split: Int?,
     onBack: () -> Unit,
@@ -84,7 +86,7 @@ fun RaceProfileDetailScreen(
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp + insets.calculateTopPadding(), end = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -103,7 +105,7 @@ fun RaceProfileDetailScreen(
         when (val res = result) {
             null -> DetailSkeleton()
             else -> res.fold(
-                onSuccess = { DetailContent(it) },
+                onSuccess = { DetailContent(it, insets.calculateBottomPadding()) },
                 onFailure = {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -133,10 +135,10 @@ private fun DetailSkeleton() {
 }
 
 @Composable
-private fun DetailContent(d: RaceDetailDto) {
+private fun DetailContent(d: RaceDetailDto, bottomInset: Dp) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomInset),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         d.trackInfo?.let { item { TrackCard(it) } }

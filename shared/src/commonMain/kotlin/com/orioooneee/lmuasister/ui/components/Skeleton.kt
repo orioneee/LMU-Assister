@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -81,17 +82,24 @@ fun RaceRowSkeleton(brush: Brush) {
     }
 }
 
-/** A leaderboard-row placeholder: rank · name · time. */
+/** Placeholder matching a leaderboard row: rank · (initials / car) · (lap / gap). */
 @Composable
 fun LeaderboardRowSkeleton(brush: Brush) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ShimmerBar(Modifier.size(22.dp), brush, corner = 4.dp)
-        ShimmerBar(Modifier.weight(1f).height(14.dp), brush)
-        ShimmerBar(Modifier.width(64.dp).height(14.dp), brush)
+        // rank, in the same 44dp column the real row uses
+        Box(Modifier.width(44.dp)) { ShimmerBar(Modifier.width(22.dp).height(16.dp), brush) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            ShimmerBar(Modifier.fillMaxWidth(0.5f).height(13.dp), brush)  // initials
+            ShimmerBar(Modifier.fillMaxWidth(0.8f).height(10.dp), brush)  // car
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            ShimmerBar(Modifier.width(70.dp).height(13.dp), brush)  // lap time
+            ShimmerBar(Modifier.width(42.dp).height(10.dp), brush)  // gap
+        }
     }
 }
 

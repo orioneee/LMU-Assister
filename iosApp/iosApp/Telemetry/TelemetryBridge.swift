@@ -1,0 +1,83 @@
+import Foundation
+import Shared
+import FirebaseAnalytics
+import FirebaseCrashlytics
+
+// Note: `Analytics` exists in BOTH Shared (our Kotlin protocol) and FirebaseAnalytics
+// (Firebase's class), so every reference is module-qualified to avoid ambiguity.
+
+/// Bridges the shared Kotlin `Telemetry` facade to the Firebase iOS SDK.
+/// Call `TelemetryBridge.install()` once, after `FirebaseApp.configure()`.
+enum TelemetryBridge {
+    static func install() {
+        Telemetry.shared.analytics = FirebaseAnalyticsSink()
+        Telemetry.shared.crashReporter = FirebaseCrashSink()
+        Telemetry.shared.userProperty(key: UserProperties.shared.PLATFORM, value: "ios")
+    }
+}
+
+/// Implements the shared `Analytics` protocol using Firebase Analytics.
+private final class FirebaseAnalyticsSink: Shared.Analytics {
+    func logEvent(event: AnalyticsEvent) {
+        FirebaseAnalytics.Analytics.logEvent(event.name, parameters: normalize(event.params))
+    }
+
+    func logScreenView(screenName: String) {
+        FirebaseAnalytics.Analytics.logEvent(AnalyticsEventScreenView, parameters: [
+            AnalyticsParameterScreenName: screenName
+        ])
+    }
+
+    func setUserId(id: String?) {
+        FirebaseAnalytics.Analytics.setUserID(id)
+    }
+
+    func setUserProperty(key: String, value: String?) {
+        FirebaseAnalytics.Analytics.setUserProperty(value, forName: key)
+    }
+
+    /// Firebase wants String/Number params; Kotlin booleans arrive as NSNumber, so
+    /// turn them back into "true"/"false" to match the Android side.
+    private func normalize(_ params: [String: Any]) -> [String: Any] {
+        var out: [String: Any] = [:]
+        for (k, v) in params {
+            if let b = v as? KotlinBoolean {
+                out[k] = b.boolValue ? "true" : "false"
+            } else {
+                out[k] = v
+            }
+        }
+        return out
+    }
+}
+
+/// Implements the shared `CrashReporter` protocol using Firebase Crashlytics.
+private final class FirebaseCrashSink: CrashReporter {
+    private let crash = Crashlytics.crashlytics()
+
+    func recordException(throwable: KotlinThrowable, keys: [String: Any]) {
+        for (k, v) in keys { setCustomKey(key: k, value: v) }
+        let userInfo: [String: Any] = [
+            NSLocalizedDescriptionKey: throwable.message ?? String(describing: type(of: throwable))
+        ]
+        let error = NSError(domain: "KotlinNonFatal", code: 0, userInfo: userInfo)
+        crash.record(error: error)
+    }
+
+    func log(message: String) {
+        crash.log(message)
+    }
+
+    func setCustomKey(key: String, value: Any?) {
+        guard let value = value else { crash.setCustomValue("", forKey: key); return }
+        if let b = value as? KotlinBoolean {
+            crash.setCustomValue(b.boolValue, forKey: key)
+        } else {
+            crash.setCustomValue(value, forKey: key)
+        }
+    }
+
+    func setUserId(id: String?) {
+        crash.setUserID(id ?? "")
+    }
+}

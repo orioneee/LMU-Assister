@@ -62,6 +62,13 @@ import com.orioooneee.lmuasister.ui.theme.Surface3
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
+import lmuassister.shared.generated.resources.Res
+import lmuassister.shared.generated.resources.susp_active_count
+import lmuassister.shared.generated.resources.susp_banned
+import lmuassister.shared.generated.resources.susp_license_clean
+import lmuassister.shared.generated.resources.susp_no_active
+import lmuassister.shared.generated.resources.susp_past_count
+import org.jetbrains.compose.resources.stringResource
 
 private val PosGreen = SkillBeginner
 private val NegRed = ClassHyper
@@ -96,9 +103,10 @@ fun ProfileView(
     accountName: String,
     onSeeAllRaces: () -> Unit = {},
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
+    onOpenSuspensions: (active: Boolean) -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        ProfileHeader(profile, accountName)
+        ProfileHeader(profile, accountName, onOpenSuspensions)
         RatingsRow(profile.driverRating, profile.safetyRating)
 
         if (profile.recentRaces.isNotEmpty()) {
@@ -170,7 +178,7 @@ fun ProfileSkeleton() {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ProfileHeader(profile: SteamProfile, accountName: String) {
+private fun ProfileHeader(profile: SteamProfile, accountName: String, onOpenSuspensions: (active: Boolean) -> Unit) {
     val accent = rankColor(profile.driverRating?.rank.orEmpty())
     val name = profile.displayName ?: profile.name ?: profile.username ?: accountName.ifBlank { "Driver" }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -193,7 +201,7 @@ private fun ProfileHeader(profile: SteamProfile, accountName: String) {
                 RatingPill("DR", profile.driverRating)
                 RatingPill("SR", profile.safetyRating)
             }
-            SuspensionStatus(profile.activeSuspensions)
+            SuspensionFlags(profile, onOpenSuspensions)
         }
     }
 }
@@ -248,12 +256,60 @@ private fun RatingPill(label: String, rating: RatingDto?) {
     }
 }
 
+private val FlagGray = Color(0xFF8A8F98)
+
+/**
+ * Licence-status flags. Active sanctions → red (the most severe state, shown first);
+ * past/expired sanctions → gray; a clean licence → green. Tapping the active or past
+ * flag opens the history filtered to just that subset. Falls back to
+ * [SteamProfile.activeSuspensions] when the detailed list is missing (older cached profile).
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SuspensionStatus(count: Int) {
-    if (count > 0) {
-        OutlinePill("$count active suspension${if (count == 1) "" else "s"}", NegRed)
-    } else {
-        Text("License clean", style = MaterialTheme.typography.labelMedium, color = PosGreen)
+private fun SuspensionFlags(profile: SteamProfile, onOpen: (active: Boolean) -> Unit) {
+    val all = profile.suspensions
+    val active = all.filter { it.active }
+    val past = all.filter { !it.active }
+
+    // No detailed list (e.g. legacy cache): keep the simple count-based status.
+    if (all.isEmpty()) {
+        if (profile.activeSuspensions > 0) {
+            ClickablePill(stringResource(Res.string.susp_active_count, profile.activeSuspensions)) { onOpen(true) }
+        } else {
+            ClickablePill(stringResource(Res.string.susp_license_clean), PosGreen, onClick = null)
+        }
+        return
+    }
+
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (active.isNotEmpty()) {
+            val label = if (active.any { it.permanent }) stringResource(Res.string.susp_banned)
+            else stringResource(Res.string.susp_active_count, active.size)
+            ClickablePill(label, NegRed) { onOpen(true) }
+        } else {
+            // No active sanction right now → green status, nothing to drill into.
+            ClickablePill(stringResource(Res.string.susp_no_active), PosGreen, onClick = null)
+        }
+        if (past.isNotEmpty()) {
+            ClickablePill(stringResource(Res.string.susp_past_count, past.size), FlagGray) { onOpen(false) }
+        }
+    }
+}
+
+/** Outline pill that opens the detail screen on tap (non-clickable when [onClick] is null). */
+@Composable
+private fun ClickablePill(text: String, color: Color = NegRed, onClick: (() -> Unit)?) {
+    val shape = RoundedCornerShape(6.dp)
+    Box(
+        Modifier.clip(shape).background(color.copy(alpha = 0.12f))
+            .border(1.dp, color.copy(alpha = 0.4f), shape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelMedium, color = color, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

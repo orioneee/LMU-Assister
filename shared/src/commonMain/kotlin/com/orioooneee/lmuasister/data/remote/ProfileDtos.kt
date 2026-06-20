@@ -17,7 +17,22 @@ data class SteamProfile(
     val driverRating: RatingDto? = null,
     val safetyRating: RatingDto? = null,
     val activeSuspensions: Int = 0,
+    val totalSuspensions: Int = 0,
+    // Full ban/warning history (newest first); each carries its reason + window + active flag.
+    val suspensions: List<SuspensionDto> = emptyList(),
     val recentRaces: List<RecentRaceDto> = emptyList(),
+)
+
+/** One licence sanction (ban / suspension / warning) from the player's penalty history. */
+@Serializable
+data class SuspensionDto(
+    val type: Int? = null,           // upstream sanction kind (numeric); semantics not documented
+    val reason: String? = null,      // human-readable text (e.g. the SR-ratio auto-ban note)
+    val from: Long? = null,          // epoch-ms window start
+    val to: Long? = null,            // epoch-ms window end
+    val permanent: Boolean = false,  // permanent bans count as active regardless of window
+    val redacted: Boolean = false,   // upstream hid the reason text
+    val active: Boolean = false,     // in effect right now (computed server-side)
 )
 
 @Serializable

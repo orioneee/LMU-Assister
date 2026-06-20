@@ -1,15 +1,17 @@
 package com.orioooneee.lmuasister.ui
 
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,7 +34,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavDestination
 import androidx.navigation.toRoute
+import com.orioooneee.lmuasister.analytics.AnalyticsEvent
+import com.orioooneee.lmuasister.analytics.Telemetry
 import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.ui.components.EmptyState
 import com.orioooneee.lmuasister.ui.components.RefreshableContent
@@ -44,6 +49,7 @@ import com.orioooneee.lmuasister.ui.profile.AllRacesScreen
 import com.orioooneee.lmuasister.ui.profile.ProfileScreen
 import com.orioooneee.lmuasister.ui.profile.RaceProfileDetailScreen
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
+import com.orioooneee.lmuasister.ui.profile.SuspensionsScreen
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Surface1
 import com.orioooneee.lmuasister.ui.theme.TextMed
@@ -64,7 +70,6 @@ object ProfileRoute
 
 @Serializable
 data class DetailsRoute(val raceId: String)
-
 @Serializable
 data class LeaderboardRoute(val leaderboardId: String, val title: String)
 
@@ -72,10 +77,15 @@ data class LeaderboardRoute(val leaderboardId: String, val title: String)
 object AllRacesRoute
 
 @Serializable
+data class SuspensionsRoute(val active: Boolean)
+
+@Serializable
 data class ProfileRaceDetailRoute(val eventId: String, val split: Int = -1)
 
 @Serializable
 object PrivacyRoute
+
+private const val NAV_ANIM = 300
 
 /** Top-level tabs shown in the bottom navigation bar. */
 private enum class TopTab(val icon: ImageVector) {
@@ -106,21 +116,27 @@ fun MainShell(
     // by the VM).
     LaunchedEffect(Unit) { viewModel.refresh() }
 
-    // Pushed (detail) screens slide up from the bottom and slide back down on close; the
-    // nav bar slides down with them. Top-level tab switches are instant.
-    val slideUp: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
-        { slideInVertically(tween(280)) { it } }
-    val slideDown: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
-        { slideOutVertically(tween(280)) { it } }
+    // One screen_view per destination change (drives Firebase's path/funnel reports).
+    LaunchedEffect(currentDest) {
+        currentDest?.let { Telemetry.screen(screenNameOf(it)) }
+    }
+
+    // Pushed (detail) screens slide up from the bottom; the screen underneath cross-fades
+    // (push → it fades out, pop → it fades back in). On close the screen slides back down +
+    // fades. Tab switches keep the NavHost defaults (instant).
+    val enterUp: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
+        { slideInVertically(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { it } }
+    val exitFade: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
+        { fadeOut(tween(NAV_ANIM)) }
+    val popEnterFade: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
+        { fadeIn(tween(NAV_ANIM)) }
+    val popExitDown: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
+        { slideOutVertically(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(NAV_ANIM)) }
 
     Scaffold(
         containerColor = Carbon,
         bottomBar = {
-            AnimatedVisibility(
-                visible = onTopLevel,
-                enter = slideInVertically(tween(280)) { it },
-                exit = slideOutVertically(tween(280)) { it },
-            ) {
+            if (onTopLevel) {
                 BottomBar(
                     selected = if (onProfile) TopTab.Profile else TopTab.Schedule,
                     onSelect = { tab ->
@@ -138,65 +154,97 @@ fun MainShell(
         NavHost(
             navController = nav,
             startDestination = HomeRoute,
-            modifier = Modifier.fillMaxSize().padding(insets),
+            // Edge-to-edge: the host fills the whole screen (background draws under the
+            // status bar / behind the nav bar). Each screen applies [insets] itself —
+            // top padding to its header, bottom padding to its scroll content.
+            modifier = Modifier.fillMaxSize(),
             enterTransition = { EnterTransition.None },
             exitTransition = { ExitTransition.None },
             popEnterTransition = { EnterTransition.None },
             popExitTransition = { ExitTransition.None },
         ) {
             composable<HomeRoute> {
-                ScheduleTab(viewModel, onOpenRace = { nav.navigate(DetailsRoute(it.id)) })
+                ScheduleTab(viewModel, insets, onOpenRace = {
+                    Telemetry.log(AnalyticsEvent.RaceDetailOpened(it.id, source = "home_grid"))
+                    nav.navigate(DetailsRoute(it.id))
+                })
             }
             composable<ProfileRoute> {
                 ProfileScreen(
                     viewModel = profileViewModel,
-                    onSeeAllRaces = { nav.navigate(AllRacesRoute) },
+                    insets = insets,
+                    onSeeAllRaces = {
+                        Telemetry.log(AnalyticsEvent.AllRacesOpened)
+                        nav.navigate(AllRacesRoute)
+                    },
                     onOpenRace = { eventId, split ->
+                        Telemetry.log(AnalyticsEvent.RaceDetailOpened(eventId, source = "profile_recent"))
                         nav.navigate(ProfileRaceDetailRoute(eventId, split ?: -1))
                     },
-                    onOpenPrivacy = { nav.navigate(PrivacyRoute) },
+                    onOpenSuspensions = { active ->
+                        Telemetry.log(AnalyticsEvent.SuspensionsOpened(active))
+                        nav.navigate(SuspensionsRoute(active))
+                    },
+                    onOpenPrivacy = {
+                        Telemetry.log(AnalyticsEvent.PrivacyOpened)
+                        nav.navigate(PrivacyRoute)
+                    },
                 )
             }
-            composable<PrivacyRoute>(enterTransition = slideUp, popExitTransition = slideDown) {
-                PrivacyPolicyScreen(onBack = { nav.popBackStack() })
+            composable<SuspensionsRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+                SuspensionsScreen(
+                    viewModel = profileViewModel,
+                    insets = insets,
+                    active = entry.toRoute<SuspensionsRoute>().active,
+                    onBack = { nav.popBackStack() },
+                )
             }
-            composable<AllRacesRoute>(enterTransition = slideUp, popExitTransition = slideDown) {
+            composable<PrivacyRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) {
+                PrivacyPolicyScreen(insets = insets, onBack = { nav.popBackStack() })
+            }
+            composable<AllRacesRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) {
                 AllRacesScreen(
                     viewModel = profileViewModel,
+                    insets = insets,
                     onBack = { nav.popBackStack() },
                     onOpenRace = { eventId, split ->
+                        Telemetry.log(AnalyticsEvent.RaceDetailOpened(eventId, source = "all_races"))
                         nav.navigate(ProfileRaceDetailRoute(eventId, split ?: -1))
                     },
                 )
             }
-            composable<ProfileRaceDetailRoute>(enterTransition = slideUp, popExitTransition = slideDown) { entry ->
+            composable<ProfileRaceDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
                 val route = entry.toRoute<ProfileRaceDetailRoute>()
                 RaceProfileDetailScreen(
                     viewModel = profileViewModel,
+                    insets = insets,
                     eventId = route.eventId,
                     split = route.split.takeIf { it >= 0 },
                     onBack = { nav.popBackStack() },
                 )
             }
-            composable<DetailsRoute>(enterTransition = slideUp, popExitTransition = slideDown) { entry ->
+            composable<DetailsRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
                 val id = entry.toRoute<DetailsRoute>().raceId
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 val race = (state as? ScheduleUiState.Success)?.data?.schedule?.races?.firstOrNull { it.id == id }
                 if (race != null) {
                     RaceDetailsScreen(
                         race,
+                        insets = insets,
                         onBack = { nav.popBackStack() },
                         onOpenLeaderboard = { lbId, title ->
+                            Telemetry.log(AnalyticsEvent.LeaderboardOpened(lbId))
                             nav.navigate(LeaderboardRoute(lbId, title))
                         },
                     )
                 }
             }
-            composable<LeaderboardRoute>(enterTransition = slideUp, popExitTransition = slideDown) { entry ->
+            composable<LeaderboardRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
                 val route = entry.toRoute<LeaderboardRoute>()
                 FullLeaderboardScreen(
                     leaderboardId = route.leaderboardId,
                     title = route.title,
+                    insets = insets,
                     onBack = { nav.popBackStack() },
                 )
             }
@@ -206,7 +254,7 @@ fun MainShell(
 
 /** Schedule tab: loading / error / the actual home screen, with pull-to-refresh. */
 @Composable
-private fun ScheduleTab(viewModel: ScheduleViewModel, onOpenRace: (Race) -> Unit) {
+private fun ScheduleTab(viewModel: ScheduleViewModel, insets: PaddingValues, onOpenRace: (Race) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val cars by viewModel.cars.collectAsStateWithLifecycle()
@@ -232,6 +280,7 @@ private fun ScheduleTab(viewModel: ScheduleViewModel, onOpenRace: (Race) -> Unit
                     schedule = data.schedule,
                     weeks = data.weeks,
                     selectedWeek = data.selected,
+                    insets = insets,
                     onSelectWeek = viewModel::selectWeek,
                     onOpenRace = onOpenRace,
                     onRefresh = viewModel::refresh,
@@ -240,6 +289,19 @@ private fun ScheduleTab(viewModel: ScheduleViewModel, onOpenRace: (Race) -> Unit
             }
         }
     }
+}
+
+/** Maps a nav destination to a stable analytics screen name. */
+private fun screenNameOf(dest: NavDestination): String = when {
+    dest.hasRoute(HomeRoute::class) -> "schedule"
+    dest.hasRoute(ProfileRoute::class) -> "profile"
+    dest.hasRoute(DetailsRoute::class) -> "race_details"
+    dest.hasRoute(LeaderboardRoute::class) -> "full_leaderboard"
+    dest.hasRoute(AllRacesRoute::class) -> "all_races"
+    dest.hasRoute(SuspensionsRoute::class) -> "suspensions"
+    dest.hasRoute(ProfileRaceDetailRoute::class) -> "race_history_detail"
+    dest.hasRoute(PrivacyRoute::class) -> "privacy_policy"
+    else -> "unknown"
 }
 
 @Composable

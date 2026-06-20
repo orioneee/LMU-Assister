@@ -21,6 +21,28 @@
     <string name="profile_field_2fa">2FA code</string>
     <string name="profile_sign_in">Sign in</string>
 
+    <!-- Profile / licence sanctions (bans, suspensions, warnings) -->
+    <string name="susp_active_count">%1$d active</string>
+    <string name="susp_past_count">%1$d past</string>
+    <string name="susp_banned">Banned</string>
+    <string name="susp_license_clean">License clean</string>
+    <string name="susp_no_active">No active bans</string>
+    <string name="susp_title_active">Active suspensions</string>
+    <string name="susp_title_past">Past suspensions</string>
+    <string name="susp_empty_active">No active suspensions</string>
+    <string name="susp_empty_past">No past suspensions</string>
+    <string name="susp_empty_subtitle">Nothing on record.</string>
+    <string name="susp_type">Type %1$d</string>
+    <string name="susp_reason_redacted">Reason withheld.</string>
+    <string name="susp_reason_none">No reason provided.</string>
+    <string name="susp_status_permanent">PERMANENT BAN</string>
+    <string name="susp_status_active">ACTIVE</string>
+    <string name="susp_status_expired">EXPIRED</string>
+    <string name="susp_issued">Issued</string>
+    <string name="susp_permanent_note">Permanent — no end date.</string>
+    <string name="susp_from">From</string>
+    <string name="susp_until">Until</string>
+
     <!-- Loading / errors -->
     <string name="retry">Retry</string>
     <string name="couldnt_load">Couldn’t load</string>
@@ -51,6 +73,8 @@
     <string name="fastest_laps">Fastest laps</string>
     <string name="loading_times">Loading times…</string>
     <string name="no_lap_times">No lap times yet.</string>
+    <string name="your_position">YOUR POSITION</string>
+    <string name="your_position_none">No lap on this board yet — set a time to appear here.</string>
     <string name="show_top">Show top %1$d  ▾</string>
     <string name="full_leaderboard">Full leaderboard  ›</string>
     <string name="full_leaderboard_title">Leaderboard</string>

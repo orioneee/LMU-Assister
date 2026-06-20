@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -76,11 +77,15 @@ private val SteamLogoBg = Color(0xFF1B2838)
 @Composable
 fun ProfileScreen(
     viewModel: SteamLoginViewModel = koinViewModel(),
+    insets: PaddingValues = PaddingValues(),
     onSeeAllRaces: () -> Unit = {},
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
+    onOpenSuspensions: (active: Boolean) -> Unit = {},
     onOpenPrivacy: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val topInset = insets.calculateTopPadding()
+    val bottomInset = insets.calculateBottomPadding()
 
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -97,7 +102,7 @@ fun ProfileScreen(
         Column(
             Modifier.fillMaxSize().background(Carbon).padding(horizontal = 16.dp),
         ) {
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(topInset + 24.dp))
             ProfileSkeleton()
         }
         return
@@ -114,8 +119,8 @@ fun ProfileScreen(
                     .padding(horizontal = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Spacer(Modifier.height(24.dp))
-                ProfileContent(signedIn.backend, onSeeAllRaces, onOpenRace)
+                Spacer(Modifier.height(topInset + 24.dp))
+                ProfileContent(signedIn.backend, onSeeAllRaces, onOpenRace, onOpenSuspensions)
                 Spacer(Modifier.height(20.dp))
                 Text(
                     "Sign out",
@@ -126,7 +131,17 @@ fun ProfileScreen(
                         .clickable { viewModel.signOut() }
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Privacy Policy",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextLow,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onOpenPrivacy)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+                Spacer(Modifier.height(32.dp + bottomInset))
             }
         }
         return
@@ -140,7 +155,7 @@ fun ProfileScreen(
             .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(topInset + 48.dp))
         Box(
             Modifier.size(96.dp).clip(CircleShape).background(SteamLogoBg),
             contentAlignment = Alignment.Center,
@@ -202,7 +217,7 @@ fun ProfileScreen(
         Spacer(Modifier.height(16.dp))
         ConsentNote(onOpenPrivacy)
 
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(32.dp + bottomInset))
     }
 }
 
@@ -234,6 +249,7 @@ private fun ProfileContent(
     backend: BackendState,
     onSeeAllRaces: () -> Unit,
     onOpenRace: (eventId: String, split: Int?) -> Unit,
+    onOpenSuspensions: (active: Boolean) -> Unit,
 ) {
     when (backend) {
         is BackendState.Ok -> ProfileView(
@@ -241,6 +257,7 @@ private fun ProfileContent(
             accountName = "",
             onSeeAllRaces = onSeeAllRaces,
             onOpenRace = onOpenRace,
+            onOpenSuspensions = onOpenSuspensions,
         )
         BackendState.Loading -> ProfileSkeleton()
         is BackendState.AuthFailed -> ProfileMessage("Couldn't load profile", backend.message)

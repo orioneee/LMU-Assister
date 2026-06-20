@@ -2,6 +2,9 @@ package com.orioooneee.lmuasister.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.orioooneee.lmuasister.analytics.AnalyticsEvent
+import com.orioooneee.lmuasister.analytics.Telemetry
+import com.orioooneee.lmuasister.analytics.TelemetryError
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.Schedule
@@ -67,6 +70,7 @@ class ScheduleViewModel(
         if (key == selected) return
         selected = key
         val cached = cache[key]
+        Telemetry.log(AnalyticsEvent.WeekSelected(key, isCached = cached != null))
         if (cached != null) {
             emitSuccess(key, cached) // instant — already prefetched
         } else {
@@ -92,6 +96,8 @@ class ScheduleViewModel(
             } else if (_state.value !is ScheduleUiState.Success) {
                 // nothing cached and the network failed → surface an error
                 _state.value = ScheduleUiState.Error("Network error — could not load schedule")
+                Telemetry.log(AnalyticsEvent.ScheduleError("network"))
+                Telemetry.recordError(TelemetryError("schedule_refresh_failed"), "stage" to "refresh")
             }
             _refreshing.value = false
         }
@@ -104,8 +110,10 @@ class ScheduleViewModel(
                 emitSuccess(key, schedule)
             }
             .onFailure {
+                Telemetry.recordError(it, "stage" to "fetch_week", "week" to (key ?: "current"))
                 if (_state.value !is ScheduleUiState.Success) {
                     _state.value = ScheduleUiState.Error(it.message ?: "Network error — could not load schedule")
+                    Telemetry.log(AnalyticsEvent.ScheduleError("network"))
                 }
             }
     }

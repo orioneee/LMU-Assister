@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,7 +33,7 @@ import org.koin.compose.koinInject
 
 /** Privacy policy — fetched as plain text from GET /api/v2/privacy and rendered in-app. */
 @Composable
-fun PrivacyPolicyScreen(onBack: () -> Unit) {
+fun PrivacyPolicyScreen(insets: PaddingValues, onBack: () -> Unit) {
     val api = koinInject<BackendApi>()
     val result by produceState<Result<String>?>(null) {
         value = runCatching { api.privacy() }
@@ -40,7 +41,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp + insets.calculateTopPadding(), end = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -66,7 +67,8 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
             else -> r.fold(
                 onSuccess = { body ->
                     SelectionContainer(
-                        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+                        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + insets.calculateBottomPadding()),
                     ) {
                         Text(
                             body.trim(),

@@ -87,11 +87,14 @@ fun HomeScreen(
     schedule: Schedule,
     weeks: List<WeekTab>,
     selectedWeek: String,
+    insets: PaddingValues,
     onSelectWeek: (String) -> Unit,
     onOpenRace: (Race) -> Unit,
     onRefresh: () -> Unit = {},
     cars: List<CarModel> = emptyList(),
 ) {
+    val topInset = insets.calculateTopPadding()
+    val bottomInset = insets.calculateBottomPadding()
     val now = remember { Clock.System.now() }
     val tabs = remember(schedule) { buildTabs(schedule, now) }
 
@@ -104,7 +107,7 @@ fun HomeScreen(
     // No upcoming races at all → just the (optional) week pills + empty state.
     if (tabs.isEmpty()) {
         Column(Modifier.fillMaxSize().background(Carbon)) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(topInset + 12.dp))
             ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo)
             Spacer(Modifier.height(12.dp))
             NoRaces(Modifier.weight(1f), onRefresh)
@@ -137,7 +140,7 @@ fun HomeScreen(
         // Pager content, pushed down by the currently-visible header height.
         Box(Modifier.fillMaxSize().offset { IntOffset(0, (headerHeight.value + headerOffset.value).roundToInt()) }) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                TabContent(tabs[page], schedule, heroHeight, isCurrentWeek, now, onOpenRace, onRefresh)
+                TabContent(tabs[page], schedule, heroHeight, isCurrentWeek, now, bottomInset, onOpenRace, onRefresh)
             }
         }
         // The header itself, translating up as the user scrolls.
@@ -148,7 +151,7 @@ fun HomeScreen(
                 .onSizeChanged { headerHeight.value = it.height.toFloat() }
                 .background(Carbon),
         ) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(topInset + 12.dp))
             ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo)
             Spacer(Modifier.height(12.dp))
             // Tabs only for Special / Championship — the main Daily+Weekly grid needs none.
@@ -242,6 +245,7 @@ private fun TabContent(
     heroHeight: Dp,
     isCurrentWeek: Boolean,
     now: Instant,
+    bottomInset: Dp,
     onOpenRace: (Race) -> Unit,
     onRefresh: () -> Unit,
 ) {
@@ -264,7 +268,7 @@ private fun TabContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomInset),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         when {

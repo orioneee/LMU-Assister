@@ -37,6 +37,13 @@ fun Instant.formatStart(): String {
     return "${dt.day} $mon ${two(dt.hour)}:${two(dt.minute)}"
 }
 
+/** Epoch-ms -> "12 Jun 2026, 14:30" (local, 24h). */
+fun formatEpochDateTime(ms: Long): String {
+    val dt = Instant.fromEpochMilliseconds(ms).local()
+    val mon = MONTHS.getOrElse(dt.month.ordinal) { "?" }
+    return "${dt.day} $mon ${dt.year}, ${two(dt.hour)}:${two(dt.minute)}"
+}
+
 /** Lap time in ms -> "1:42.623". */
 fun formatLap(ms: Long): String {
     if (ms <= 0) return "—"

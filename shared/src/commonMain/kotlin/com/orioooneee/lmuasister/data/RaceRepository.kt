@@ -37,6 +37,7 @@ import com.orioooneee.lmuasister.data.remote.WeatherDto
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 
@@ -192,6 +193,28 @@ class RaceRepository(
         models
     }
 
+    private var liveryModelsMem: Map<String, String>? = null
+
+    /**
+     * Livery/team name → real car model — e.g. "BMWMH Custom Team 2025 #397" → "BMW M
+     * Hybrid V8". The leaderboard sends the livery as its `car`; this resolves it to the
+     * actual machine. Uses the cached roster first, fetching once if nothing is cached.
+     */
+    suspend fun liveryToModel(): Map<String, String> {
+        liveryModelsMem?.let { return it }
+        val raw = diskList<CarsCache>(CARS_KEY)?.data?.takeIf { it.isNotEmpty() }
+            ?: runCatching {
+                val resp = api.cars()
+                carsMem = dedupCars(resp.cars)
+                runCatching { LocalCache.write(CARS_KEY, AppJson.encodeToString(CarsCache(nowMs(), resp.cars))) }
+                resp.cars
+            }.getOrNull().orEmpty()
+        return raw.asSequence()
+            .filter { it.name.isNotBlank() && it.model.isNotBlank() }
+            .associate { it.name to it.model }
+            .also { if (it.isNotEmpty()) liveryModelsMem = it }
+    }
+
     /** Cursor-paginated full leaderboard, for the dedicated screen (Paging 3). */
     fun leaderboardPager(leaderboardId: String): Pager<String, LapEntry> =
         Pager(
@@ -211,6 +234,12 @@ class RaceRepository(
      * moment for the app token (the session restores async at launch); if it isn't there
      * in time, returns null and the screen just renders the public board.
      */
+    /**
+     * The current signed-in app token, or null. Lets the UI tell an *active session*
+     * (show a skeleton while "your position" loads) apart from a signed-out user.
+     */
+    val appToken: StateFlow<String?> get() = tokenHolder.token
+
     suspend fun leaderboardMe(leaderboardId: String): LapEntry? {
         val token = tokenHolder.await(LB_TOKEN_WAIT_MS) ?: return null
         return runCatching {

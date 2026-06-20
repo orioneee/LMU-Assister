@@ -131,11 +131,14 @@ import lmuassister.shared.generated.resources.track_turns
 import lmuassister.shared.generated.resources.weather
 import lmuassister.shared.generated.resources.weather_rain
 import lmuassister.shared.generated.resources.yes
+import lmuassister.shared.generated.resources.your_position
+import lmuassister.shared.generated.resources.your_position_none
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RaceDetailsScreen(
     race: Race,
+    insets: PaddingValues,
     onBack: () -> Unit,
     onOpenLeaderboard: (leaderboardId: String, title: String) -> Unit = { _, _ -> },
 ) {
@@ -167,7 +170,12 @@ fun RaceDetailsScreen(
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 320.dp),
         modifier = Modifier.fillMaxSize().background(Carbon),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 16.dp + insets.calculateTopPadding(),
+            end = 16.dp,
+            bottom = 16.dp + insets.calculateBottomPadding(),
+        ),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -654,14 +662,36 @@ private fun LeaderboardCard(
             // Where the signed-in player sits on this class's board (token-gated; waits
             // briefly for the token, null when not signed in / no entry).
             val repo = koinInject<RaceRepository>()
-            val me by produceState<LapEntry?>(null, board.leaderboardId) {
-                value = board.leaderboardId?.let { runCatching { repo.leaderboardMe(it) }.getOrNull() }
+            val hasSession by repo.appToken.collectAsState()
+            // Livery/team name → real car model, so rows show "BMW M Hybrid V8" instead
+            // of "BMWMH Custom Team #397". Empty until the roster resolves (raw name shown).
+            val liveryToModel by produceState(emptyMap<String, String>()) {
+                value = runCatching { repo.liveryToModel() }.getOrDefault(emptyMap())
             }
-            me?.let { m ->
-                YourPositionRow(m, leader)
-                Spacer(Modifier.height(10.dp))
+            val me by produceState<MeRow>(MeRow.Loading, board.leaderboardId) {
+                val id = board.leaderboardId
+                value = if (id == null) MeRow.None
+                else runCatching { repo.leaderboardMe(id) }.getOrNull()
+                    ?.let { MeRow.Found(it) } ?: MeRow.None
             }
-            board.entries.take(LB_PREVIEW).forEach { e -> LeaderboardRow(e, leader) }
+            when (val row = me) {
+                is MeRow.Found -> {
+                    YourPositionRow(row.entry, leader, liveryToModel)
+                    Spacer(Modifier.height(10.dp))
+                }
+                // Active-session-only placeholders: a signed-out user has no position,
+                // so we show nothing. While the row resolves → skeleton; if there's no
+                // lap on this board → an explanatory empty row.
+                MeRow.Loading -> if (hasSession != null) {
+                    YourPositionSkeleton()
+                    Spacer(Modifier.height(10.dp))
+                }
+                MeRow.None -> if (hasSession != null) {
+                    YourPositionEmpty()
+                    Spacer(Modifier.height(10.dp))
+                }
+            }
+            board.entries.take(LB_PREVIEW).forEach { e -> LeaderboardRow(e, leader, liveryToModel = liveryToModel) }
             board.leaderboardId?.let { id ->
                 Spacer(Modifier.height(10.dp))
                 FullLeaderboardButton {
@@ -674,24 +704,90 @@ private fun LeaderboardCard(
     }
 }
 
+/** Resolution state of the signed-in player's "your position" row. */
+private sealed interface MeRow {
+    data object Loading : MeRow
+    data object None : MeRow
+    data class Found(val entry: LapEntry) : MeRow
+}
+
+/** Label above the "your position" block (row / skeleton / empty all share it). */
+@Composable
+private fun YourPositionLabel() {
+    Text(
+        stringResource(Res.string.your_position),
+        style = MaterialTheme.typography.labelSmall,
+        color = TextMed,
+        fontWeight = FontWeight.Bold,
+    )
+}
+
+/** Neutral (grey) container shared by the skeleton + empty states, matching board rows. */
+@Composable
+private fun YourPositionPlaceholderBox(content: @Composable () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Surface2)
+            .border(1.dp, Outline, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+    ) { content() }
+}
+
+/** Shimmer stand-in for [YourPositionRow] while an active session resolves its row. */
+@Composable
+private fun YourPositionSkeleton() {
+    val brush = shimmerBrush()
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        YourPositionLabel()
+        YourPositionPlaceholderBox {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ShimmerBar(Modifier.width(20.dp).height(15.dp), brush)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    ShimmerBar(Modifier.fillMaxWidth(0.4f).height(13.dp), brush)
+                    Spacer(Modifier.height(6.dp))
+                    ShimmerBar(Modifier.fillMaxWidth(0.55f).height(9.dp), brush)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(horizontalAlignment = Alignment.End) {
+                    ShimmerBar(Modifier.width(70.dp).height(13.dp), brush)
+                    Spacer(Modifier.height(6.dp))
+                    ShimmerBar(Modifier.width(44.dp).height(9.dp), brush)
+                }
+            }
+        }
+    }
+}
+
+/** Shown for a signed-in player with no lap on this board yet. */
+@Composable
+private fun YourPositionEmpty() {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        YourPositionLabel()
+        YourPositionPlaceholderBox {
+            Text(
+                stringResource(Res.string.your_position_none),
+                style = MaterialTheme.typography.bodySmall,
+                color = TextLow,
+            )
+        }
+    }
+}
+
 /** The signed-in player's own row, tinted and labelled, above the board preview. */
 @Composable
-private fun YourPositionRow(entry: LapEntry, leader: Long) {
+private fun YourPositionRow(entry: LapEntry, leader: Long, liveryToModel: Map<String, String> = emptyMap()) {
     val accent = MaterialTheme.colorScheme.primary
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            "YOUR POSITION",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextMed,
-            fontWeight = FontWeight.Bold,
-        )
+        YourPositionLabel()
         Box(
             Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .background(accent.copy(alpha = 0.12f))
                 .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
         ) {
-            LeaderboardRow(entry, leader)
+            LeaderboardRow(entry, leader, liveryToModel = liveryToModel)
         }
     }
 }
@@ -769,11 +865,17 @@ private fun classLabelFull(carClass: String): String {
 
 /**
  * One leaderboard row: rank (class-tinted) · driver + car · lap time + gap, with the
- * sector splits underneath. The car name auto-scrolls as a marquee when it's too long
- * to fit, so full livery/team names stay readable without truncation.
+ * sector splits underneath. [liveryToModel] resolves the entry's livery/team name to the
+ * real car model (e.g. "BMWMH Custom Team #397" → "BMW M Hybrid V8"); the raw string is
+ * kept when the roster has no match. The car name auto-scrolls as a marquee when long.
  */
 @Composable
-internal fun LeaderboardRow(e: LapEntry, leaderMs: Long, alt: Boolean = false) {
+internal fun LeaderboardRow(
+    e: LapEntry,
+    leaderMs: Long,
+    alt: Boolean = false,
+    liveryToModel: Map<String, String> = emptyMap(),
+) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -801,7 +903,7 @@ internal fun LeaderboardRow(e: LapEntry, leaderMs: Long, alt: Boolean = false) {
                 )
                 e.car?.let { car ->
                     Text(
-                        car,
+                        liveryToModel[car] ?: car,
                         style = MaterialTheme.typography.labelSmall,
                         color = TextLow,
                         maxLines = 1,

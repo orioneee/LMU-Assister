@@ -77,6 +77,12 @@ kotlin {
                 implementation(libs.ktor.client.okhttp)
                 // Encrypted token storage for the persisted Steam session.
                 implementation(libs.androidx.security.crypto)
+                // Firebase Analytics + Crashlytics (Android-only telemetry backend).
+                // `api` so the app module's Crashlytics Gradle plugin sees the dependency
+                // on its runtime classpath. The BoM pins the module versions.
+                api(project.dependencies.platform(libs.firebase.bom))
+                api(libs.firebase.analytics)
+                api(libs.firebase.crashlytics)
             }
         }
         commonMain.dependencies {

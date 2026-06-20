@@ -49,14 +49,19 @@ import org.koin.compose.koinInject
 
 /** Full, cursor-paginated leaderboard for one race (Paging 3). */
 @Composable
-fun FullLeaderboardScreen(leaderboardId: String, title: String, onBack: () -> Unit) {
+fun FullLeaderboardScreen(leaderboardId: String, title: String, insets: PaddingValues, onBack: () -> Unit) {
     val repo = koinInject<RaceRepository>()
     val entries = remember(leaderboardId) { repo.leaderboardPager(leaderboardId).flow }
         .collectAsLazyPagingItems()
+    // Livery/team name → real car model (e.g. "BMW M Hybrid V8"); empty until the roster
+    // resolves, in which case rows fall back to the raw livery string.
+    val liveryToModel by produceState(emptyMap<String, String>()) {
+        value = runCatching { repo.liveryToModel() }.getOrDefault(emptyMap())
+    }
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
         Row(
-            Modifier.fillMaxWidth().padding(12.dp),
+            Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp + insets.calculateTopPadding(), end = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CircleButton(Modifier, onBack)
@@ -101,17 +106,17 @@ fun FullLeaderboardScreen(leaderboardId: String, title: String, onBack: () -> Un
                         .background(accent.copy(alpha = 0.12f))
                         .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
                 ) {
-                    LeaderboardRow(m, best, alt = false)
+                    LeaderboardRow(m, best, alt = false, liveryToModel = liveryToModel)
                 }
             }
         }
         val skeletonBrush = shimmerBrush()
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp + insets.calculateBottomPadding()),
         ) {
             items(entries.itemCount) { index ->
-                entries[index]?.let { e -> LeaderboardRow(e, best, alt = index % 2 == 1) }
+                entries[index]?.let { e -> LeaderboardRow(e, best, alt = index % 2 == 1, liveryToModel = liveryToModel) }
             }
 
             when (val append = entries.loadState.append) {
