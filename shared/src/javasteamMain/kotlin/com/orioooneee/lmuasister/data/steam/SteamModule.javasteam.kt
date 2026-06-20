@@ -3,8 +3,9 @@ package com.orioooneee.lmuasister.data.steam
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import org.koin.dsl.module
 
-// JVM uses the device-tunnel mechanism (sidecar logs into Steam through this machine's IP).
+// Android + desktop JVM: on-device JavaSteam (SteamKit2). No device tunnel.
 actual fun steamModule() = module {
+    single<SteamAuthClient> { JavaSteamAuthClient() }
     single<SteamSessionStore> { steamSessionStore() }
-    single<SteamSignIn> { TunnelSteamSignIn(get<SteamBackendApi>(), get()) }
+    single<SteamSignIn> { JavaSteamSignIn(get(), get<SteamBackendApi>(), get()) }
 }

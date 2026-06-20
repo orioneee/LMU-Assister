@@ -51,8 +51,8 @@ private const val PROFILE_CACHE_KEY = "steam_profile_v2"
 private const val AUTH_WAIT_MS = 60_000L
 
 /**
- * Drives the Steam login form via the platform [SteamSignIn] (device tunnel on
- * Android/JVM/iOS), then loads the profile with the resulting app token.
+ * Drives the Steam login form via the platform [SteamSignIn] (on-device JavaSteam on
+ * Android/JVM, device tunnel on iOS), then loads the profile with the resulting app token.
  */
 class SteamLoginViewModel(
     private val signIn: SteamSignIn,

@@ -51,8 +51,8 @@ kotlin {
     }
     
     sourceSets {
-        // Shared Steam device-tunnel (Ktor raw sockets + websockets) — used by all
-        // (Android/JVM/iOS) clients.
+        // Steam device-tunnel (Ktor raw sockets + websockets) — iOS only (no native
+        // Steam lib there). Android/JVM do on-device Steam auth via JavaSteam instead.
         val tunnelMain = create("tunnelMain") {
             dependsOn(commonMain.get())
             dependencies {
@@ -60,8 +60,18 @@ kotlin {
                 implementation(libs.ktor.network)
             }
         }
+        // On-device Steam auth (JavaSteam = SteamKit2 port, a plain JVM lib) — shared by
+        // Android + desktop JVM. BouncyCastle: Android ships a stripped "BC" provider, so
+        // the full bcprov is bundled and swapped in at runtime (harmless on desktop).
+        val javasteamMain = create("javasteamMain") {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(libs.javasteam)
+                implementation(libs.bouncycastle.prov)
+            }
+        }
         androidMain {
-            dependsOn(tunnelMain)
+            dependsOn(javasteamMain)
             dependencies {
                 implementation(libs.compose.uiToolingPreview)
                 implementation(libs.ktor.client.okhttp)
@@ -100,11 +110,9 @@ kotlin {
             implementation(libs.kotlin.test)
         }
         jvmMain {
-            dependsOn(tunnelMain)
+            dependsOn(javasteamMain)
             dependencies {
                 implementation(libs.ktor.client.cio)
-                // OkHttp engine for the tunnel WebSocket (CIO's WS has Cloudflare quirks).
-                implementation(libs.ktor.client.okhttp)
             }
         }
         iosMain {

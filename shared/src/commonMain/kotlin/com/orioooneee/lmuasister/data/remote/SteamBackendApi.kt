@@ -18,6 +18,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+/** Response of /auth/steam: exchanges an on-device Steam Web API ticket for our app token. */
+@Serializable
+data class SteamAuthResponse(val token: String, val uid: String)
+
 /** Steam refresh creds handed back to the device by /auth/steam/login — device-only secret. */
 @Serializable
 data class SteamCreds(val account: String? = null, val refresh: String? = null, val guard: String? = null)
@@ -65,6 +69,18 @@ class SteamGuardNeeded(val kind: String) : Exception("need_guard:$kind")
  * token, then call profile endpoints with it as a Bearer.
  */
 class SteamBackendApi(private val client: HttpClient) {
+
+    /** Exchanges an on-device Steam Web API ticket (hex) for our app token (Android/JVM). */
+    suspend fun authSteam(ticketHex: String): SteamAuthResponse {
+        val resp = client.post("$API_BASE/auth/steam") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ticket":"$ticketHex"}""") // hex is [0-9a-f], no escaping needed
+        }
+        return when (resp.status.value) {
+            in 200..299 -> AppJson.decodeFromString(resp.bodyAsText())
+            else -> throw resp.toError()
+        }
+    }
 
     suspend fun profile(token: String): SteamProfile =
         AppJson.decodeFromString(getAuthed("$API_BASE/profile", token))

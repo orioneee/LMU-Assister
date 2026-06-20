@@ -2,5 +2,5 @@ package com.orioooneee.lmuasister.data.steam
 
 import org.koin.core.module.Module
 
-/** Binds [SteamSignIn] — the device-tunnel impl on Android/JVM/iOS, a stub on js/wasm. */
+/** Binds [SteamSignIn] — on-device JavaSteam on Android/JVM, the device tunnel on iOS. */
 expect fun steamModule(): Module
