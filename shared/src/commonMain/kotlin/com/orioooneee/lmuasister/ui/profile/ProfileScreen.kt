@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -77,6 +79,7 @@ fun ProfileScreen(
     viewModel: SteamLoginViewModel = koinViewModel(),
     onSeeAllRaces: () -> Unit = {},
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
+    onOpenPrivacy: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -198,7 +201,34 @@ fun ProfileScreen(
             loading = loading,
             onClick = { viewModel.login(login, password, code) },
         )
+
+        Spacer(Modifier.height(16.dp))
+        ConsentNote(onOpenPrivacy)
+
         Spacer(Modifier.height(32.dp))
+    }
+}
+
+/** "By signing in you agree to the Privacy Policy" — the link opens the policy screen. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ConsentNote(onOpenPrivacy: () -> Unit) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+    ) {
+        Text(
+            "By signing in you agree to the",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextLow,
+        )
+        Text(
+            "Privacy Policy",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.clickable(onClick = onOpenPrivacy),
+        )
     }
 }
 

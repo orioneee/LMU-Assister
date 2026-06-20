@@ -27,6 +27,9 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -185,7 +188,7 @@ fun RaceDetailsScreen(
                         ),
                     ),
                 )
-                CircleButton("‹", Modifier.align(Alignment.TopStart).padding(12.dp), onBack)
+                CircleButton(Modifier.align(Alignment.TopStart).padding(12.dp), onBack)
                 Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
                     Text(race.type.label.uppercase(), style = MaterialTheme.typography.labelMedium, color = race.accentColor())
                     Spacer(Modifier.height(6.dp))
@@ -967,12 +970,12 @@ private fun DetailRows(rows: List<Pair<String, String>>) {
 }
 
 @Composable
-internal fun CircleButton(label: String, modifier: Modifier, onClick: () -> Unit) {
+internal fun CircleButton(modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier.size(38.dp).clip(CircleShape).background(Carbon.copy(alpha = 0.55f))
             .border(1.dp, Outline, CircleShape).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = MaterialTheme.typography.titleLarge, color = TextHigh)
+        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextHigh, modifier = Modifier.size(22.dp))
     }
 }

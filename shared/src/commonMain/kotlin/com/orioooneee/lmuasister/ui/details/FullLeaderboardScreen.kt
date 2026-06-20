@@ -60,7 +60,7 @@ fun FullLeaderboardScreen(leaderboardId: String, title: String, onBack: () -> Un
             Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CircleButton("‹", Modifier, onBack)
+            CircleButton(Modifier, onBack)
             Spacer(Modifier.size(12.dp))
             Column {
                 Text(

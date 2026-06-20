@@ -88,7 +88,7 @@ fun RaceProfileDetailScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            CircleButton("‹", Modifier, onBack)
+            CircleButton(Modifier, onBack)
             Text(
                 result?.getOrNull()?.title ?: "Race",
                 style = MaterialTheme.typography.titleLarge,

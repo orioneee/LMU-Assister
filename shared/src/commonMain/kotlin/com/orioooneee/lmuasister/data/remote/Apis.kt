@@ -55,6 +55,9 @@ class BackendApi(private val client: HttpClient) {
     suspend fun cars(): CarsResponse =
         AppJson.decodeFromString(client.get("$API_BASE/cars").bodyAsText())
 
+    /** Privacy policy as plain text — rendered in-app (no auth required). */
+    suspend fun privacy(): String = client.get("$API_BASE/privacy").bodyAsText()
+
     /** One page of the full official leaderboard (cursor-paginated). When [token] is
      *  supplied, the response also carries the caller's own row + rank (`me`). */
     suspend fun leaderboardPage(

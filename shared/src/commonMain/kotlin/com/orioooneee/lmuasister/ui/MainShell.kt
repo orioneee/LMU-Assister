@@ -31,6 +31,7 @@ import com.orioooneee.lmuasister.ui.components.RefreshableContent
 import com.orioooneee.lmuasister.ui.details.FullLeaderboardScreen
 import com.orioooneee.lmuasister.ui.details.RaceDetailsScreen
 import com.orioooneee.lmuasister.ui.home.HomeScreen
+import com.orioooneee.lmuasister.ui.legal.PrivacyPolicyScreen
 import com.orioooneee.lmuasister.ui.profile.AllRacesScreen
 import com.orioooneee.lmuasister.ui.profile.ProfileScreen
 import com.orioooneee.lmuasister.ui.profile.RaceProfileDetailScreen
@@ -64,6 +65,9 @@ object AllRacesRoute
 
 @Serializable
 data class ProfileRaceDetailRoute(val eventId: String, val split: Int = -1)
+
+@Serializable
+object PrivacyRoute
 
 /** Top-level tabs shown in the bottom navigation bar. */
 private enum class TopTab(val icon: ImageVector) {
@@ -128,7 +132,11 @@ fun MainShell(
                     onOpenRace = { eventId, split ->
                         nav.navigate(ProfileRaceDetailRoute(eventId, split ?: -1))
                     },
+                    onOpenPrivacy = { nav.navigate(PrivacyRoute) },
                 )
+            }
+            composable<PrivacyRoute> {
+                PrivacyPolicyScreen(onBack = { nav.popBackStack() })
             }
             composable<AllRacesRoute> {
                 AllRacesScreen(

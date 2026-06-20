@@ -95,7 +95,7 @@ fun AllRacesScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            CircleButton("‹", Modifier, onBack)
+            CircleButton(Modifier, onBack)
             Text(
                 "All races",
                 style = MaterialTheme.typography.titleLarge,
