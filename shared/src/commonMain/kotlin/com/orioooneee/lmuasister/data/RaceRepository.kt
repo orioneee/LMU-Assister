@@ -108,7 +108,7 @@ class RaceRepository(
     fun cachedWeeks(): List<String>? = cached()?.weeks?.map { it.key }
 
     /** Force a network refetch; updates the in-memory + on-disk cache. */
-    suspend fun refreshSchedule(): Result<Unit> = runCatching { network(refresh = true); Unit }
+    suspend fun refreshSchedule(): Result<Unit> = runCatching { network(refresh = true) }.map { }
 
     /** Week keys (current + upcoming), for the week picker. */
     suspend fun availableWeeks(refresh: Boolean = false): List<String> =

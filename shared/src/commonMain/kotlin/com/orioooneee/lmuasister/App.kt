@@ -11,6 +11,7 @@ import com.orioooneee.lmuasister.di.appModule
 import com.orioooneee.lmuasister.ui.MainShell
 import com.orioooneee.lmuasister.ui.theme.LmuTheme
 import org.koin.compose.KoinApplication
+import org.koin.dsl.koinConfiguration
 
 @Composable
 @Preview
@@ -28,7 +29,7 @@ fun App() {
             .build()
     }
 
-    KoinApplication(application = { modules(appModule, steamModule()) }) {
+    KoinApplication(configuration = koinConfiguration { modules(appModule, steamModule()) }) {
         LmuTheme {
             MainShell()
         }

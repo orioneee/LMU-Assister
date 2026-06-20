@@ -34,6 +34,9 @@ internal class AndroidSteamSessionStore(private val prefs: SharedPreferences) : 
     }
 }
 
+// androidx.security-crypto (MasterKey / EncryptedSharedPreferences) is deprecated by
+// Google with no drop-in replacement; it still works and is the right tool here.
+@Suppress("DEPRECATION")
 actual fun steamSessionStore(): SteamSessionStore {
     val ctx = AndroidAppContext.value ?: return InMemorySteamSessionStore()
     val prefs = runCatching {

@@ -13,6 +13,8 @@ kotlin {
     compilerOptions {
         // kotlin.time.Instant / Clock (used since kotlinx-datetime 0.7) are still experimental on 2.4
         optIn.add("kotlin.time.ExperimentalTime")
+        // We use expect/actual classes & objects (e.g. LocalCache) — opt out of the Beta warning.
+        freeCompilerArgs.add("-Xexpect-actual-classes")
     }
 
     // We add a custom intermediate source set (tunnelMain) with manual dependsOn,

@@ -89,6 +89,7 @@ fun MainShell(
     val onTopLevel = currentDest?.hierarchy?.any {
         it.hasRoute(HomeRoute::class) || it.hasRoute(ProfileRoute::class)
     } == true
+    val onProfile = currentDest?.hierarchy?.any { it.hasRoute(ProfileRoute::class) } == true
 
     // Kick a fresh schedule update once on launch (cache is already painted instantly
     // by the VM).
@@ -98,7 +99,6 @@ fun MainShell(
         containerColor = Carbon,
         bottomBar = {
             if (onTopLevel) {
-                val onProfile = currentDest?.hierarchy?.any { it.hasRoute(ProfileRoute::class) } == true
                 BottomBar(
                     selected = if (onProfile) TopTab.Profile else TopTab.Schedule,
                     onSelect = { tab ->

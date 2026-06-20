@@ -33,8 +33,8 @@ private fun two(n: Int) = n.toString().padStart(2, '0')
 /** 24-hour local format, e.g. "12 Jun 19:45". */
 fun Instant.formatStart(): String {
     val dt = local()
-    val mon = MONTHS.getOrElse(dt.monthNumber - 1) { "?" }
-    return "${dt.dayOfMonth} $mon ${two(dt.hour)}:${two(dt.minute)}"
+    val mon = MONTHS.getOrElse(dt.month.ordinal) { "?" }
+    return "${dt.day} $mon ${two(dt.hour)}:${two(dt.minute)}"
 }
 
 /** Lap time in ms -> "1:42.623". */
