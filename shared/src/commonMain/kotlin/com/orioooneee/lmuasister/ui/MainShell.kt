@@ -97,7 +97,6 @@ fun MainShell(
     val backStack by nav.currentBackStackEntryAsState()
     val currentDest = backStack?.destination
 
-    // Bottom bar only on the top-level destinations — hidden on details/leaderboard.
     val onTopLevel = currentDest?.hierarchy?.any {
         it.hasRoute(HomeRoute::class) || it.hasRoute(ProfileRoute::class)
     } == true

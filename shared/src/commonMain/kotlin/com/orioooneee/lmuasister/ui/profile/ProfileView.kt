@@ -184,7 +184,6 @@ private fun ProfileHeader(profile: SteamProfile, accountName: String) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            // One row: licence badge(s) + in-game-style DR / SR rating badges.
             val badges = profile.badges.ifEmpty { listOfNotNull(profile.badge) }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

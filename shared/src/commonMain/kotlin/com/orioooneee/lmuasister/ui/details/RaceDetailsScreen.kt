@@ -501,10 +501,8 @@ private fun LeaderboardSkeletonCard() {
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(Surface1)
             .border(1.dp, Outline, MaterialTheme.shapes.large).padding(16.dp),
     ) {
-        // title
         ShimmerBar(Modifier.width(130.dp).height(16.dp), brush)
         Spacer(Modifier.height(16.dp))
-        // column header
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             ShimmerBar(Modifier.width(14.dp).height(8.dp), brush)
             Spacer(Modifier.width(12.dp))
@@ -515,7 +513,6 @@ private fun LeaderboardSkeletonCard() {
             ShimmerBar(Modifier.width(34.dp).height(8.dp), brush)
         }
         Spacer(Modifier.height(12.dp))
-        // single row
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -533,7 +530,6 @@ private fun LeaderboardSkeletonCard() {
             ShimmerBar(Modifier.width(44.dp).height(13.dp), brush)
         }
         Spacer(Modifier.height(12.dp))
-        // "show more" button
         ShimmerBar(Modifier.fillMaxWidth().height(38.dp), brush, corner = 8.dp)
     }
 }
@@ -666,7 +662,6 @@ private fun LeaderboardCard(
                 Spacer(Modifier.height(10.dp))
             }
             board.entries.take(LB_PREVIEW).forEach { e -> LeaderboardRow(e, leader) }
-            // "Full leaderboard" opens whichever class tab is selected.
             board.leaderboardId?.let { id ->
                 Spacer(Modifier.height(10.dp))
                 FullLeaderboardButton {

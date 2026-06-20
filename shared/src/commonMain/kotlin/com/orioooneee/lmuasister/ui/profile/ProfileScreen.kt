@@ -65,7 +65,6 @@ import lmuassister.shared.generated.resources.profile_sign_in
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-// Steam brand blues for the sign-in CTA.
 private val SteamTop = Color(0xFF2A475E)
 private val SteamBottom = Color(0xFF171A21)
 private val SteamLogoBg = Color(0xFF1B2838)
