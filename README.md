@@ -15,6 +15,22 @@
 
 ---
 
+## 📸 Screenshots
+
+<div align="center">
+
+<table>
+<tr>
+<td align="center" width="33%"><img src="screen_1.jpg" alt="Schedule" width="240"><br><sub><b>Schedule</b></sub></td>
+<td align="center" width="33%"><img src="screen_2.jpg" alt="Race details" width="240"><br><sub><b>Race details</b></sub></td>
+<td align="center" width="33%"><img src="screen_4.jpg" alt="Race result" width="240"><br><sub><b>Your race result</b></sub></td>
+</tr>
+</table>
+
+</div>
+
+---
+
 ## ✨ Features
 
 - **📅 Schedule** — daily / weekly / special / championship races with a collapsing week-and-category header, per-class colours, countdowns and pull-to-refresh.

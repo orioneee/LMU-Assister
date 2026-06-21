@@ -1,6 +1,6 @@
 <resources>
     <!-- App / Home -->
-    <string name="app_name">Lmu Assister</string>
+    <string name="app_name">LMU Assister</string>
     <string name="home_events">Race Control · %1$d events</string>
     <string name="home_all_races">All %1$s races</string>
     <string name="tab_races">Races</string>
