@@ -107,6 +107,11 @@ fun ProfileView(
         ProfileHeader(profile, accountName, onOpenSuspensions)
         RatingsRow(profile.driverRating, profile.safetyRating)
 
+        profile.ratingHistory?.takeIf { it.dr.isNotEmpty() || it.sr.isNotEmpty() }?.let {
+            RatingProgressionCard(it)
+        }
+        profile.stats?.total?.let { CareerStatsGrid(it) }
+
         if (profile.recentRaces.isNotEmpty()) {
             SectionHeader("Recent races")
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
