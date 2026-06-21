@@ -129,6 +129,12 @@ class SteamBackendApi(private val client: HttpClient) {
     suspend fun racesPage(token: String, page: Int): RacesPageDto =
         ProfileJson.decodeFromString(getAuthed("$API_BASE/profile/races?page=$page", token))
 
+    /** One page (30/page) of a single stat category: wins | podiums | poles | fastest_laps | top5. */
+    suspend fun categoryRacesPage(token: String, category: String, page: Int): RacesPageDto =
+        ProfileJson.decodeFromString(
+            getAuthed("$API_BASE/profile/races/${category.encodeURLPathPart()}?page=$page", token),
+        )
+
     /** Full race-page detail by eventId (split disambiguates which split you raced). */
     suspend fun raceDetail(token: String, eventId: String, split: Int?, page: Int?): RaceDetailDto {
         val qs = buildList {

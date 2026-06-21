@@ -46,6 +46,7 @@ import com.orioooneee.lmuasister.ui.details.RaceDetailsScreen
 import com.orioooneee.lmuasister.ui.home.HomeScreen
 import com.orioooneee.lmuasister.ui.legal.PrivacyPolicyScreen
 import com.orioooneee.lmuasister.ui.profile.AllRacesScreen
+import com.orioooneee.lmuasister.ui.profile.CategoryRacesScreen
 import com.orioooneee.lmuasister.ui.profile.ProfileScreen
 import com.orioooneee.lmuasister.ui.profile.RaceProfileDetailScreen
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
@@ -84,6 +85,9 @@ data class LeaderboardRoute(val leaderboardId: String, val title: String)
 
 @Serializable
 object AllRacesRoute
+
+@Serializable
+data class CategoryRacesRoute(val category: String, val title: String)
 
 @Serializable
 data class SuspensionsRoute(val active: Boolean)
@@ -188,6 +192,10 @@ fun MainShell(
                         Telemetry.log(AnalyticsEvent.SuspensionsOpened(active))
                         nav.navigate(SuspensionsRoute(active))
                     },
+                    onOpenCategory = { category ->
+                        Telemetry.log(AnalyticsEvent.CategoryRacesOpened(category.key))
+                        nav.navigate(CategoryRacesRoute(category.key, category.title))
+                    },
                     onOpenPrivacy = {
                         Telemetry.log(AnalyticsEvent.PrivacyOpened)
                         nav.navigate(PrivacyRoute)
@@ -230,6 +238,20 @@ fun MainShell(
                     onBack = { nav.popBackStack() },
                     onOpenRace = { eventId, split ->
                         Telemetry.log(AnalyticsEvent.RaceDetailOpened(eventId, source = "all_races"))
+                        nav.navigate(ProfileRaceDetailRoute(eventId, split ?: -1))
+                    },
+                )
+            }
+            composable<CategoryRacesRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+                val route = entry.toRoute<CategoryRacesRoute>()
+                CategoryRacesScreen(
+                    viewModel = profileViewModel,
+                    insets = insets,
+                    category = route.category,
+                    title = route.title,
+                    onBack = { nav.popBackStack() },
+                    onOpenRace = { eventId, split ->
+                        Telemetry.log(AnalyticsEvent.RaceDetailOpened(eventId, source = "category_races"))
                         nav.navigate(ProfileRaceDetailRoute(eventId, split ?: -1))
                     },
                 )

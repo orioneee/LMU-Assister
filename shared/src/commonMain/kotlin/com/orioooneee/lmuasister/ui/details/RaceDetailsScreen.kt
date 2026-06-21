@@ -63,6 +63,7 @@ import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
+import com.orioooneee.lmuasister.ui.IconBolt
 import com.orioooneee.lmuasister.ui.components.ClassChip
 import com.orioooneee.lmuasister.ui.components.carClassColor
 import com.orioooneee.lmuasister.ui.components.CoverImage
@@ -93,6 +94,7 @@ import com.orioooneee.lmuasister.ui.util.skyColor
 import com.orioooneee.lmuasister.ui.util.skyEmoji
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import kotlin.math.roundToInt
 import kotlin.time.Clock
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.cars_section
@@ -663,6 +665,7 @@ private fun LeaderboardCard(
             }
             when (val row = me) {
                 is MeRow.Found -> {
+                    FasterThanRow(row.entry)
                     YourPositionRow(row.entry, leader, liveryToModel)
                     Spacer(Modifier.height(10.dp))
                 }
@@ -755,6 +758,40 @@ private fun YourPositionEmpty() {
             )
         }
     }
+}
+
+/** "⚡ You're faster than 97.7% of drivers" — shown above the board for the signed-in player.
+ *  Hidden when the percentile is absent or the board is unstable (numbers can't be trusted). */
+@Composable
+private fun FasterThanRow(entry: LapEntry) {
+    val pct = entry.fasterThanPct
+    if (pct == null || entry.rankUnstable) return
+    val accent = MaterialTheme.colorScheme.primary
+    Column {
+        Row(
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(accent.copy(alpha = 0.12f))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(IconBolt, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
+            Text(
+                "You're faster than ${formatPct(pct)}% of drivers",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextHigh,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+    }
+}
+
+/** Coarse one-decimal percent, trailing ".0" dropped: 97.69 → "97.7", 98.0 → "98". */
+private fun formatPct(p: Double): String {
+    val r = (p * 10).roundToInt() / 10.0
+    return if (r % 1.0 == 0.0) r.toInt().toString() else r.toString()
 }
 
 @Composable

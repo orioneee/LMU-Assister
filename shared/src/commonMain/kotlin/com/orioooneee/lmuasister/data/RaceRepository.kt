@@ -350,6 +350,8 @@ private fun LeaderboardEntryDto.toModel() = LapEntry(
     carClass = carClass,
     drRank = drRank,
     srRank = srRank,
+    fasterThanPct = fasterThanPct,
+    rankUnstable = rankUnstable,
 )
 
 private fun HotlapDto.toModel() = Hotlap(

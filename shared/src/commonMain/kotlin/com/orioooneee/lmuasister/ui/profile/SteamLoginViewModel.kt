@@ -59,6 +59,17 @@ data class AllRacesUi(
     val error: String? = null,
 )
 
+/** Paginated drill-down for one stat category (wins/podiums/poles/fastest_laps/top5). */
+data class CategoryRacesUi(
+    val category: String? = null,
+    val races: List<RecentRaceDto> = emptyList(),
+    val total: Int = 0,
+    val page: Int = 0,
+    val hasMore: Boolean = true,
+    val loading: Boolean = false,
+    val error: String? = null,
+)
+
 private const val PROFILE_CACHE_KEY = "steam_profile_v2"
 
 // App-store-review login: the reviewer types these into the normal form; we route them to
@@ -88,6 +99,9 @@ class SteamLoginViewModel(
 
     private val _allRaces = MutableStateFlow(AllRacesUi())
     val allRacesState: StateFlow<AllRacesUi> = _allRaces.asStateFlow()
+
+    private val _categoryRaces = MutableStateFlow(CategoryRacesUi())
+    val categoryRacesState: StateFlow<CategoryRacesUi> = _categoryRaces.asStateFlow()
 
     val guardRequired: Boolean get() = _state.value is SteamLoginUiState.GuardRequired
 
@@ -243,6 +257,7 @@ class SteamLoginViewModel(
             runCatching { LocalCache.write(PROFILE_CACHE_KEY, "") }
             runCatching { LocalCache.write(DEMO_FLAG_KEY, "") }
             _allRaces.value = AllRacesUi()
+            _categoryRaces.value = CategoryRacesUi()
             _exiting.value = ExitAction.NONE
             _state.value = SteamLoginUiState.Idle
         }
@@ -272,6 +287,45 @@ class SteamLoginViewModel(
         _allRaces.value = _allRaces.value.copy(error = null)
         loadMoreAllRaces()
     }
+
+    /** Open a category list: reset + load the first page when switching to a new category,
+     *  otherwise keep what's already paginated (back-navigation re-enters the same screen). */
+    fun openCategory(category: String) {
+        val cur = _categoryRaces.value
+        if (cur.category == category && cur.races.isNotEmpty()) return
+        _categoryRaces.value = CategoryRacesUi(category = category)
+        loadMoreCategory()
+    }
+
+    fun loadMoreCategory() {
+        val cur = _categoryRaces.value
+        val category = cur.category ?: return
+        if (cur.loading || !cur.hasMore) return
+        viewModelScope.launch {
+            _categoryRaces.value = cur.copy(loading = true, error = null)
+            runCatching { categoryRacesPage(category, cur.page + 1) }
+                .onSuccess { p ->
+                    _categoryRaces.value = _categoryRaces.value.copy(
+                        races = _categoryRaces.value.races + p.races,
+                        total = p.total ?: _categoryRaces.value.total,
+                        page = cur.page + 1,
+                        hasMore = p.hasMore && p.races.isNotEmpty(),
+                        loading = false,
+                    )
+                }
+                .onFailure { e ->
+                    _categoryRaces.value = _categoryRaces.value.copy(error = e.message ?: "Couldn't load races", loading = false)
+                }
+        }
+    }
+
+    fun retryCategory() {
+        _categoryRaces.value = _categoryRaces.value.copy(error = null)
+        loadMoreCategory()
+    }
+
+    private suspend fun categoryRacesPage(category: String, page: Int): RacesPageDto =
+        withReauth { backend.categoryRacesPage(it, category, page) }
 
     private suspend fun loadProfile() {
         val cached = loadCachedProfile()

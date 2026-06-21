@@ -308,6 +308,8 @@ internal object MockData {
         val me = if (withMe) LeaderboardEntryDto(
             rank = 12, initials = "PER", bestLapMs = (classPaceMs[cls] ?: 137_000L) + 7_227,
             sectors = emptyList(), car = "McLaren 720S LMGT3 Evo", carClass = cls, drRank = "B3", srRank = "S",
+            // P12 of `total` → faster than the rest of the field.
+            fasterThanPct = ((total - 12).toDouble() / total * 1000).toInt() / 10.0, rankUnstable = false,
         ) else null
         return AppJson.encodeToString(
             LeaderboardPageResponse(
@@ -414,6 +416,29 @@ internal object MockData {
             RacesPageDto(
                 page = page, pageSize = pageSize, count = all.size,
                 hasMore = from + pageSize < all.size, races = slice,
+            ),
+        )
+    }
+
+    /** GET /profile/races/<category>?page=N — filter the history by the stat the user tapped. */
+    fun categoryRacesPage(category: String, page: Int): String {
+        val pageSize = 30
+        val all = recentRaces()
+        val filtered = when (category) {
+            "wins" -> all.filter { it.position == 1 }
+            "podiums" -> all.filter { it.position in 1..3 }
+            "poles" -> all.filter { it.gridPosition == 1 }
+            "top5" -> all.filter { it.position in 1..5 }
+            "fastest_laps" -> all.filterIndexed { i, _ -> i % 2 == 0 } // no FL flag in mock
+            else -> all
+        }
+        val from = (page - 1).coerceAtLeast(0) * pageSize
+        val slice = filtered.drop(from).take(pageSize)
+        return AppJson.encodeToString(
+            RacesPageDto(
+                page = page, pageSize = pageSize, count = slice.size,
+                total = filtered.size, category = category,
+                hasMore = from + pageSize < filtered.size, races = slice,
             ),
         )
     }

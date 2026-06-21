@@ -48,6 +48,8 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
                 path == "/profile" -> json(MockData.profile())
                 path == "/profile/stats" -> json(MockData.stats())
                 path == "/profile/races" -> json(MockData.racesPage(params["page"]?.toIntOrNull() ?: 1))
+                path.startsWith("/profile/races/") ->
+                    json(MockData.categoryRacesPage(path.removePrefix("/profile/races/"), params["page"]?.toIntOrNull() ?: 1))
                 path.startsWith("/profile/track/") ->
                     json(MockData.trackDetail(path.removePrefix("/profile/track/")))
                 path.startsWith("/profile/race/") ->

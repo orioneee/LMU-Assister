@@ -59,6 +59,9 @@ sealed class AnalyticsEvent(
 
     data object AllRacesOpened : AnalyticsEvent("all_races_opened")
 
+    class CategoryRacesOpened(category: String) :
+        AnalyticsEvent("category_races_opened", mapOf("category" to category))
+
     class SuspensionsOpened(active: Boolean) :
         AnalyticsEvent("suspensions_opened", mapOf("active" to active))
 

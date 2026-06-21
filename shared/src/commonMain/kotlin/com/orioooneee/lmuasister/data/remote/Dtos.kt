@@ -203,6 +203,11 @@ data class LeaderboardEntryDto(
     val carClass: String? = null,
     val drRank: String? = null,
     val srRank: String? = null,
+    // Standing stats — only the `me` row carries these. `fasterThanPct` is "faster than N% of
+    // the board" (null when off-board or unstable); `rankUnstable` means the board is being
+    // rebuilt → the percentile can't be trusted, so we hide it and show only the rank.
+    val fasterThanPct: Double? = null,
+    val rankUnstable: Boolean = false,
 )
 
 /** GET /leaderboard/<id>?limit=&cursor= — one paginated page of the full board. */

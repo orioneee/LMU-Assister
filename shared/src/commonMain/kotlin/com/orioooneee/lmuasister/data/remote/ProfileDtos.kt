@@ -169,12 +169,18 @@ data class RecentRaceDto(
     val sessions: RaceSessionsDto? = null,
 )
 
-/** GET /api/v2/profile/races?page=N — one paginated page (5/page) of race cards. */
+/**
+ * GET /api/v2/profile/races?page=N — one paginated page (5/page) of the full race history,
+ * and GET /api/v2/profile/races/<category>?page=N — a category drill-down (30/page).
+ * `category` / `total` are only sent by the category endpoint, so both stay optional.
+ */
 @Serializable
 data class RacesPageDto(
     val page: Int,
     @SerialName("page_size") val pageSize: Int,
     val count: Int,
+    val total: Int? = null,            // category endpoint only: full count across all pages
+    val category: String? = null,      // category endpoint only: echoes the requested category
     @SerialName("has_more") val hasMore: Boolean = false,
     val races: List<RecentRaceDto> = emptyList(),
 )

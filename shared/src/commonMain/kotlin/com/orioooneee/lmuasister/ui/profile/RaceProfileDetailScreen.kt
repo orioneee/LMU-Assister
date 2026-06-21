@@ -84,7 +84,8 @@ import com.orioooneee.lmuasister.ui.util.formatLap
 private val PosGreen = Color(0xFF53D769)
 private val NegRed = Color(0xFFE5484D)
 
-private const val WINDOW = 3
+// Rows shown above/below your own position in the collapsed classification (1 → me ±1).
+private const val WINDOW = 1
 private const val FOREIGN_PREVIEW = 7
 
 @Composable

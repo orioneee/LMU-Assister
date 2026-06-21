@@ -154,6 +154,9 @@ data class LapEntry(
     val carClass: String?,
     val drRank: String?,
     val srRank: String?,
+    // Only set on the signed-in player's own "Your position" row.
+    val fasterThanPct: Double? = null,
+    val rankUnstable: Boolean = false,
 )
 
 /** A YouTube hot-lap video for a track (parsed server-side, no API key). */

@@ -103,6 +103,7 @@ fun ProfileView(
     onSeeAllRaces: () -> Unit = {},
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
     onOpenSuspensions: (active: Boolean) -> Unit = {},
+    onOpenCategory: (StatCategory) -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         ProfileHeader(profile, accountName, onOpenSuspensions)
@@ -111,7 +112,7 @@ fun ProfileView(
         profile.ratingHistory?.takeIf { it.dr.isNotEmpty() || it.sr.isNotEmpty() }?.let {
             RatingProgressionCard(it)
         }
-        profile.stats?.total?.let { CareerStatsGrid(it) }
+        profile.stats?.total?.let { CareerStatsGrid(it, onOpenCategory = onOpenCategory) }
 
         if (profile.recentRaces.isNotEmpty()) {
             SectionHeader("Recent races")
