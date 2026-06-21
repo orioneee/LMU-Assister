@@ -103,7 +103,7 @@ class SteamBackendApi(private val client: HttpClient) {
     }
 
     suspend fun profile(token: String): SteamProfile =
-        AppJson.decodeFromString(getAuthed("$API_BASE/profile", token))
+        ProfileJson.decodeFromString(getAuthed("$API_BASE/profile", token))
 
     suspend fun stats(token: String): String = getAuthed("$API_BASE/profile/stats", token)
 
@@ -122,7 +122,7 @@ class SteamBackendApi(private val client: HttpClient) {
 
     /** One paginated page (5/page) of the player's full race history. */
     suspend fun racesPage(token: String, page: Int): RacesPageDto =
-        AppJson.decodeFromString(getAuthed("$API_BASE/profile/races?page=$page", token))
+        ProfileJson.decodeFromString(getAuthed("$API_BASE/profile/races?page=$page", token))
 
     /** Full race-page detail by eventId (split disambiguates which split you raced). */
     suspend fun raceDetail(token: String, eventId: String, split: Int?, page: Int?): RaceDetailDto {
@@ -131,14 +131,14 @@ class SteamBackendApi(private val client: HttpClient) {
             page?.let { add("page=$it") }
         }.joinToString("&")
         val url = "$API_BASE/profile/race/${eventId.encodeURLPathPart()}" + if (qs.isEmpty()) "" else "?$qs"
-        return AppJson.decodeFromString(getAuthed(url, token))
+        return ProfileJson.decodeFromString(getAuthed(url, token))
     }
 
     /** One foreign split's classification (lazy, per-tab). `seriesId` lets the backend skip a history re-read. */
     suspend fun raceSplit(token: String, eventId: String, splitNo: Int, seriesId: String?): SplitDetailDto {
         val qs = seriesId?.takeIf { it.isNotBlank() }?.let { "?series_id=${it.encodeURLQueryComponent()}" } ?: ""
         val url = "$API_BASE/profile/race/${eventId.encodeURLPathPart()}/split/$splitNo$qs"
-        return AppJson.decodeFromString(getAuthed(url, token))
+        return ProfileJson.decodeFromString(getAuthed(url, token))
     }
 
 

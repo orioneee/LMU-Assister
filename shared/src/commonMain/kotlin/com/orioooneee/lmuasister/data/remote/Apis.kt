@@ -23,6 +23,19 @@ val AppJson: Json = Json {
 }
 
 /**
+ * Profile endpoints decode with this instead of [AppJson]. The /profile* surface mixes
+ * snake_case (most fields) and camelCase (the `stats.total` counters), and a global
+ * naming strategy rewrites @SerialName too — so it can't express that mix. Here there is
+ * NO strategy: every wire key is stated explicitly via @SerialName (snake) or matches the
+ * Kotlin name verbatim (the camelCase stat keys). Same leniency/coercion as [AppJson].
+ */
+val ProfileJson: Json = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    coerceInputValues = true
+}
+
+/**
  * The LmuAssister backend — the client's only data source. It does all the
  * upstream merging (lmuportal schedule, S3 cards, racecontrol covers, weather,
  * time-slot maths) server-side and exposes:

@@ -1,32 +1,37 @@
 package com.orioooneee.lmuasister.data.remote
 
-import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonNames
 
-/** Player profile from GET /api/v2/profile (snake_case → camelCase via [AppJson]). */
+// Decoded with [ProfileJson] (no naming strategy): snake_case wire keys are stated explicitly
+// via @SerialName; the camelCase `stats.total` counters match the Kotlin name verbatim.
+// Non-null scalars are required (absence/null is a real decode error we want to see); only
+// genuinely-optional data is nullable, and boolean flags keep `false` as "absent == off".
+
+/** Player profile from GET /api/v2/profile. */
 @Serializable
 data class SteamProfile(
-    val uid: String = "",
+    val uid: String,
     // Real LMU in-game name (backend may send any of these) — shown instead of the Steam nick.
     val name: String? = null,
-    val displayName: String? = null,
+    @SerialName("display_name") val displayName: String? = null,
     val username: String? = null,
     val nationality: String? = null,
     val badge: String? = null,
     val badges: List<String> = emptyList(),
     val email: String? = null,
-    val driverRating: RatingDto? = null,
-    val safetyRating: RatingDto? = null,
-    val activeSuspensions: Int = 0,
-    val totalSuspensions: Int = 0,
+    @SerialName("driver_rating") val driverRating: RatingDto? = null,
+    @SerialName("safety_rating") val safetyRating: RatingDto? = null,
+    // Kept defaulted: a live /profile response omits these when there's nothing to report.
+    @SerialName("active_suspensions") val activeSuspensions: Int = 0,
+    @SerialName("total_suspensions") val totalSuspensions: Int = 0,
     // Full ban/warning history (newest first); each carries its reason + window + active flag.
     val suspensions: List<SuspensionDto> = emptyList(),
-    val recentRaces: List<RecentRaceDto> = emptyList(),
+    @SerialName("recent_races") val recentRaces: List<RecentRaceDto> = emptyList(),
     // Career stats (profile_get_stats) — totals + per-class/manufacturer breakdown.
     val stats: ProfileStatsDto? = null,
     // DR/SR progression: one point per race, oldest→newest, for the profile chart.
-    val ratingHistory: RatingHistoryDto? = null,
+    @SerialName("rating_history") val ratingHistory: RatingHistoryDto? = null,
 )
 
 /** GET /api/v2/profile → `stats`. Only the headline `total` block is used by the UI;
@@ -36,24 +41,19 @@ data class ProfileStatsDto(
     val total: StatTotalsDto? = null,
 )
 
-/** Headline career counters. The backend sends these keys in camelCase, but [AppJson] runs
- *  a global SnakeCase naming strategy (which also rewrites @SerialName values) — so the real
- *  camelCase keys are matched via @JsonNames alternatives, which the strategy leaves intact. */
-@OptIn(ExperimentalSerializationApi::class)
+/** Headline career counters. The backend sends these keys in camelCase — under [ProfileJson]
+ *  (no naming strategy) the Kotlin property names match the wire keys verbatim, no override. */
 @Serializable
 data class StatTotalsDto(
-    // Single-word keys round-trip through SnakeCase unchanged, so they need no override.
-    val races: Int = 0,
-    val wins: Int = 0,
-    val podiums: Int = 0,
-    val top5: Int = 0,
-    val dnfs: Int = 0,
-    // Multi-word keys: SnakeCase would look for `pole_positions` etc.; match the real
-    // camelCase key via @JsonNames (an alternative the strategy doesn't rewrite).
-    @JsonNames("polePositions") val polePositions: Int = 0,
-    @JsonNames("lapsCompleted") val lapsCompleted: Int = 0,
-    @JsonNames("lapsLead") val lapsLead: Int = 0,
-    @JsonNames("fastestLaps") val fastestLaps: Int = 0,
+    val races: Int,
+    val wins: Int,
+    val podiums: Int,
+    val top5: Int,
+    val dnfs: Int,
+    val polePositions: Int,
+    val lapsCompleted: Int,
+    val lapsLead: Int,
+    val fastestLaps: Int,
 )
 
 /** GET /api/v2/profile → `rating_history`: two series of points (driver / safety). */
@@ -89,8 +89,8 @@ data class SuspensionDto(
 
 @Serializable
 data class RatingDto(
-    val rank: String = "",
-    val tier: Int = 0,
+    val rank: String,
+    val tier: Int,
     val progress: Double? = null,
     val elo: Double? = null,
     val rating: Double? = null,
@@ -100,11 +100,11 @@ data class RatingDto(
 @Serializable
 data class SessionSummaryDto(
     val position: Int? = null,
-    val classPosition: Int? = null,
-    val gridPosition: Int? = null,
-    val bestLapMs: Long? = null,
-    val finishTimeMs: Long? = null,
-    val finishStatus: String? = null,
+    @SerialName("class_position") val classPosition: Int? = null,
+    @SerialName("grid_position") val gridPosition: Int? = null,
+    @SerialName("best_lap_ms") val bestLapMs: Long? = null,
+    @SerialName("finish_time_ms") val finishTimeMs: Long? = null,
+    @SerialName("finish_status") val finishStatus: String? = null,
 )
 
 @Serializable
@@ -117,37 +117,40 @@ data class RaceSessionsDto(
 @Serializable
 data class RecentRaceDto(
     val date: String? = null,
-    val title: String = "",
-    val eventId: String? = null,     // id for the race-detail endpoint
-    val seriesId: String? = null,
+    val title: String,
+    @SerialName("event_id") val eventId: String? = null,     // id for the race-detail endpoint
+    @SerialName("series_id") val seriesId: String? = null,
     val track: String? = null,
-    val trackLogo: String? = null,   // backend asset path or absolute url
+    @SerialName("track_logo") val trackLogo: String? = null, // backend asset path or absolute url
     val tier: String? = null,        // difficulty: beginner / intermediate / …
-    val eventType: String? = null,   // daily / weekly / special …
+    @SerialName("event_type") val eventType: String? = null, // daily / weekly / special …
     val official: Boolean = false,
     val split: Int? = null,          // which split the driver raced in
-    val totalSplits: Int? = null,    // total splits for the event
-    val fieldSize: Int = 0,
+    // total splits for the event — NOT sent by /profile or /profile/races (list endpoints);
+    // only the race-detail endpoint fills it, so it stays nullable here.
+    @SerialName("total_splits") val totalSplits: Int? = null,
+    @SerialName("field_size") val fieldSize: Int,
+    // Kept defaulted: a no-result race sends position: null, which coerces to 0 (see [ProfileJson]).
     val position: Int = 0,
-    val gridPosition: Int? = null,
-    val carClass: String? = null,
+    @SerialName("grid_position") val gridPosition: Int? = null,
+    @SerialName("car_class") val carClass: String? = null,
     // Car model name, e.g. "McLaren 720S GT3" (backend may send either key).
     val car: String? = null,
-    val carName: String? = null,
-    val bestLapMs: Long? = null,
-    val finishStatus: String? = null,
-    val srChange: Double? = null,
-    val drChange: Double? = null,
+    @SerialName("car_name") val carName: String? = null,
+    @SerialName("best_lap_ms") val bestLapMs: Long? = null,
+    @SerialName("finish_status") val finishStatus: String? = null,
+    @SerialName("sr_change") val srChange: Double? = null,
+    @SerialName("dr_change") val drChange: Double? = null,
     val sessions: RaceSessionsDto? = null,
 )
 
 /** GET /api/v2/profile/races?page=N — one paginated page (5/page) of race cards. */
 @Serializable
 data class RacesPageDto(
-    val page: Int = 1,
-    val pageSize: Int = 5,
-    val count: Int = 0,
-    val hasMore: Boolean = false,
+    val page: Int,
+    @SerialName("page_size") val pageSize: Int,
+    val count: Int,
+    @SerialName("has_more") val hasMore: Boolean = false,
     val races: List<RecentRaceDto> = emptyList(),
 )
 
@@ -155,29 +158,29 @@ data class RacesPageDto(
 @Serializable
 data class RaceDetailDto(
     val date: String? = null,
-    val title: String = "",
-    val eventId: String? = null,
+    val title: String,
+    @SerialName("event_id") val eventId: String? = null,
     val car: String? = null,
-    val carName: String? = null,
-    val carClass: String? = null,
+    @SerialName("car_name") val carName: String? = null,
+    @SerialName("car_class") val carClass: String? = null,
     val track: String? = null,
-    val trackLogo: String? = null,
-    val trackInfo: TrackDto? = null,   // full track block (emblem, minimap, length…), like the schedule
+    @SerialName("track_logo") val trackLogo: String? = null,
+    @SerialName("track_info") val trackInfo: TrackDto? = null, // full track block (emblem, minimap, length…)
     val tier: String? = null,
-    val eventType: String? = null,
+    @SerialName("event_type") val eventType: String? = null,
     val official: Boolean = false,
-    val seriesId: String? = null,    // needed to request other splits
+    @SerialName("series_id") val seriesId: String? = null,     // needed to request other splits
     val split: Int? = null,          // YOUR split
-    val totalSplits: Int? = null,
-    val splitsAvailable: List<Int> = emptyList(),  // render as tabs
-    val fieldSize: Int = 0,
+    @SerialName("total_splits") val totalSplits: Int? = null,
+    @SerialName("splits_available") val splitsAvailable: List<Int> = emptyList(),  // render as tabs
+    @SerialName("field_size") val fieldSize: Int,
     val position: Int? = null,
-    val gridPosition: Int? = null,
-    val bestLapMs: Long? = null,
-    val finishStatus: String? = null,
-    val srChange: Double? = null,
-    val drChange: Double? = null,
-    val heroImage: String? = null,
+    @SerialName("grid_position") val gridPosition: Int? = null,
+    @SerialName("best_lap_ms") val bestLapMs: Long? = null,
+    @SerialName("finish_status") val finishStatus: String? = null,
+    @SerialName("sr_change") val srChange: Double? = null,
+    @SerialName("dr_change") val drChange: Double? = null,
+    @SerialName("hero_image") val heroImage: String? = null,
     // keyed "practice" / "qualifying" / "race" — YOUR split, fully here
     val sessions: Map<String, RaceSessionDetailDto> = emptyMap(),
 )
@@ -185,8 +188,8 @@ data class RaceDetailDto(
 /** GET /api/v2/profile/race/<eventId>/split/<n> — one foreign split's tables (no `me` row). */
 @Serializable
 data class SplitDetailDto(
-    val splitNo: Int = 0,
-    val fieldSize: Int = 0,
+    @SerialName("split_no") val splitNo: Int,
+    @SerialName("field_size") val fieldSize: Int,
     // keyed "practice" / "qualifying" / "race"; rows are all is_me=false.
     val sessions: Map<String, RaceSessionDetailDto> = emptyMap(),
 )
@@ -200,20 +203,20 @@ data class RaceSessionDetailDto(
 @Serializable
 data class ClassificationRowDto(
     val position: Int? = null,
-    val classPosition: Int? = null,
-    val gridPosition: Int? = null,
+    @SerialName("class_position") val classPosition: Int? = null,
+    @SerialName("grid_position") val gridPosition: Int? = null,
     val name: String? = null,
     val nationality: String? = null,
-    val isMe: Boolean = false,
+    @SerialName("is_me") val isMe: Boolean = false,
     val car: String? = null,
-    val carNumber: String? = null,
-    val carClass: String? = null,
-    val bestLapMs: Long? = null,
-    val finishTimeMs: Long? = null,
-    val finishStatus: String? = null,
-    val srChange: Double? = null,
-    val drChange: Double? = null,
+    @SerialName("car_number") val carNumber: String? = null,
+    @SerialName("car_class") val carClass: String? = null,
+    @SerialName("best_lap_ms") val bestLapMs: Long? = null,
+    @SerialName("finish_time_ms") val finishTimeMs: Long? = null,
+    @SerialName("finish_status") val finishStatus: String? = null,
+    @SerialName("sr_change") val srChange: Double? = null,
+    @SerialName("dr_change") val drChange: Double? = null,
     // Per-driver absolute ratings (driver_rating / safety_rating), same shape as the profile owner's.
-    val driverRating: RatingDto? = null,
-    val safetyRating: RatingDto? = null,
+    @SerialName("driver_rating") val driverRating: RatingDto? = null,
+    @SerialName("safety_rating") val safetyRating: RatingDto? = null,
 )

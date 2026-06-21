@@ -121,23 +121,26 @@ data class SettingsDto(
     val limitedTires: String? = null,
 )
 
+// Explicit @SerialName keys (not the global snake-case strategy) because this is also nested in
+// RaceDetailDto, decoded by the strategy-less [ProfileJson]; the explicit snake keys decode under
+// both that and [AppJson] (snake-casing an already-snake name is a no-op).
 @Serializable
 data class TrackDto(
     val name: String = "",
-    val shortName: String = "",
-    val simpleName: String? = null,
+    @SerialName("short_name") val shortName: String = "",
+    @SerialName("simple_name") val simpleName: String? = null,
     val town: String? = null,
     val country: String? = null,
     // v2 sends length as a string ("13.626"); parsed to Double in the mapper.
-    val lengthKm: String? = null,
-    val numTurns: Int? = null,
-    val mapUrl: String? = null,
+    @SerialName("length_km") val lengthKm: String? = null,
+    @SerialName("num_turns") val numTurns: Int? = null,
+    @SerialName("map_url") val mapUrl: String? = null,
     // v2 asset URLs — sent by the backend once race.track is enriched; until then
     // they're derived client-side from map_url (same /track/<id>/ path).
-    val logoUrl: String? = null,
-    val cardUrl: String? = null,
-    val backgroundUrl: String? = null,
-    val countryCode: String? = null,
+    @SerialName("logo_url") val logoUrl: String? = null,
+    @SerialName("card_url") val cardUrl: String? = null,
+    @SerialName("background_url") val backgroundUrl: String? = null,
+    @SerialName("country_code") val countryCode: String? = null,
 )
 
 /** GET /cars — the v2 roster (manufacturer / class / model / series). */

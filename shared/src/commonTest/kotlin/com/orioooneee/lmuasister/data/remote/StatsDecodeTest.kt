@@ -3,8 +3,9 @@ package com.orioooneee.lmuasister.data.remote
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** Guards the camelCase career-stat keys against the global SnakeCase naming strategy:
- *  these are matched via @JsonNames, and a regression would silently zero them out. */
+/** Guards the camelCase career-stat keys. The profile decodes with [ProfileJson] (no naming
+ *  strategy), so these match by Kotlin property name; under the old global SnakeCase strategy
+ *  they'd have looked for `pole_positions` and silently zeroed out. */
 class StatsDecodeTest {
 
     @Test
@@ -24,7 +25,7 @@ class StatsDecodeTest {
             }
         """.trimIndent()
 
-        val total = AppJson.decodeFromString<SteamProfile>(json).stats?.total
+        val total = ProfileJson.decodeFromString<SteamProfile>(json).stats?.total
         assertEquals(169, total?.races)
         assertEquals(15, total?.wins)
         assertEquals(13, total?.polePositions)   // camelCase — the regression-prone one
