@@ -338,8 +338,9 @@ private fun SummaryCard(d: RaceDetailDto) {
     var showBreakdown by remember { mutableStateOf(false) }
     var showLaps by remember { mutableStateOf(false) }
     val hasBreakdown = d.srReasons.isNotEmpty() || d.drReasons.isNotEmpty()
+    val laps = raceLaps(d)
     // Any laps at all — laps without a time still get a row (shown as "—").
-    val hasLaps = d.lapProgress.isNotEmpty()
+    val hasLaps = laps.isNotEmpty()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -369,12 +370,12 @@ private fun SummaryCard(d: RaceDetailDto) {
         }
         // Average pace over valid laps (skips the warm-up laps and pit laps), with the gap to
         // the best lap. The number of warm-up laps to drop is adjustable (default 1).
-        val maxSkip = maxOpeningSkip(d.lapProgress)
+        val maxSkip = maxOpeningSkip(laps)
         if (maxSkip >= 0) {
             var showPaceInfo by remember { mutableStateOf(false) }
             var warmup by remember { mutableStateOf(if (maxSkip >= 1) 1 else 0) }
             val skip = warmup.coerceIn(0, maxSkip)
-            val pace = paceFrom(d.lapProgress, skip)!!
+            val pace = paceFrom(laps, skip)!!
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -438,7 +439,7 @@ private fun SheetLink(label: String, onClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LapsSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
-    val laps = d.lapProgress
+    val laps = raceLaps(d)
     val bestMs = laps.mapNotNull { it.lapTimeMs?.takeIf { t -> t > 0L } }.minOrNull()
     // Fastest time per sector across all laps — used to green-highlight the best sector each lap.
     val bestSectors = bestSectorsByIndex(laps)
@@ -460,7 +461,7 @@ private fun LapsSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 Stat("Laps", laps.size.toString())
                 bestMs?.let { Stat("Best", formatLap(it)) }
-                paceFrom(d.lapProgress, 1)?.let { Stat("Avg", formatLap(it.avgMs)) }
+                paceFrom(laps, 1)?.let { Stat("Avg", formatLap(it.avgMs)) }
                 d.finishStatus?.takeIf { it.isNotBlank() }?.let { Stat("Result", it) }
             }
             Column(
@@ -487,8 +488,11 @@ private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(lap.lap?.toString() ?: "—", style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
-            lap.position?.let { Text("P$it", style = MaterialTheme.typography.labelSmall, color = TextLow, modifier = Modifier.width(30.dp)) }
+            Text(lap.lap?.toString() ?: "—", style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.Bold, modifier = Modifier.width(22.dp))
+            // Class position this lap (overall as fallback), shown prominently.
+            (lap.classPosition ?: lap.position)?.takeIf { it > 0 }?.let {
+                Text("P$it", style = MaterialTheme.typography.labelMedium, color = TextHigh, fontWeight = FontWeight.SemiBold)
+            }
             if (lap.pit) PitBadge()
             Spacer(Modifier.weight(1f))
             Text(
@@ -640,6 +644,12 @@ private fun signedOneDecimal(v: Double): String {
     val sign = if (v < 0) "−" else "+"
     return "$sign${r / 10}.${r % 10}"
 }
+
+/** Lap list for the pace card / lap sheet. Prefer the race-session "me" row — it carries
+ *  class_position per lap, which the top-level lap_progress copy currently omits. */
+private fun raceLaps(d: RaceDetailDto): List<LapDto> =
+    d.sessions["race"]?.classification?.firstOrNull { it.isMe }?.lapProgress?.takeIf { it.isNotEmpty() }
+        ?: d.lapProgress
 
 /** Player's average pace over valid laps + the gap to the best valid lap. */
 private class PaceStats(

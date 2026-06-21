@@ -50,6 +50,8 @@ import com.orioooneee.lmuasister.ui.profile.ProfileScreen
 import com.orioooneee.lmuasister.ui.profile.RaceProfileDetailScreen
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
 import com.orioooneee.lmuasister.ui.profile.SuspensionsScreen
+import com.orioooneee.lmuasister.ui.tracks.TrackDetailScreen
+import com.orioooneee.lmuasister.ui.tracks.TracksScreen
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Surface1
 import com.orioooneee.lmuasister.ui.theme.TextMed
@@ -58,6 +60,7 @@ import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.error_title
 import lmuassister.shared.generated.resources.nav_profile
 import lmuassister.shared.generated.resources.nav_schedule
+import lmuassister.shared.generated.resources.nav_tracks
 import lmuassister.shared.generated.resources.retry
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -67,6 +70,12 @@ object HomeRoute
 
 @Serializable
 object ProfileRoute
+
+@Serializable
+object TracksRoute
+
+@Serializable
+data class TrackDetailRoute(val trackId: String)
 
 @Serializable
 data class DetailsRoute(val raceId: String)
@@ -89,6 +98,7 @@ private const val NAV_ANIM = 300
 
 private enum class TopTab(val icon: ImageVector) {
     Schedule(IconCalendarOutline),
+    Tracks(IconFlag),
     Profile(IconPersonOutline),
 }
 
@@ -102,9 +112,13 @@ fun MainShell(
     val currentDest = backStack?.destination
 
     val onTopLevel = currentDest?.hierarchy?.any {
-        it.hasRoute(HomeRoute::class) || it.hasRoute(ProfileRoute::class)
+        it.hasRoute(HomeRoute::class) || it.hasRoute(TracksRoute::class) || it.hasRoute(ProfileRoute::class)
     } == true
-    val onProfile = currentDest?.hierarchy?.any { it.hasRoute(ProfileRoute::class) } == true
+    val selectedTab = when {
+        currentDest?.hierarchy?.any { it.hasRoute(ProfileRoute::class) } == true -> TopTab.Profile
+        currentDest?.hierarchy?.any { it.hasRoute(TracksRoute::class) } == true -> TopTab.Tracks
+        else -> TopTab.Schedule
+    }
 
     LaunchedEffect(Unit) { viewModel.refresh() }
 
@@ -126,9 +140,13 @@ fun MainShell(
         bottomBar = {
             if (onTopLevel) {
                 BottomBar(
-                    selected = if (onProfile) TopTab.Profile else TopTab.Schedule,
+                    selected = selectedTab,
                     onSelect = { tab ->
-                        val route = if (tab == TopTab.Profile) ProfileRoute else HomeRoute
+                        val route: Any = when (tab) {
+                            TopTab.Profile -> ProfileRoute
+                            TopTab.Tracks -> TracksRoute
+                            TopTab.Schedule -> HomeRoute
+                        }
                         nav.navigate(route) {
                             popUpTo(HomeRoute) { saveState = true }
                             launchSingleTop = true
@@ -173,6 +191,24 @@ fun MainShell(
                     onOpenPrivacy = {
                         Telemetry.log(AnalyticsEvent.PrivacyOpened)
                         nav.navigate(PrivacyRoute)
+                    },
+                )
+            }
+            composable<TracksRoute> {
+                TracksScreen(
+                    insets = insets,
+                    onOpenTrack = { trackId -> nav.navigate(TrackDetailRoute(trackId)) },
+                )
+            }
+            composable<TrackDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+                TrackDetailScreen(
+                    viewModel = profileViewModel,
+                    insets = insets,
+                    trackId = entry.toRoute<TrackDetailRoute>().trackId,
+                    onBack = { nav.popBackStack() },
+                    onOpenRace = { eventId, split ->
+                        Telemetry.log(AnalyticsEvent.RaceDetailOpened(eventId, source = "track_detail"))
+                        nav.navigate(ProfileRaceDetailRoute(eventId, split ?: -1))
                     },
                 )
             }
@@ -277,6 +313,8 @@ private fun ScheduleTab(viewModel: ScheduleViewModel, insets: PaddingValues, onO
 
 private fun screenNameOf(dest: NavDestination): String = when {
     dest.hasRoute(HomeRoute::class) -> "schedule"
+    dest.hasRoute(TracksRoute::class) -> "tracks"
+    dest.hasRoute(TrackDetailRoute::class) -> "track_detail"
     dest.hasRoute(ProfileRoute::class) -> "profile"
     dest.hasRoute(DetailsRoute::class) -> "race_details"
     dest.hasRoute(LeaderboardRoute::class) -> "full_leaderboard"
@@ -293,6 +331,7 @@ private fun BottomBar(selected: TopTab, onSelect: (TopTab) -> Unit) {
         TopTab.entries.forEach { tab ->
             val label = when (tab) {
                 TopTab.Schedule -> stringResource(Res.string.nav_schedule)
+                TopTab.Tracks -> stringResource(Res.string.nav_tracks)
                 TopTab.Profile -> stringResource(Res.string.nav_profile)
             }
             NavigationBarItem(

@@ -27,7 +27,13 @@ import com.orioooneee.lmuasister.data.remote.SessionWeatherDto
 import com.orioooneee.lmuasister.data.remote.SettingsDto
 import com.orioooneee.lmuasister.data.remote.SteamProfile
 import com.orioooneee.lmuasister.data.remote.SuspensionDto
+import com.orioooneee.lmuasister.data.remote.TrackAttemptDto
+import com.orioooneee.lmuasister.data.remote.TrackAssetsDto
+import com.orioooneee.lmuasister.data.remote.TrackDetailResponse
 import com.orioooneee.lmuasister.data.remote.TrackDto
+import com.orioooneee.lmuasister.data.remote.TrackFullDto
+import com.orioooneee.lmuasister.data.remote.TrackPersonalDto
+import com.orioooneee.lmuasister.data.remote.TracksResponse
 import com.orioooneee.lmuasister.data.remote.WeatherDto
 import com.orioooneee.lmuasister.data.remote.WeatherSegmentDto
 import kotlin.random.Random
@@ -460,7 +466,7 @@ internal object MockData {
                         n == 3 -> base              // the best lap of the run
                         else -> base + 400L + n * 35L
                     }
-                    LapDto(lap = n, position = card.position, lapTimeMs = ms, sectorsMs = sectors(ms), pit = pit)
+                    LapDto(lap = n, position = card.position, classPosition = card.classPosition, lapTimeMs = ms, sectorsMs = sectors(ms), pit = pit)
                 }
             },
             sessions = mapOf(
@@ -511,6 +517,73 @@ internal object MockData {
         val s1 = lapMs * 34 / 100
         val s2 = lapMs * 33 / 100
         return listOf(s1, s2, lapMs - s1 - s2)
+    }
+
+    // ───────────────────────── tracks ─────────────────────────
+
+    private fun Trk.idKey() = simple.lowercase().filter { it.isLetterOrDigit() }
+
+    private fun trackFull(t: Trk): TrackFullDto {
+        val id = t.idKey()
+        return TrackFullDto(
+            id = id,
+            code = "${t.short}_2023",
+            base = t.simple.lowercase(),
+            name = t.name,
+            eventName = t.simple,
+            fullName = t.name,
+            countryCode = t.cc.uppercase(),
+            lengthKm = t.lengthKm,
+            corners = t.turns,
+            type = "Permanent",
+            official = true,
+            assets = TrackAssetsDto(
+                map = "/api/v2/track/$id/map.svg",
+                logo = "/api/v2/track/$id/logo.svg",
+                card = "/api/v2/track/$id/card.webp",
+                background = "/api/v2/track/$id/background.webp",
+            ),
+        )
+    }
+
+    fun tracks(): String = AppJson.encodeToString(
+        TracksResponse(count = tracks.size, tracks = tracks.map { trackFull(it) }),
+    )
+
+    fun trackDetail(rawId: String): String {
+        val key = rawId.lowercase().filter { it.isLetterOrDigit() }
+        val t = tracks.firstOrNull { it.idKey() == key } ?: tracks[0]
+        val now = Clock.System.now().toEpochMilliseconds()
+        fun attempt(cls: String, lapMs: Long, daysAgo: Int, session: String, pos: Int, status: String) =
+            TrackAttemptDto(
+                bestLapMs = lapMs,
+                session = session,
+                car = carsByClass[cls]?.firstOrNull() ?: "GT Car",
+                carClass = cls,
+                date = Instant.fromEpochMilliseconds(now - daysAgo * 86_400_000L).toString(),
+                eventId = "ev-$key-$daysAgo",
+                eventTitle = "$cls Fixed",
+                tier = "intermediate",
+                official = true,
+                split = 4,
+                position = pos,
+                finishStatus = status,
+            )
+        val base = classPaceMs["LMGT3"] ?: 143_000L
+        val gt3 = attempt("LMGT3", base + 845, 6, "qualifying", 6, "Finished")
+        val lmp2 = attempt("LMP2", base - 14_000, 12, "race", 3, "Finished")
+        val personal = TrackPersonalDto(
+            races = 29,
+            bestLap = lmp2,                                   // absolute best (faster prototype)
+            bestByClass = mapOf("LMGT3" to gt3, "LMP2" to lmp2),
+            recent = listOf(
+                gt3,
+                attempt("LMGT3", base + 1_320, 9, "race", 11, "Finished"),
+                lmp2,
+                attempt("LMGT3", base + 2_010, 20, "race", 18, "DNF"),
+            ),
+        )
+        return AppJson.encodeToString(TrackDetailResponse(track = trackFull(t), personal = personal))
     }
 
     // ───────────────────────── cars ─────────────────────────

@@ -42,11 +42,14 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
             when {
                 path == "/schedule" -> json(MockData.schedule())
                 path == "/cars" -> json(MockData.cars())
+                path == "/tracks" -> json(MockData.tracks())
                 path == "/privacy" -> respond(MockData.privacy(), HttpStatusCode.OK)
 
                 path == "/profile" -> json(MockData.profile())
                 path == "/profile/stats" -> json(MockData.stats())
                 path == "/profile/races" -> json(MockData.racesPage(params["page"]?.toIntOrNull() ?: 1))
+                path.startsWith("/profile/track/") ->
+                    json(MockData.trackDetail(path.removePrefix("/profile/track/")))
                 path.startsWith("/profile/race/") ->
                     json(MockData.profileRaceDetail(path.removePrefix("/profile/race/")))
 

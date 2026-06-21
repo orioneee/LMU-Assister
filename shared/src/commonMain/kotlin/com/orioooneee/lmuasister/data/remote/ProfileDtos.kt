@@ -110,7 +110,8 @@ data class ReasonDto(
 @Serializable
 data class LapDto(
     val lap: Int? = null,        // 1-based lap number
-    val position: Int? = null,
+    val position: Int? = null,   // overall running order this lap
+    @SerialName("class_position") val classPosition: Int? = null, // position in own class this lap
     @SerialName("lap_time_ms") val lapTimeMs: Long? = null,
     @SerialName("sectors_ms") val sectorsMs: List<Long?> = emptyList(),
     val pit: Boolean = false,    // in/out lap around a pit stop — excluded from average pace
@@ -251,6 +252,8 @@ data class ClassificationRowDto(
     @SerialName("finish_status") val finishStatus: String? = null,
     @SerialName("sr_change") val srChange: Double? = null,
     @SerialName("dr_change") val drChange: Double? = null,
+    // This driver's per-lap progress (carries class_position per lap, unlike the top-level copy).
+    @SerialName("lap_progress") val lapProgress: List<LapDto> = emptyList(),
     // Per-driver absolute ratings (driver_rating / safety_rating), same shape as the profile owner's.
     @SerialName("driver_rating") val driverRating: RatingDto? = null,
     @SerialName("safety_rating") val safetyRating: RatingDto? = null,

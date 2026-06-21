@@ -24,6 +24,7 @@ import com.orioooneee.lmuasister.data.remote.AppJson
 import com.orioooneee.lmuasister.data.remote.AppTokenHolder
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.CarDto
+import com.orioooneee.lmuasister.data.remote.TrackFullDto
 import com.orioooneee.lmuasister.data.remote.ClassInfoDto
 import com.orioooneee.lmuasister.data.remote.ClassLeaderboardDto
 import com.orioooneee.lmuasister.data.remote.HotlapDto
@@ -63,6 +64,10 @@ private data class HlCache(val ts: Long = 0, val data: List<HotlapDto> = emptyLi
 private data class CarsCache(val ts: Long = 0, val data: List<CarDto> = emptyList())
 
 private const val CARS_KEY = "cars_v2"
+
+private data class TracksCache(val ts: Long = 0, val data: List<TrackFullDto> = emptyList())
+
+private const val TRACKS_KEY = "tracks_v2"
 
 private fun dedupCars(dtos: List<CarDto>): List<CarModel> =
     dtos.map { CarModel(it.id, it.name, it.manufacturer, it.model, it.carClass, it.series, it.engine) }
@@ -166,6 +171,27 @@ class RaceRepository(
         carsMem = models
         runCatching { LocalCache.write(CARS_KEY, AppJson.encodeToString(CarsCache(nowMs(), resp.cars))) }
         models
+    }
+
+    private var tracksMem: List<TrackFullDto>? = null
+
+    fun cachedTracks(): List<TrackFullDto>? =
+        tracksMem ?: diskList<TracksCache>(TRACKS_KEY)?.data?.let { dedupTracks(it) }?.also { tracksMem = it }
+
+    suspend fun tracks(): Result<List<TrackFullDto>> = runCatching {
+        val raw = api.tracks().tracks
+        val list = dedupTracks(raw)
+        tracksMem = list
+        runCatching { LocalCache.write(TRACKS_KEY, AppJson.encodeToString(TracksCache(nowMs(), raw))) }
+        list
+    }
+
+    // The /tracks roster has true duplicates (same physical layout under several event codes,
+    // e.g. Spa ×3, Silverstone ELMS+WEC). Collapse by physical signature, keep distinct configs
+    // (Bahrain GP/Endurance/Outer/Paddock differ in length/corners, so they survive).
+    private fun dedupTracks(list: List<TrackFullDto>): List<TrackFullDto> {
+        val seen = HashSet<String>()
+        return list.filter { seen.add("${it.base}|${it.lengthKm}|${it.corners}") }
     }
 
     private var liveryModelsMem: Map<String, String>? = null

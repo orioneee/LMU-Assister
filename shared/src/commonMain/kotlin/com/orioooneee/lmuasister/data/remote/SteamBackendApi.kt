@@ -107,6 +107,11 @@ class SteamBackendApi(private val client: HttpClient) {
 
     suspend fun stats(token: String): String = getAuthed("$API_BASE/profile/stats", token)
 
+    /** Track reference block + the caller's personal record on it. trackId = id / code / base.
+     *  All-snake-case payload (no camelCase outlier), so it decodes with [AppJson]. */
+    suspend fun trackDetail(token: String, trackId: String): TrackDetailResponse =
+        AppJson.decodeFromString(getAuthed("$API_BASE/profile/track/${trackId.encodeURLPathPart()}", token))
+
     /**
      * Drops the server-side session and every piece of data we hold for the user.
      * Idempotent on the backend; treated as best-effort by callers (the device clears its

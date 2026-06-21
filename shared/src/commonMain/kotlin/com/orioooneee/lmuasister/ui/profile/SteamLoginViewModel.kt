@@ -15,6 +15,7 @@ import com.orioooneee.lmuasister.data.remote.BackendReauthRequired
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
 import com.orioooneee.lmuasister.data.remote.RacesPageDto
 import com.orioooneee.lmuasister.data.remote.SplitDetailDto
+import com.orioooneee.lmuasister.data.remote.TrackDetailResponse
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import com.orioooneee.lmuasister.data.remote.SteamProfile
@@ -318,8 +319,18 @@ class SteamLoginViewModel(
         LocalCache.read(splitKey(eventId, splitNo))?.takeIf { it.isNotBlank() }
             ?.let { runCatching { AppJson.decodeFromString<SplitDetailDto>(it) }.getOrNull() }
 
+    /** Track detail + personal record. Offline-first: cache the last good payload per track. */
+    suspend fun trackDetail(trackId: String): TrackDetailResponse =
+        withReauth { backend.trackDetail(it, trackId) }
+            .also { runCatching { LocalCache.write(trackDetailKey(trackId), AppJson.encodeToString(it)) } }
+
+    fun cachedTrackDetail(trackId: String): TrackDetailResponse? =
+        LocalCache.read(trackDetailKey(trackId))?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { AppJson.decodeFromString<TrackDetailResponse>(it) }.getOrNull() }
+
     private fun raceDetailKey(eventId: String) = "race_detail_$eventId"
     private fun splitKey(eventId: String, splitNo: Int) = "race_split_${eventId}_$splitNo"
+    private fun trackDetailKey(trackId: String) = "track_detail_$trackId"
 
     private suspend fun <T> withReauth(block: suspend (token: String) -> T): T {
         // Auth may still be restoring at launch (Render cold start). Wait for the token
