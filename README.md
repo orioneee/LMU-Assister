@@ -21,10 +21,10 @@
 
 <table>
 <tr>
-<td align="center" width="25%"><img src="screen_1.jpg" alt="Schedule" width="200"><br><sub><b>Schedule</b></sub></td>
-<td align="center" width="25%"><img src="screen_2.jpg" alt="Profile" width="200"><br><sub><b>Profile</b></sub></td>
-<td align="center" width="25%"><img src="screen_3.jpg" alt="Race details" width="200"><br><sub><b>Race details</b></sub></td>
-<td align="center" width="25%"><img src="screen_4.jpg" alt="Race result" width="200"><br><sub><b>Your race result</b></sub></td>
+<td align="center" width="25%"><img src="screenshot_schedule.jpg" alt="Schedule" width="200"><br><sub><b>Schedule</b></sub></td>
+<td align="center" width="25%"><img src="screenshot_profile.jpg" alt="Profile" width="200"><br><sub><b>Profile</b></sub></td>
+<td align="center" width="25%"><img src="screenshot_race_details.jpg" alt="Race details" width="200"><br><sub><b>Race details</b></sub></td>
+<td align="center" width="25%"><img src="screenshot_race_result.jpg" alt="Race result" width="200"><br><sub><b>Your race result</b></sub></td>
 </tr>
 </table>
 
