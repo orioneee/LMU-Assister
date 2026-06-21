@@ -110,7 +110,7 @@ fun ProfileScreen(
         val exiting by viewModel.exiting.collectAsStateWithLifecycle()
         var showClearConfirm by remember { mutableStateOf(false) }
 
-        RefreshableContent(refreshing, viewModel::refresh) {
+        RefreshableContent(refreshing, viewModel::refresh, topInset = topInset) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()

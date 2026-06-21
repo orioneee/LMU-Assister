@@ -14,6 +14,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
+import io.ktor.http.encodeURLQueryComponent
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -130,6 +131,13 @@ class SteamBackendApi(private val client: HttpClient) {
             page?.let { add("page=$it") }
         }.joinToString("&")
         val url = "$API_BASE/profile/race/${eventId.encodeURLPathPart()}" + if (qs.isEmpty()) "" else "?$qs"
+        return AppJson.decodeFromString(getAuthed(url, token))
+    }
+
+    /** One foreign split's classification (lazy, per-tab). `seriesId` lets the backend skip a history re-read. */
+    suspend fun raceSplit(token: String, eventId: String, splitNo: Int, seriesId: String?): SplitDetailDto {
+        val qs = seriesId?.takeIf { it.isNotBlank() }?.let { "?series_id=${it.encodeURLQueryComponent()}" } ?: ""
+        val url = "$API_BASE/profile/race/${eventId.encodeURLPathPart()}/split/$splitNo$qs"
         return AppJson.decodeFromString(getAuthed(url, token))
     }
 

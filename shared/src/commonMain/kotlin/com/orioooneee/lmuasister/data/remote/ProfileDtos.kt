@@ -166,8 +166,10 @@ data class RaceDetailDto(
     val tier: String? = null,
     val eventType: String? = null,
     val official: Boolean = false,
-    val split: Int? = null,
+    val seriesId: String? = null,    // needed to request other splits
+    val split: Int? = null,          // YOUR split
     val totalSplits: Int? = null,
+    val splitsAvailable: List<Int> = emptyList(),  // render as tabs
     val fieldSize: Int = 0,
     val position: Int? = null,
     val gridPosition: Int? = null,
@@ -176,7 +178,16 @@ data class RaceDetailDto(
     val srChange: Double? = null,
     val drChange: Double? = null,
     val heroImage: String? = null,
-    // keyed "practice" / "qualifying" / "race"
+    // keyed "practice" / "qualifying" / "race" — YOUR split, fully here
+    val sessions: Map<String, RaceSessionDetailDto> = emptyMap(),
+)
+
+/** GET /api/v2/profile/race/<eventId>/split/<n> — one foreign split's tables (no `me` row). */
+@Serializable
+data class SplitDetailDto(
+    val splitNo: Int = 0,
+    val fieldSize: Int = 0,
+    // keyed "practice" / "qualifying" / "race"; rows are all is_me=false.
     val sessions: Map<String, RaceSessionDetailDto> = emptyMap(),
 )
 

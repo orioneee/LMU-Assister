@@ -259,7 +259,7 @@ private fun ScheduleTab(viewModel: ScheduleViewModel, insets: PaddingValues, onO
 
         is ScheduleUiState.Success -> {
             val data = s.data
-            RefreshableContent(refreshing, viewModel::refresh) {
+            RefreshableContent(refreshing, viewModel::refresh, topInset = insets.calculateTopPadding()) {
                 HomeScreen(
                     schedule = data.schedule,
                     weeks = data.weeks,

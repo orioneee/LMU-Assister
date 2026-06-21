@@ -14,6 +14,7 @@ import com.orioooneee.lmuasister.data.remote.BackendAuthFailed
 import com.orioooneee.lmuasister.data.remote.BackendReauthRequired
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
 import com.orioooneee.lmuasister.data.remote.RacesPageDto
+import com.orioooneee.lmuasister.data.remote.SplitDetailDto
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import com.orioooneee.lmuasister.data.remote.SteamProfile
@@ -298,8 +299,27 @@ class SteamLoginViewModel(
 
     suspend fun racesPage(page: Int): RacesPageDto = withReauth { backend.racesPage(it, page) }
 
+    /** Race-detail with offline-first caching: finished races are immutable, so a fresh fetch
+     *  always overwrites the cache and reads can fall back to it when offline. */
     suspend fun raceDetail(eventId: String, split: Int?, page: Int?): RaceDetailDto =
         withReauth { backend.raceDetail(it, eventId, split, page) }
+            .also { runCatching { LocalCache.write(raceDetailKey(eventId), AppJson.encodeToString(it)) } }
+
+    fun cachedRaceDetail(eventId: String): RaceDetailDto? =
+        LocalCache.read(raceDetailKey(eventId))?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { AppJson.decodeFromString<RaceDetailDto>(it) }.getOrNull() }
+
+    /** One foreign split's tables (lazy, per tab) — same offline-first caching as [raceDetail]. */
+    suspend fun raceSplit(eventId: String, splitNo: Int, seriesId: String?): SplitDetailDto =
+        withReauth { backend.raceSplit(it, eventId, splitNo, seriesId) }
+            .also { runCatching { LocalCache.write(splitKey(eventId, splitNo), AppJson.encodeToString(it)) } }
+
+    fun cachedSplit(eventId: String, splitNo: Int): SplitDetailDto? =
+        LocalCache.read(splitKey(eventId, splitNo))?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { AppJson.decodeFromString<SplitDetailDto>(it) }.getOrNull() }
+
+    private fun raceDetailKey(eventId: String) = "race_detail_$eventId"
+    private fun splitKey(eventId: String, splitNo: Int) = "race_split_${eventId}_$splitNo"
 
     private suspend fun <T> withReauth(block: suspend (token: String) -> T): T {
         // Auth may still be restoring at launch (Render cold start). Wait for the token

@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,13 +18,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -44,11 +48,14 @@ import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
+import com.orioooneee.lmuasister.data.remote.RaceSessionDetailDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
 import com.orioooneee.lmuasister.ui.components.BlockSkeleton
+import com.orioooneee.lmuasister.ui.components.LeaderboardRowSkeleton
 import com.orioooneee.lmuasister.ui.components.MetaChip
+import com.orioooneee.lmuasister.ui.components.ShimmerBar
 import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import com.orioooneee.lmuasister.ui.components.classColorFor
 import com.orioooneee.lmuasister.ui.components.onBadgeText
@@ -67,6 +74,7 @@ private val PosGreen = Color(0xFF53D769)
 private val NegRed = Color(0xFFE5484D)
 
 private const val WINDOW = 3
+private const val FOREIGN_PREVIEW = 7
 
 @Composable
 fun RaceProfileDetailScreen(
@@ -77,7 +85,10 @@ fun RaceProfileDetailScreen(
     onBack: () -> Unit,
 ) {
     val result by produceState<Result<RaceDetailDto>?>(null, eventId, split) {
-        value = runCatching { viewModel.raceDetail(eventId, split, null) }
+        // Offline-first: paint the cached page instantly, then revalidate over the network.
+        viewModel.cachedRaceDetail(eventId)?.let { value = Result.success(it) }
+        val fresh = runCatching { viewModel.raceDetail(eventId, split, null) }
+        if (fresh.isSuccess || value == null) value = fresh
     }
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
@@ -101,7 +112,7 @@ fun RaceProfileDetailScreen(
         when (val res = result) {
             null -> DetailSkeleton()
             else -> res.fold(
-                onSuccess = { DetailContent(it, insets.calculateBottomPadding()) },
+                onSuccess = { DetailContent(viewModel, eventId, it, insets.calculateBottomPadding()) },
                 onFailure = {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -123,15 +134,44 @@ private fun DetailSkeleton() {
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        BlockSkeleton(brush, 180.dp)
-        BlockSkeleton(brush, 120.dp)
-        BlockSkeleton(brush, 160.dp)
-        BlockSkeleton(brush, 200.dp)
+        BlockSkeleton(brush, 220.dp)   // track card
+        BlockSkeleton(brush, 110.dp)   // summary card
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(4) { ShimmerBar(Modifier.width(64.dp).height(32.dp), brush, corner = 8.dp) }
+        }
+        SplitSessionsSkeleton(brush)
     }
 }
 
 @Composable
-private fun DetailContent(d: RaceDetailDto, bottomInset: Dp) {
+private fun DetailContent(
+    vm: SteamLoginViewModel,
+    eventId: String,
+    d: RaceDetailDto,
+    bottomInset: Dp,
+) {
+    val mySplit = d.split
+    val tabs = d.splitsAvailable.takeIf { it.isNotEmpty() } ?: listOfNotNull(mySplit)
+    var selected by remember(eventId) { mutableStateOf(mySplit ?: tabs.firstOrNull()) }
+    var reloadNonce by remember(eventId) { mutableStateOf(0) }
+    // Foreign splits, loaded lazily; kept in memory across tab switches. null = still loading.
+    val loaded = remember(eventId) { mutableStateMapOf<Int, Result<Map<String, RaceSessionDetailDto>>>() }
+
+    LaunchedEffect(selected, reloadNonce) {
+        val s = selected
+        if (s != null && s != mySplit && loaded[s] == null) {
+            // Offline-first: show the cached split instantly, then revalidate.
+            vm.cachedSplit(eventId, s)?.let { loaded[s] = Result.success(it.sessions) }
+            val fresh = runCatching { vm.raceSplit(eventId, s, d.seriesId) }
+            if (fresh.isSuccess || loaded[s] == null) loaded[s] = fresh.map { it.sessions }
+        }
+    }
+
+    val selectedSessions: Result<Map<String, RaceSessionDetailDto>>? = when (selected) {
+        null, mySplit -> Result.success(d.sessions)
+        else -> loaded[selected]
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomInset),
@@ -139,10 +179,104 @@ private fun DetailContent(d: RaceDetailDto, bottomInset: Dp) {
     ) {
         d.trackInfo?.let { item { TrackCard(it) } }
         item { SummaryCard(d) }
-        for (key in listOf("qualifying", "race")) {
-            val session = d.sessions[key] ?: continue
-            if (session.classification.isEmpty()) continue
-            item { SessionCard(sessionLabel(key), session.classification) }
+        if (tabs.size > 1) {
+            item { SplitTabs(tabs, selected, mySplit) { selected = it } }
+        }
+        when {
+            selectedSessions == null -> item { SplitSessionsSkeleton(shimmerBrush()) }
+            selectedSessions.isFailure -> item {
+                SplitError {
+                    loaded.remove(selected)
+                    reloadNonce++
+                }
+            }
+            else -> {
+                val sessions = selectedSessions.getOrThrow()
+                for (key in listOf("qualifying", "race")) {
+                    val session = sessions[key] ?: continue
+                    if (session.classification.isEmpty()) continue
+                    item(key = "$selected-$key") { SessionCard(sessionLabel(key), session.classification) }
+                }
+            }
+        }
+    }
+}
+
+/** Horizontal, scrollable split selector; the player's own split is marked with a dot. */
+@Composable
+private fun SplitTabs(tabs: List<Int>, selected: Int?, mySplit: Int?, onSelect: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        tabs.forEach { n ->
+            val sel = n == selected
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (sel) Amber else Surface1)
+                    .border(1.dp, if (sel) Amber else Outline, RoundedCornerShape(8.dp))
+                    .clickable { onSelect(n) }
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Text(
+                    "Split $n",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (sel) Carbon else TextMed,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (n == mySplit) {
+                    Box(Modifier.size(5.dp).clip(CircleShape).background(if (sel) Carbon else Amber))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SplitSessionsSkeleton(brush: androidx.compose.ui.graphics.Brush) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        repeat(2) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                ShimmerBar(Modifier.width(80.dp).height(12.dp), brush)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, Outline, RoundedCornerShape(12.dp))
+                        .padding(vertical = 4.dp),
+                ) {
+                    repeat(6) { LeaderboardRowSkeleton(brush) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SplitError(onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface1)
+            .border(1.dp, Outline, RoundedCornerShape(12.dp))
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Couldn't load this split", style = MaterialTheme.typography.bodyMedium, color = TextMed)
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(Surface2)
+                .clickable(onClick = onRetry)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Text("Retry", style = MaterialTheme.typography.labelMedium, color = Amber, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -253,10 +387,12 @@ private fun DeltaStat(label: String, delta: Double?) {
 private fun SessionCard(label: String, rows: List<ClassificationRowDto>) {
     var expanded by remember { mutableStateOf(false) }
     val meIndex = rows.indexOfFirst { it.isMe }
-    val shown = if (expanded || meIndex < 0) {
-        rows
-    } else {
-        rows.subList((meIndex - WINDOW).coerceAtLeast(0), (meIndex + WINDOW).coerceAtMost(rows.lastIndex) + 1)
+    val shown = when {
+        expanded -> rows
+        // Your split: window the rows around your own position.
+        meIndex >= 0 -> rows.subList((meIndex - WINDOW).coerceAtLeast(0), (meIndex + WINDOW).coerceAtMost(rows.lastIndex) + 1)
+        // Foreign split (no "me"): preview the first few, expand for the full field.
+        else -> rows.take(FOREIGN_PREVIEW)
     }
     val canToggle = expanded || shown.size < rows.size
 
