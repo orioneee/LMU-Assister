@@ -64,14 +64,8 @@ import com.orioooneee.lmuasister.ui.util.formatLap
 private val PosGreen = Color(0xFF53D769)
 private val NegRed = Color(0xFFE5484D)
 
-/** How many classification rows to show above/below the player before "show all". */
 private const val WINDOW = 3
 
-/**
- * Full detail of a single past race — track card + the player's result + per-session
- * classification (qualifying then race; practice hidden). Each table shows a window
- * around the player and expands to the full field. Data: GET /profile/race/<eventId>.
- */
 @Composable
 fun RaceProfileDetailScreen(
     viewModel: SteamLoginViewModel,
@@ -127,10 +121,10 @@ private fun DetailSkeleton() {
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        BlockSkeleton(brush, 180.dp) // track card
-        BlockSkeleton(brush, 120.dp) // summary
-        BlockSkeleton(brush, 160.dp) // qualifying
-        BlockSkeleton(brush, 200.dp) // race
+        BlockSkeleton(brush, 180.dp)
+        BlockSkeleton(brush, 120.dp)
+        BlockSkeleton(brush, 160.dp)
+        BlockSkeleton(brush, 200.dp)
     }
 }
 
@@ -143,7 +137,6 @@ private fun DetailContent(d: RaceDetailDto, bottomInset: Dp) {
     ) {
         d.trackInfo?.let { item { TrackCard(it) } }
         item { SummaryCard(d) }
-        // Qualifying first, then the race — practice intentionally hidden.
         for (key in listOf("qualifying", "race")) {
             val session = d.sessions[key] ?: continue
             if (session.classification.isEmpty()) continue
@@ -378,7 +371,6 @@ private fun absUrl(path: String?): String? = when {
     else -> BuildConfig.BACKEND_URL.substringBefore("/api/", BuildConfig.BACKEND_URL).trimEnd('/') + path
 }
 
-/** nationality is an ISO-3166 alpha-2 code → circle-flags SVG (same as the rest of the app). */
 private fun flagFor(value: String?): String? {
     val cc = value?.trim()?.lowercase() ?: return null
     if (cc.length != 2 || cc.any { it !in 'a'..'z' }) return null

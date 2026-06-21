@@ -40,28 +40,23 @@ class ScheduleViewModel(
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
-    /** Car roster for the Home carousel — loaded independently of the schedule. */
     private val _cars = MutableStateFlow<List<CarModel>>(emptyList())
     val cars: StateFlow<List<CarModel>> = _cars.asStateFlow()
 
-    /** Loaded schedules per week key — makes switching weeks instant. */
     private val cache = mutableMapOf<String, Schedule>()
     private var weeks: List<String> = emptyList()
     private var selected: String? = null
 
     init {
-        // Cars: offline-first, independent of the schedule (static reference data).
         viewModelScope.launch {
             repository.cachedCars()?.let { _cars.value = it }
             repository.cars().getOrNull()?.let { _cars.value = it }
         }
-        // Offline-first: paint instantly from the cached schedule (memory/disk), no network.
-        // The network update is kicked from the Home screen's LaunchedEffect → refresh().
         viewModelScope.launch {
             repository.cachedWeeks()?.let { cachedKeys ->
                 weeks = cachedKeys
                 selected = cachedKeys.firstOrNull()
-                fetchWeek(selected) // load() reads the cached response — instant
+                fetchWeek(selected)
             }
         }
     }
@@ -72,7 +67,7 @@ class ScheduleViewModel(
         val cached = cache[key]
         Telemetry.log(AnalyticsEvent.WeekSelected(key, isCached = cached != null))
         if (cached != null) {
-            emitSuccess(key, cached) // instant — already prefetched
+            emitSuccess(key, cached)
         } else {
             _refreshing.value = true
             viewModelScope.launch {
@@ -82,19 +77,17 @@ class ScheduleViewModel(
         }
     }
 
-    /** Launch update / pull-to-refresh — force-refetch the whole schedule from the backend. */
     fun refresh() {
         _refreshing.value = true
         viewModelScope.launch {
             if (repository.refreshSchedule().isSuccess) {
-                weeks = repository.availableWeeks() // from the just-refreshed cache
+                weeks = repository.availableWeeks()
                 val sel = selected
                 if (sel == null || sel !in weeks) selected = weeks.firstOrNull()
-                cache.clear() // backend refetch updates every week — drop all stale copies
+                cache.clear()
                 fetchWeek(selected)
                 prefetchOtherWeeks()
             } else if (_state.value !is ScheduleUiState.Success) {
-                // nothing cached and the network failed → surface an error
                 _state.value = ScheduleUiState.Error("Network error — could not load schedule")
                 Telemetry.log(AnalyticsEvent.ScheduleError("network"))
                 Telemetry.recordError(TelemetryError("schedule_refresh_failed"), "stage" to "refresh")
@@ -118,7 +111,6 @@ class ScheduleViewModel(
             }
     }
 
-    /** Warm the cache for every other week in the background so switching is instant. */
     private suspend fun prefetchOtherWeeks() {
         weeks.forEach { week ->
             if (cache[week] == null) {
@@ -128,7 +120,6 @@ class ScheduleViewModel(
     }
 
     private fun emitSuccess(key: String?, schedule: Schedule) {
-        // Cache the (working) schedule track logos so the profile can fall back to them.
         TrackLogoIndex.populate(
             schedule.races.flatMap { r ->
                 listOf(r.track?.name to r.track?.logoUrl, r.circuit to r.track?.logoUrl)

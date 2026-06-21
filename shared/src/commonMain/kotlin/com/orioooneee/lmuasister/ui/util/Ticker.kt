@@ -10,7 +10,6 @@ import kotlinx.coroutines.delay
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-/** A "now" that updates every [periodMs] so countdowns tick live. */
 @Composable
 fun rememberNow(periodMs: Long = 1000L): Instant {
     var now by remember { mutableStateOf(Clock.System.now()) }

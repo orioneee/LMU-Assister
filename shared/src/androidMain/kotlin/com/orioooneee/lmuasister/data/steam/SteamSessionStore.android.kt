@@ -6,7 +6,6 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import kotlinx.serialization.json.Json
 
-/** Application context captured by [initSteamStorage]; needed for prefs storage. */
 internal object AndroidAppContext {
     @Volatile
     var value: Context? = null

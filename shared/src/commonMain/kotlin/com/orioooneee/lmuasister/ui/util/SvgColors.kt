@@ -7,7 +7,7 @@ package com.orioooneee.lmuasister.ui.util
  * black. Rewriting the classes as attributes makes the logo render in its real colours.
  */
 fun inlineSvgCss(svg: String): String {
-    val rules = HashMap<String, String>()  // class name → " a=\"x\" b=\"y\"" attribute string
+    val rules = HashMap<String, String>()
     val ruleRe = Regex("\\.([A-Za-z0-9_-]+)\\s*\\{([^}]*)\\}")
     Regex("<style[^>]*>(.*?)</style>", RegexOption.DOT_MATCHES_ALL).findAll(svg).forEach { block ->
         ruleRe.findAll(block.groupValues[1]).forEach { rule ->

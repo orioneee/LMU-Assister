@@ -1,6 +1,8 @@
 package com.orioooneee.lmuasister.di
 
+import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.RaceRepository
+import com.orioooneee.lmuasister.data.mock.mockHttpClient
 import com.orioooneee.lmuasister.data.remote.AppTokenHolder
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
@@ -11,16 +13,11 @@ import io.ktor.client.plugins.HttpTimeout
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
-/**
- * Wires the backend-backed pipeline:
- *   HttpClient → BackendApi → RaceRepository → ScheduleViewModel
- *
- * HttpClient uses the platform's default engine (OkHttp/CIO/Darwin/Js).
- * The backend base URL comes from BuildConfig.BACKEND_URL (local.properties).
- */
 val appModule = module {
     single {
-        HttpClient {
+        // No real backend configured (or backend.mock=true) → serve bundled mock data.
+        if (BuildConfig.USE_MOCK) mockHttpClient()
+        else HttpClient {
             followRedirects = true
             install(HttpTimeout) {
                 requestTimeoutMillis = 20_000

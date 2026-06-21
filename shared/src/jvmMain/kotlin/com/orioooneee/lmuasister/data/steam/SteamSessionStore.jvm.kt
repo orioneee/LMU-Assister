@@ -5,7 +5,6 @@ import java.io.File
 
 private val json = Json { ignoreUnknownKeys = true }
 
-/** Plain-JSON file under the user's home — keeps the session across runs. */
 internal class FileSteamSessionStore(private val file: File) : SteamSessionStore {
     override fun save(tokens: SteamTokens) {
         runCatching {

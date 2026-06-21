@@ -32,12 +32,6 @@ import com.orioooneee.lmuasister.ui.theme.Surface2
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextMed
 
-/**
- * Friendly centered placeholder for "nothing here" pages — an accent-ringed icon,
- * a title, a muted subtitle, and an optional action button. The caller supplies
- * the sizing modifier (e.g. `fillParentMaxSize()` in a LazyColumn item) so the
- * content vertically centers in the available space.
- */
 @Composable
 fun EmptyState(
     title: String,
@@ -53,7 +47,6 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        // concentric rings: soft accent glow behind a bordered medallion
         Box(contentAlignment = Alignment.Center) {
             Box(Modifier.size(116.dp).clip(CircleShape).background(accent.copy(alpha = 0.06f)))
             Box(

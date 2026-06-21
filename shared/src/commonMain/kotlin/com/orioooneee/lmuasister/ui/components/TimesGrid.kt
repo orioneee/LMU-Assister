@@ -64,7 +64,6 @@ fun TimesGrid(
         TimesContent(upcoming, next, now, header, columns, showCountdown, centered)
     } else {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            // As many time columns as comfortably fit (3..6) instead of a fixed 3.
             val perCol = if (centered) 60.dp else 36.dp
             val cols = (maxWidth / perCol).toInt().coerceIn(3, 7)
             TimesContent(upcoming, next, now, header, cols, showCountdown, centered)
@@ -120,8 +119,6 @@ private fun TimesContent(
                     val isNext = showCountdown && t == next
                     Text(
                         text = t.hhmm(),
-                        // Centered: fixed-width cells kept as a tight, aligned cluster.
-                        // Default: weighted columns that span the card width.
                         modifier = if (centered) Modifier.width(46.dp) else Modifier.weight(1f),
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.labelSmall,

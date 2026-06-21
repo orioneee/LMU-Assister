@@ -33,7 +33,6 @@ import com.orioooneee.lmuasister.ui.theme.Surface1
 import com.orioooneee.lmuasister.ui.theme.Surface2
 import com.orioooneee.lmuasister.ui.theme.Surface3
 
-/** A shared, animated shimmer brush — create once per skeleton and pass to its bars. */
 @Composable
 fun shimmerBrush(): Brush {
     val transition = rememberInfiniteTransition(label = "shimmer")
@@ -50,13 +49,11 @@ fun shimmerBrush(): Brush {
     )
 }
 
-/** One rounded shimmer placeholder bar. Size it via [modifier]. */
 @Composable
 fun ShimmerBar(modifier: Modifier, brush: Brush, corner: Dp = 6.dp) {
     Box(modifier.clip(RoundedCornerShape(corner)).background(brush))
 }
 
-/** A race-row card placeholder (position badge · title/car/track · right rail). */
 @Composable
 fun RaceRowSkeleton(brush: Brush) {
     Row(
@@ -82,28 +79,25 @@ fun RaceRowSkeleton(brush: Brush) {
     }
 }
 
-/** Placeholder matching a leaderboard row: rank · (initials / car) · (lap / gap). */
 @Composable
 fun LeaderboardRowSkeleton(brush: Brush) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // rank, in the same 44dp column the real row uses
         Box(Modifier.width(44.dp)) { ShimmerBar(Modifier.width(22.dp).height(16.dp), brush) }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            ShimmerBar(Modifier.fillMaxWidth(0.5f).height(13.dp), brush)  // initials
-            ShimmerBar(Modifier.fillMaxWidth(0.8f).height(10.dp), brush)  // car
+            ShimmerBar(Modifier.fillMaxWidth(0.5f).height(13.dp), brush)
+            ShimmerBar(Modifier.fillMaxWidth(0.8f).height(10.dp), brush)
         }
         Spacer(Modifier.width(10.dp))
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            ShimmerBar(Modifier.width(70.dp).height(13.dp), brush)  // lap time
-            ShimmerBar(Modifier.width(42.dp).height(10.dp), brush)  // gap
+            ShimmerBar(Modifier.width(70.dp).height(13.dp), brush)
+            ShimmerBar(Modifier.width(42.dp).height(10.dp), brush)
         }
     }
 }
 
-/** Generic full-width block placeholder (e.g. a detail card). */
 @Composable
 fun BlockSkeleton(brush: Brush, height: Dp) {
     ShimmerBar(Modifier.fillMaxWidth().height(height), brush, corner = 14.dp)

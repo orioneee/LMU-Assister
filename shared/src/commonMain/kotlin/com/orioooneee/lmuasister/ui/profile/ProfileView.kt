@@ -77,7 +77,6 @@ private val Silver = Color(0xFFC9D1DA)
 private val Bronze = Color(0xFFCD7F32)
 private val Platinum = Color(0xFF6FE3F0)
 
-/** Metal colour for a rating rank (Bronze/Silver/Gold/Platinum) by first letter. */
 private fun rankColor(rank: String): Color = when (rank.trim().firstOrNull()?.lowercaseChar()) {
     'b' -> Bronze
     's' -> Silver
@@ -94,7 +93,6 @@ private fun roman(n: Int): String = when (n) {
 private fun prettyBadge(badge: String): String =
     badge.split('-', '_').joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) }
 
-/** How many recent races to show inline before the "See more" button. */
 private const val RECENT_PREVIEW = 3
 
 @Composable
@@ -130,7 +128,6 @@ fun ProfileView(
     }
 }
 
-/** "See all" CTA under the recent-races preview → opens the full paginated history. */
 @Composable
 private fun SeeMoreButton(onClick: () -> Unit) {
     Row(
@@ -153,7 +150,6 @@ private fun SeeMoreButton(onClick: () -> Unit) {
     }
 }
 
-/** Shimmer placeholder shown while the profile loads (and no cache to paint). */
 @Composable
 fun ProfileSkeleton() {
     val brush = shimmerBrush()
@@ -206,7 +202,6 @@ private fun ProfileHeader(profile: SteamProfile, accountName: String, onOpenSusp
     }
 }
 
-/** Round flag avatar — the player's country, cropped into a circle. */
 @Composable
 private fun CountryFlag(nationality: String?, accent: Color) {
     val box = Modifier
@@ -224,17 +219,15 @@ private fun CountryFlag(nationality: String?, accent: Color) {
     AsyncImage(
         model = "https://flagcdn.com/w160/$cc.png",
         contentDescription = nationality,
-        contentScale = ContentScale.Crop, // fill the circle
+        contentScale = ContentScale.Crop,
         modifier = box,
     )
 }
 
-/** Two-segment rating badge in the same style as the schedule's SrBadge: "DR | Bronze III". */
 @Composable
 private fun RatingPill(label: String, rating: RatingDto?) {
     if (rating == null || rating.rank.isBlank()) return
     val color = rankColor(rating.rank)
-    // Compact in-game style: first letter of the rank + tier number, e.g. "B3", "S2".
     val letter = rating.rank.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty()
     val value = letter + if (rating.tier > 0) rating.tier.toString() else ""
     Row(
@@ -258,12 +251,6 @@ private fun RatingPill(label: String, rating: RatingDto?) {
 
 private val FlagGray = Color(0xFF8A8F98)
 
-/**
- * Licence-status flags. Active sanctions → red (the most severe state, shown first);
- * past/expired sanctions → gray; a clean licence → green. Tapping the active or past
- * flag opens the history filtered to just that subset. Falls back to
- * [SteamProfile.activeSuspensions] when the detailed list is missing (older cached profile).
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SuspensionFlags(profile: SteamProfile, onOpen: (active: Boolean) -> Unit) {
@@ -290,7 +277,6 @@ private fun SuspensionFlags(profile: SteamProfile, onOpen: (active: Boolean) -> 
             else stringResource(Res.string.susp_active_count, active.size)
             ClickablePill(label, NegRed) { onOpen(true) }
         } else {
-            // No active sanction right now → green status, nothing to drill into.
             ClickablePill(stringResource(Res.string.susp_no_active), PosGreen, onClick = null)
         }
         if (past.isNotEmpty()) {
@@ -299,7 +285,6 @@ private fun SuspensionFlags(profile: SteamProfile, onOpen: (active: Boolean) -> 
     }
 }
 
-/** Outline pill that opens the detail screen on tap (non-clickable when [onClick] is null). */
 @Composable
 private fun ClickablePill(text: String, color: Color = NegRed, onClick: (() -> Unit)?) {
     val shape = RoundedCornerShape(6.dp)
@@ -397,7 +382,7 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
                 color = TextHigh,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
-                modifier = Modifier.fillMaxWidth().basicMarquee(), // scroll long titles instead of truncating
+                modifier = Modifier.fillMaxWidth().basicMarquee(),
             )
             CarLine(race.carClass, race.carName ?: race.car)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -405,13 +390,10 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
                 race.track?.let {
                     Text(it, style = MaterialTheme.typography.labelMedium, color = TextMed, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                // Lap chip only when there's no per-session breakdown to show it in.
                 if (race.sessions == null) race.bestLapMs?.let { MetaChip("⏱ ${formatLap(it)}") }
             }
             SessionsBreakdown(race.sessions, includeRace = finished)
         }
-        // Right rail, in-flow (no overlap with the times block): event-type on top,
-        // rating deltas in the middle, split at the bottom.
         Column(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -427,7 +409,6 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
     }
 }
 
-/** Car-class badge first, then the model name (scrolls when it doesn't fit). */
 @Composable
 private fun CarLine(carClass: String?, carName: String?) {
     val name = carName?.takeIf { it.isNotBlank() }
@@ -450,11 +431,9 @@ private fun CarLine(carClass: String?, carName: String?) {
     }
 }
 
-/** Per-session breakdown: Quali / Race (and Practice) — position + best lap. */
 @Composable
 private fun SessionsBreakdown(sessions: RaceSessionsDto?, includeRace: Boolean) {
     if (sessions == null) return
-    // Practice intentionally omitted — only Quali + Race matter on the card.
     val rows = listOfNotNull(
         sessions.qualifying?.let { "Quali" to it },
         if (includeRace) sessions.race?.let { "Race" to it } else null,
@@ -488,7 +467,7 @@ private fun SessionLine(label: String, s: SessionSummaryDto) {
             style = MaterialTheme.typography.labelMedium,
             color = TextHigh,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.width(32.dp), // fixed so lap times line up
+            modifier = Modifier.width(32.dp),
         )
         (s.bestLapMs ?: s.finishTimeMs)?.let {
             Text(
@@ -500,8 +479,6 @@ private fun SessionLine(label: String, s: SessionSummaryDto) {
     }
 }
 
-/** Track emblem (SVG) — same approach as the race-details screen: only shown once Coil
- *  has it (a missing/failed asset just leaves no gap). */
 @Composable
 private fun TrackLogo(url: String?, trackName: String? = null) {
     // Profile cards often come back with no track_logo → fall back to the schedule's
@@ -519,7 +496,6 @@ private fun TrackLogo(url: String?, trackName: String? = null) {
     }
 }
 
-/** Positions gained/lost: "P5→P2" green if moved up, red if dropped. */
 @Composable
 private fun GridToFinish(grid: Int?, finish: Int) {
     if (grid == null || finish <= 0) return
@@ -538,11 +514,9 @@ private fun absUrl(path: String?): String? = when {
     else -> BuildConfig.BACKEND_URL.substringBefore("/api/", BuildConfig.BACKEND_URL).trimEnd('/') + path
 }
 
-/** "Split 14/29" when the total is known, else "Split 14". */
 private fun splitLabel(split: Int, total: Int?): String =
     if (total != null && total > 0) "Split $split/$total" else "Split $split"
 
-/** Lap milliseconds → "M:SS.mmm". */
 private fun formatLap(ms: Long): String {
     val m = ms / 60000
     val s = (ms % 60000) / 1000
@@ -555,7 +529,6 @@ private fun PositionBadge(position: Int, fieldSize: Int, finishStatus: String?) 
     val dnf = statusLabel(finishStatus)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         if (dnf != null) {
-            // Did-not-finish / disqualified etc. — a dark badge with the status instead of a place.
             Box(
                 Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black)
                     .border(1.dp, NegRed.copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
@@ -589,7 +562,6 @@ private fun PositionBadge(position: Int, fieldSize: Int, finishStatus: String?) 
     }
 }
 
-/** Short badge label for a non-finish (DNF/DQ/DNS), or null for a normal finish (→ show position). */
 private fun statusLabel(status: String?): String? {
     val s = status?.trim()?.lowercase().orEmpty()
     if (s.isEmpty()) return null
@@ -654,7 +626,6 @@ private fun DeltaText(label: String, delta: Double?) {
     }
 }
 
-/** One decimal, no trailing ".0" noise beyond that. */
 private fun formatDelta(d: Double): String {
     val abs = if (d < 0) -d else d
     val rounded = (abs * 10).toLong()

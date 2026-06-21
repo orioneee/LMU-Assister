@@ -6,7 +6,6 @@ interface Platform {
 
 expect fun getPlatform(): Platform
 
-/** Touch platforms (Android / iOS) — used to enable pull-to-refresh only there. */
 val isTouchPlatform: Boolean
     get() = getPlatform().name.let {
         it.startsWith("Android") || it.startsWith("iOS") || it.contains("iPhone") || it.contains("iPad")

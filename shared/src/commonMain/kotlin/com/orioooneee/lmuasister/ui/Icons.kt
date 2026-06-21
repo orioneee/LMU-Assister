@@ -23,7 +23,6 @@ private fun icon(name: String, block: ImageVector.Builder.() -> Unit): ImageVect
         viewportHeight = 24f,
     ).apply(block).build()
 
-/** Builds a 24x24 icon straight from an SVG path string (for real brand logos). */
 private fun svgIcon(name: String, pathData: String): ImageVector =
     ImageVector.Builder(
         name = name,
@@ -58,7 +57,6 @@ val IconHome: ImageVector by lazy {
 
 val IconSchedule: ImageVector by lazy {
     icon("Schedule") {
-        // three rounded list bars
         path(fill = white) {
             moveTo(4f, 5f); lineTo(20f, 5f); lineTo(20f, 8f); lineTo(4f, 8f); close()
             moveTo(4f, 10.5f); lineTo(20f, 10.5f); lineTo(20f, 13.5f); lineTo(4f, 13.5f); close()
@@ -67,17 +65,14 @@ val IconSchedule: ImageVector by lazy {
     }
 }
 
-/** Outlined calendar — bottom-nav Schedule tab. */
 val IconCalendarOutline: ImageVector by lazy {
     icon("CalendarOutline") {
         path(stroke = white, strokeLineWidth = 1.8f, strokeLineJoin = StrokeJoin.Round, strokeLineCap = StrokeCap.Round) {
             moveTo(4f, 6f); lineTo(20f, 6f); lineTo(20f, 20f); lineTo(4f, 20f); close()
         }
-        // header divider
         path(stroke = white, strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round) {
             moveTo(4f, 9.5f); lineTo(20f, 9.5f)
         }
-        // hanger legs
         path(stroke = white, strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round) {
             moveTo(8f, 4f); lineTo(8f, 7f)
             moveTo(16f, 4f); lineTo(16f, 7f)
@@ -85,17 +80,14 @@ val IconCalendarOutline: ImageVector by lazy {
     }
 }
 
-/** Outlined person — bottom-nav Profile tab. */
 val IconPersonOutline: ImageVector by lazy {
     icon("PersonOutline") {
-        // head
         path(stroke = white, strokeLineWidth = 1.8f, strokeLineJoin = StrokeJoin.Round) {
             moveTo(15.2f, 8f)
             arcToRelative(3.2f, 3.2f, 0f, true, true, -6.4f, 0f)
             arcToRelative(3.2f, 3.2f, 0f, true, true, 6.4f, 0f)
             close()
         }
-        // shoulders (open arc)
         path(stroke = white, strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round) {
             moveTo(5.5f, 19.5f)
             arcToRelative(6.5f, 6.5f, 0f, false, true, 13f, 0f)
@@ -105,7 +97,6 @@ val IconPersonOutline: ImageVector by lazy {
 
 val IconTools: ImageVector by lazy {
     icon("Tools") {
-        // four squares (apps grid)
         path(fill = white) {
             moveTo(4f, 4f); lineTo(10.5f, 4f); lineTo(10.5f, 10.5f); lineTo(4f, 10.5f); close()
             moveTo(13.5f, 4f); lineTo(20f, 4f); lineTo(20f, 10.5f); lineTo(13.5f, 10.5f); close()
@@ -132,9 +123,7 @@ val IconChevronRight: ImageVector by lazy {
 val IconFlag: ImageVector by lazy {
     icon("Flag") {
         path(fill = white) {
-            // pole
             moveTo(5f, 3f); lineTo(6.6f, 3f); lineTo(6.6f, 21f); lineTo(5f, 21f); close()
-            // flag body
             moveTo(6.6f, 4f); lineTo(19f, 4f); lineTo(19f, 13f); lineTo(6.6f, 13f); close()
         }
     }
@@ -157,12 +146,10 @@ val IconBolt: ImageVector by lazy {
 val IconPerson: ImageVector by lazy {
     icon("Person") {
         path(fill = white) {
-            // head
             moveTo(8f, 7.5f)
             arcToRelative(4f, 4f, 0f, true, true, 8f, 0f)
             arcToRelative(4f, 4f, 0f, true, true, -8f, 0f)
             close()
-            // shoulders
             moveTo(5f, 20.5f)
             arcToRelative(7f, 7f, 0f, true, true, 14f, 0f)
             close()
@@ -207,10 +194,8 @@ val IconGithub: ImageVector by lazy {
 val IconChampionship: ImageVector by lazy {
     icon("Trophy") {
         path(fill = white) {
-            // cup bowl
             moveTo(7f, 4f); lineTo(17f, 4f); lineTo(17f, 8f)
             arcToRelative(5f, 5f, 0f, false, true, -10f, 0f); close()
-            // stem + base
             moveTo(11f, 12.5f); lineTo(13f, 12.5f); lineTo(13f, 17f); lineTo(11f, 17f); close()
             moveTo(8f, 18f); lineTo(16f, 18f); lineTo(16f, 20.5f); lineTo(8f, 20.5f); close()
         }

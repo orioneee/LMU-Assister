@@ -19,7 +19,6 @@ interface Analytics {
  * failed network calls) that never crash the app but still lose users.
  */
 interface CrashReporter {
-    /** Report a non-fatal error with optional context keys attached to this report. */
     fun recordException(throwable: Throwable, keys: Map<String, Any?> = emptyMap())
 
     /** Breadcrumb log — attached to the next crash/non-fatal report. */
@@ -77,7 +76,6 @@ object Telemetry {
         crashReporter.setUserId(id)
     }
 
-    /** A user-segment property (Analytics) that is also mirrored as a Crashlytics key. */
     fun userProperty(key: String, value: String?) {
         analytics.setUserProperty(key, value)
         crashReporter.setCustomKey(key, value ?: "")

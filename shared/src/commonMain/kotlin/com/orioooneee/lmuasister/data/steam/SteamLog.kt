@@ -13,7 +13,6 @@ internal object SteamLog {
     fun e(msg: String, t: Throwable? = null) =
         println("$TAG ERROR $msg" + (t?.let { " :: ${it::class.simpleName}: ${it.message}" } ?: ""))
 
-    /** Shorten a token/secret for logs (keep head + tail). */
     fun short(s: String?): String = when {
         s == null -> "null"
         s.length <= 12 -> s

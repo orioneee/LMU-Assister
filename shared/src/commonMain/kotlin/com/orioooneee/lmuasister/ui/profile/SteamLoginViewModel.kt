@@ -6,6 +6,7 @@ import com.orioooneee.lmuasister.analytics.AnalyticsEvent
 import com.orioooneee.lmuasister.analytics.Telemetry
 import com.orioooneee.lmuasister.analytics.TelemetryError
 import com.orioooneee.lmuasister.analytics.UserProperties
+import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.cache.LocalCache
 import com.orioooneee.lmuasister.data.remote.AppJson
 import com.orioooneee.lmuasister.data.remote.AppTokenHolder
@@ -26,7 +27,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 
-/** State of the backend profile call chain (auth → profile). */
 sealed interface BackendState {
     data object Loading : BackendState
     data class Ok(val profile: SteamProfile, val fromCache: Boolean = false) : BackendState
@@ -37,23 +37,18 @@ sealed interface BackendState {
 sealed interface SteamLoginUiState {
     data object Idle : SteamLoginUiState
 
-    /** Startup: silently restoring a saved session — show a loader, not the login form. */
     data object Restoring : SteamLoginUiState
     data object Loading : SteamLoginUiState
 
-    /** Steam asked for a Guard code — the UI should enable the 2FA field. */
     data class GuardRequired(val kind: SteamGuardKind) : SteamLoginUiState
 
-    /** Signed in; [backend] carries the profile (offline-first). */
     data class SignedIn(val backend: BackendState = BackendState.Loading) : SteamLoginUiState
 
     data class Error(val message: String) : SteamLoginUiState
 }
 
-/** Which exit action is currently running — drives the two profile buttons' loaders. */
 enum class ExitAction { NONE, SIGNING_OUT, CLEARING }
 
-/** Paginated full race history for the "See all races" screen (kept in the VM). */
 data class AllRacesUi(
     val races: List<RecentRaceDto> = emptyList(),
     val page: Int = 0,
@@ -64,13 +59,16 @@ data class AllRacesUi(
 
 private const val PROFILE_CACHE_KEY = "steam_profile_v2"
 
-// How long a token-gated call waits for the session to finish restoring before giving up.
+// App-store-review login: the reviewer types these into the normal form; we route them to
+// /auth/demo (a service-account session) instead of a real Steam sign-in. Configured via
+// local.properties (demo.username / demo.password); defaults match the backend's.
+private val DEMO_USERNAME = BuildConfig.DEMO_USERNAME
+private val DEMO_PASSWORD = BuildConfig.DEMO_PASSWORD
+// Marks the active session as a demo one so we silently re-mint it on restart / 401.
+private const val DEMO_FLAG_KEY = "auth_demo_session"
+
 private const val AUTH_WAIT_MS = 60_000L
 
-/**
- * Drives the Steam login form via the platform [SteamSignIn] (on-device JavaSteam on
- * Android/JVM, device tunnel on iOS), then loads the profile with the resulting app token.
- */
 class SteamLoginViewModel(
     private val signIn: SteamSignIn,
     private val backend: SteamBackendApi,
@@ -83,20 +81,14 @@ class SteamLoginViewModel(
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
-    // Which of the two exit buttons is mid-flight (so each can show its own loader and both
-    // can be disabled while one runs).
     private val _exiting = MutableStateFlow(ExitAction.NONE)
     val exiting: StateFlow<ExitAction> = _exiting.asStateFlow()
 
-    // Full race-history pagination, held here (not in the screen) so it survives navigating
-    // into a race and back — the screen's own state would be lost when it leaves the back stack.
     private val _allRaces = MutableStateFlow(AllRacesUi())
     val allRacesState: StateFlow<AllRacesUi> = _allRaces.asStateFlow()
 
     val guardRequired: Boolean get() = _state.value is SteamLoginUiState.GuardRequired
 
-    // Mirrors every change into the shared holder so token-optional calls (leaderboard
-    // "your position") can pick it up.
     private var appToken: String? = null
         set(value) {
             field = value
@@ -104,13 +96,25 @@ class SteamLoginViewModel(
         }
 
     init {
-        // Optimistic UI: if we cached a profile last session, paint it instantly (no loader)
-        // while the token is silently refreshed in the background.
         val cached = loadCachedProfile()
         if (cached != null) {
             _state.value = SteamLoginUiState.SignedIn(BackendState.Ok(cached, fromCache = true))
         }
         viewModelScope.launch {
+            if (LocalCache.read(DEMO_FLAG_KEY) == "1") {
+                SteamLog.d("vm: restoring demo session…")
+                val r = runCatching { backend.authDemo(DEMO_USERNAME, DEMO_PASSWORD) }.getOrNull()
+                if (r != null) {
+                    appToken = r.token
+                    Telemetry.log(AnalyticsEvent.LoginSuccess(restored = true))
+                    Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
+                    if (cached == null) _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
+                    loadProfile()
+                    return@launch
+                }
+                SteamLog.d("vm: demo restore failed, falling back")
+                runCatching { LocalCache.write(DEMO_FLAG_KEY, "") }
+            }
             SteamLog.d("vm: trying silent session restore…")
             val token = runCatching { signIn.restore() }.getOrNull()
             if (token != null) {
@@ -122,7 +126,6 @@ class SteamLoginViewModel(
                 loadProfile()
             } else {
                 SteamLog.d("vm: no saved session")
-                // Keep the cached profile if we have one; otherwise fall to the login form.
                 if (cached == null) {
                     _state.value = SteamLoginUiState.Idle
                     Telemetry.log(AnalyticsEvent.LoginFormShown)
@@ -135,6 +138,10 @@ class SteamLoginViewModel(
         if (_state.value is SteamLoginUiState.Loading) return
         if (username.isBlank() || password.isBlank()) {
             _state.value = SteamLoginUiState.Error("Enter your login and password.")
+            return
+        }
+        if (username == DEMO_USERNAME && password == DEMO_PASSWORD) {
+            loginDemo()
             return
         }
         _state.value = SteamLoginUiState.Loading
@@ -166,7 +173,29 @@ class SteamLoginViewModel(
         }
     }
 
-    /** Bucket the freeform Steam error into a low-cardinality reason for analytics. */
+    /** App-store-review path: no Steam, just exchange the demo creds for a service-account token. */
+    private fun loginDemo() {
+        _state.value = SteamLoginUiState.Loading
+        Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = false))
+        viewModelScope.launch {
+            runCatching { backend.authDemo(DEMO_USERNAME, DEMO_PASSWORD) }
+                .onSuccess { r ->
+                    appToken = r.token
+                    runCatching { LocalCache.write(DEMO_FLAG_KEY, "1") }
+                    Telemetry.log(AnalyticsEvent.LoginSuccess(restored = false))
+                    Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
+                    _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
+                    loadProfile()
+                }
+                .onFailure { e ->
+                    SteamLog.e("vm: demo login failed", e)
+                    Telemetry.log(AnalyticsEvent.LoginFailed(loginFailReason(e.message ?: "")))
+                    Telemetry.recordError(e, "stage" to "login_demo")
+                    _state.value = SteamLoginUiState.Error(e.message ?: "Login failed")
+                }
+        }
+    }
+
     private fun loginFailReason(raw: String): String {
         val r = raw.lowercase()
         return when {
@@ -178,7 +207,6 @@ class SteamLoginViewModel(
         }
     }
 
-    /** Pull-to-refresh on the profile: re-fetch (with one silent reauth on 401). */
     fun refresh() {
         if (appToken == null || _refreshing.value) return
         viewModelScope.launch {
@@ -193,10 +221,8 @@ class SteamLoginViewModel(
         }
     }
 
-    /** Plain sign out: tells the backend to drop our session/data, then clears the device. */
     fun signOut() = exit(ExitAction.SIGNING_OUT, AnalyticsEvent.ProfileSignedOut)
 
-    /** "Clear my data" (App Review 5.1.1(v)): same backend call, shown behind a confirm popup. */
     fun clearMyData() = exit(ExitAction.CLEARING, AnalyticsEvent.ProfileDataCleared)
 
     private fun exit(action: ExitAction, event: AnalyticsEvent) {
@@ -204,8 +230,6 @@ class SteamLoginViewModel(
         _exiting.value = action
         Telemetry.log(event)
         viewModelScope.launch {
-            // Best-effort: the endpoint is idempotent and wipes all server-side data we hold.
-            // Whatever happens, the device still clears its own state below.
             appToken?.let { token ->
                 runCatching { backend.signOut(token) }
                     .onFailure { SteamLog.e("vm: backend sign-out failed", it) }
@@ -215,13 +239,13 @@ class SteamLoginViewModel(
             signIn.signOut()
             appToken = null
             runCatching { LocalCache.write(PROFILE_CACHE_KEY, "") }
+            runCatching { LocalCache.write(DEMO_FLAG_KEY, "") }
             _allRaces.value = AllRacesUi()
             _exiting.value = ExitAction.NONE
             _state.value = SteamLoginUiState.Idle
         }
     }
 
-    /** Loads the next page of the full race history (no-op while loading / at the end). */
     fun loadMoreAllRaces() {
         val cur = _allRaces.value
         if (cur.loading || !cur.hasMore) return
@@ -248,7 +272,6 @@ class SteamLoginViewModel(
     }
 
     private suspend fun loadProfile() {
-        // Offline-first: paint cache instantly.
         val cached = loadCachedProfile()
         if (cached != null) _state.value = SteamLoginUiState.SignedIn(BackendState.Ok(cached, fromCache = true))
 
@@ -267,21 +290,17 @@ class SteamLoginViewModel(
                     if (e is BackendAuthFailed) BackendState.AuthFailed(e.message ?: "auth_failed")
                     else BackendState.Error(e.message ?: e::class.simpleName ?: "error"),
                 )
-            } // else keep showing the cached profile
+            }
         }
     }
 
-    /** Fetches the profile; on a 401 does one silent reauth + retry. */
     private suspend fun fetchProfileWithReauth(): SteamProfile = withReauth { backend.profile(it) }
 
-    /** One page of the full race history (for the "See all" screen). */
     suspend fun racesPage(page: Int): RacesPageDto = withReauth { backend.racesPage(it, page) }
 
-    /** Full race-page detail by eventId. */
     suspend fun raceDetail(eventId: String, split: Int?, page: Int?): RaceDetailDto =
         withReauth { backend.raceDetail(it, eventId, split, page) }
 
-    /** Runs [block] with the app token; on a 401 does one silent reauth + retry. */
     private suspend fun <T> withReauth(block: suspend (token: String) -> T): T {
         // Auth may still be restoring at launch (Render cold start). Wait for the token
         // instead of failing instantly with "not signed in" — callers paint a loader
@@ -292,13 +311,18 @@ class SteamLoginViewModel(
             block(token)
         } catch (e: BackendReauthRequired) {
             Telemetry.log(AnalyticsEvent.ProfileReauthTriggered)
-            val fresh = signIn.reauth() ?: throw e
+            val fresh = reauthToken() ?: throw e
             appToken = fresh
             block(fresh)
         }
     }
 
-    /** Ties the anonymous session id + skill segment to this signed-in user. */
+    /** Silent reauth → fresh app token: re-mint the demo session, else a real Steam reauth. */
+    private suspend fun reauthToken(): String? =
+        if (LocalCache.read(DEMO_FLAG_KEY) == "1")
+            runCatching { backend.authDemo(DEMO_USERNAME, DEMO_PASSWORD).token }.getOrNull()
+        else signIn.reauth()
+
     private fun applyProfileTelemetry(p: SteamProfile) {
         Telemetry.setUserId(p.uid.takeIf { it.isNotBlank() })
         Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")

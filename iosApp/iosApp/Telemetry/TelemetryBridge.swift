@@ -6,8 +6,6 @@ import FirebaseCrashlytics
 // Note: `Analytics` exists in BOTH Shared (our Kotlin protocol) and FirebaseAnalytics
 // (Firebase's class), so every reference is module-qualified to avoid ambiguity.
 
-/// Bridges the shared Kotlin `Telemetry` facade to the Firebase iOS SDK.
-/// Call `TelemetryBridge.install()` once, after `FirebaseApp.configure()`.
 enum TelemetryBridge {
     static func install() {
         Telemetry.shared.analytics = FirebaseAnalyticsSink()
@@ -16,7 +14,6 @@ enum TelemetryBridge {
     }
 }
 
-/// Implements the shared `Analytics` protocol using Firebase Analytics.
 private final class FirebaseAnalyticsSink: Shared.Analytics {
     func logEvent(event: AnalyticsEvent) {
         FirebaseAnalytics.Analytics.logEvent(event.name, parameters: normalize(event.params))
@@ -51,7 +48,6 @@ private final class FirebaseAnalyticsSink: Shared.Analytics {
     }
 }
 
-/// Implements the shared `CrashReporter` protocol using Firebase Crashlytics.
 private final class FirebaseCrashSink: CrashReporter {
     private let crash = Crashlytics.crashlytics()
 

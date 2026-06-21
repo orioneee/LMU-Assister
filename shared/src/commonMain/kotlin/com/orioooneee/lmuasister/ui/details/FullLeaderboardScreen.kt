@@ -47,7 +47,6 @@ import lmuassister.shared.generated.resources.retry
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
-/** Full, cursor-paginated leaderboard for one race (Paging 3). */
 @Composable
 fun FullLeaderboardScreen(leaderboardId: String, title: String, insets: PaddingValues, onBack: () -> Unit) {
     val repo = koinInject<RaceRepository>()

@@ -45,6 +45,9 @@ private data class LoginBody(val username: String, val password: String, val gua
 @Serializable
 private data class RefreshBody(val account: String, val refresh: String, val tunnelKey: String)
 
+@Serializable
+private data class DemoBody(val username: String, val password: String)
+
 /** Plain JSON for request bodies — keeps property names verbatim (camelCase). */
 private val RequestJson = Json { encodeDefaults = true }
 
@@ -75,6 +78,22 @@ class SteamBackendApi(private val client: HttpClient) {
         val resp = client.post("$API_BASE/auth/steam") {
             contentType(ContentType.Application.Json)
             setBody("""{"ticket":"$ticketHex"}""") // hex is [0-9a-f], no escaping needed
+        }
+        return when (resp.status.value) {
+            in 200..299 -> AppJson.decodeFromString(resp.bodyAsText())
+            else -> throw resp.toError()
+        }
+    }
+
+    /**
+     * App-store-review login under the service account (no Steam, no tunnel). Hands back the
+     * same {token, uid} shape as [authSteam]; the reviewer then reads /profile* like a real user.
+     */
+    suspend fun authDemo(username: String, password: String): SteamAuthResponse {
+        val resp = client.post("$API_BASE/auth/demo") {
+            timeout { requestTimeoutMillis = TICKET_TIMEOUT } // Render cold start
+            contentType(ContentType.Application.Json)
+            setBody(RequestJson.encodeToString(DemoBody(username, password)))
         }
         return when (resp.status.value) {
             in 200..299 -> AppJson.decodeFromString(resp.bodyAsText())

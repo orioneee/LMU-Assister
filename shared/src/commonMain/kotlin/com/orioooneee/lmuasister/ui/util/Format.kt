@@ -91,7 +91,6 @@ fun Instant.hhmm(): String {
     return "${two(dt.hour)}:${two(dt.minute)}"
 }
 
-/** True if this instant is on the system-local current day. */
 fun Instant.isToday(now: Instant): Boolean = local().date == now.local().date
 
 /** Local weekday short name, e.g. "WED". */

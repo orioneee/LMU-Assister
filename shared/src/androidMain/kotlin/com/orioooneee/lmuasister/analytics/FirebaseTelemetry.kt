@@ -5,12 +5,6 @@ import android.os.Bundle
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 
-/**
- * Wires the global [Telemetry] facade to Firebase. Call once, early — from the
- * Android Application / Activity onCreate. Firebase itself auto-initializes from
- * google-services.json (via its ContentProvider), so this only swaps in the real
- * Analytics + Crashlytics sinks and sets the platform user-property.
- */
 fun initTelemetry(context: Context) {
     Telemetry.analytics = FirebaseAnalyticsSink(context.applicationContext)
     Telemetry.crashReporter = FirebaseCrashSink()
@@ -62,7 +56,6 @@ private class FirebaseCrashSink : CrashReporter {
     override fun setUserId(id: String?) = crash.setUserId(id ?: "")
 }
 
-/** Firebase only accepts String/Long/Double params, so booleans become "true"/"false". */
 private fun Map<String, Any?>.toBundle(): Bundle = Bundle().apply {
     forEach { (k, v) ->
         when (v) {

@@ -34,14 +34,8 @@ import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextMed
 
-/** Items past the last visible row to keep buffered (≈ 3 pages of 5). */
 private const val PREFETCH_AHEAD = 15
 
-/**
- * The player's full race history — pages of 5 pulled from GET /profile/races as the user
- * scrolls. Pagination state lives in [SteamLoginViewModel] so it survives opening a race
- * detail and coming back (the screen's own state would be dropped from the back stack).
- */
 @Composable
 fun AllRacesScreen(
     viewModel: SteamLoginViewModel,
@@ -52,7 +46,6 @@ fun AllRacesScreen(
     val state by viewModel.allRacesState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
-    // First load (only if we don't already have pages cached in the VM) + infinite scroll.
     LaunchedEffect(Unit) { if (state.races.isEmpty()) viewModel.loadMoreAllRaces() }
     LaunchedEffect(listState) {
         snapshotFlow {

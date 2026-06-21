@@ -60,11 +60,6 @@ private val PosGreen = SkillBeginner
 private val NegRed = ClassHyper
 private val FlagGray = Color(0xFF8A8F98)
 
-/**
- * Licence history scoped to one subset — [active] sanctions (currently in effect) or the
- * past/expired ones — depending on which header flag was tapped. Newest first. Reads the
- * already loaded profile from the [SteamLoginViewModel] (no extra network call).
- */
 @Composable
 fun SuspensionsScreen(
     viewModel: SteamLoginViewModel,
@@ -110,7 +105,6 @@ fun SuspensionsScreen(
     }
 }
 
-/** Nothing in this subset — clean for active, empty for past. */
 @Composable
 private fun EmptyState(active: Boolean) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -160,7 +154,6 @@ private fun SuspensionCard(s: SuspensionDto) {
     }
 }
 
-/** "PERMANENT BAN" / "ACTIVE" / "EXPIRED" pill matching the flag colour. */
 @Composable
 private fun StatusBadge(text: String, color: Color) {
     Box(

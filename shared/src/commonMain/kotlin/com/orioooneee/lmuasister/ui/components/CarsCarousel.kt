@@ -43,7 +43,6 @@ import lmuassister.shared.generated.resources.cars_count
 import lmuassister.shared.generated.resources.cars_section
 import org.jetbrains.compose.resources.stringResource
 
-/** v2 car-class name → accent colour. */
 fun carClassColor(carClass: String): Color {
     val c = carClass.lowercase()
     return when {
@@ -69,7 +68,6 @@ private fun classLabel(carClass: String): String {
     }
 }
 
-/** A single-row horizontal carousel of the available car models (v2 roster). */
 @Composable
 fun CarsCarousel(cars: List<CarModel>, modifier: Modifier = Modifier) {
     if (cars.isEmpty()) return
@@ -115,7 +113,6 @@ private fun CarCard(car: CarModel) {
             .background(Surface1)
             .border(1.dp, Outline, RoundedCornerShape(12.dp)),
     ) {
-        // class-coloured accent rail
         Box(Modifier.width(4.dp).fillMaxHeight().background(accent))
         Column(Modifier.fillMaxHeight().padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Column {

@@ -73,10 +73,6 @@ private val SteamBottom = Color(0xFF171A21)
 private val SteamLogoBg = Color(0xFF1B2838)
 private val DangerRed = Color(0xFFE5484D)
 
-/**
- * Steam sign-in form — custom credential auth (login / password / optional 2FA).
- * Talks to [SteamLoginViewModel]; the 2FA field unlocks only once Steam asks for it.
- */
 @Composable
 fun ProfileScreen(
     viewModel: SteamLoginViewModel = koinViewModel(),
@@ -99,8 +95,6 @@ fun ProfileScreen(
     val restoring = state is SteamLoginUiState.Restoring
     val signedIn = state as? SteamLoginUiState.SignedIn
 
-    // Startup: while a saved session is being restored, show the profile skeleton (not the
-    // login form, not a bare spinner).
     if (restoring) {
         Column(
             Modifier.fillMaxSize().background(Carbon).padding(horizontal = 16.dp),
@@ -229,7 +223,6 @@ fun ProfileScreen(
             onValueChange = { code = it },
             label = stringResource(Res.string.profile_field_2fa),
             keyboardType = KeyboardType.Number,
-            // 2FA stays locked until Steam actually asks for a Guard code.
             enabled = guardRequired && !loading,
         )
 
@@ -249,7 +242,6 @@ fun ProfileScreen(
     }
 }
 
-/** "By signing in you agree to the Privacy Policy" — the link opens the policy screen. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ConsentNote(onOpenPrivacy: () -> Unit) {
@@ -272,10 +264,6 @@ private fun ConsentNote(onOpenPrivacy: () -> Unit) {
     }
 }
 
-/**
- * Pill button for the two profile exit actions. [destructive] tints it red ("Clear my data");
- * otherwise it's a neutral outlined button. Shows an inline spinner while [loading].
- */
 @Composable
 private fun ExitButton(
     text: String,
@@ -315,7 +303,6 @@ private fun ExitButton(
     }
 }
 
-/** Confirmation popup for "Clear my data" — the App Review 5.1.1(v) deletion flow. */
 @Composable
 private fun ClearDataDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(

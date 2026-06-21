@@ -14,7 +14,6 @@ sealed class AnalyticsEvent(
     val name: String,
     val params: Map<String, Any?> = emptyMap(),
 ) {
-    // ── Schedule (anonymous) ─────────────────────────────────────────────
     data object ScheduleViewed : AnalyticsEvent("schedule_viewed")
 
     class WeekSelected(weekKey: String, isCached: Boolean) :
@@ -23,7 +22,6 @@ sealed class AnalyticsEvent(
     class ScheduleError(reason: String) :
         AnalyticsEvent("schedule_error", mapOf("reason" to reason))
 
-    // ── Race detail / leaderboard ────────────────────────────────────────
     /** [source] = home_grid | profile_recent | all_races. */
     class RaceDetailOpened(raceId: String, source: String) :
         AnalyticsEvent("race_detail_opened", mapOf("race_id" to raceId, "source" to source))
@@ -31,7 +29,6 @@ sealed class AnalyticsEvent(
     class LeaderboardOpened(leaderboardId: String) :
         AnalyticsEvent("leaderboard_full_opened", mapOf("leaderboard_id" to leaderboardId))
 
-    // ── Login funnel (Steam) ─────────────────────────────────────────────
     data object LoginFormShown : AnalyticsEvent("login_form_shown")
 
     class LoginSubmitted(has2fa: Boolean) :
@@ -52,7 +49,6 @@ sealed class AnalyticsEvent(
 
     data object ProfileReauthTriggered : AnalyticsEvent("profile_reauth_triggered")
 
-    // ── Profile (signed-in) ──────────────────────────────────────────────
     class ProfileLoaded(fromCache: Boolean) :
         AnalyticsEvent("profile_loaded", mapOf("from_cache" to fromCache))
 
@@ -69,7 +65,6 @@ sealed class AnalyticsEvent(
     data object PrivacyOpened : AnalyticsEvent("privacy_opened")
 }
 
-/** Shared user-property keys (also mirrored as Crashlytics custom keys). */
 object UserProperties {
     const val PLATFORM = "platform"
     const val IS_LOGGED_IN = "is_logged_in"

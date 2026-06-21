@@ -13,7 +13,6 @@ interface SteamSessionStore {
     fun clear()
 }
 
-/** Process-lifetime fallback for platforms without real persistence. */
 internal class InMemorySteamSessionStore : SteamSessionStore {
     private var tokens: SteamTokens? = null
     override fun save(tokens: SteamTokens) { this.tokens = tokens }
@@ -21,5 +20,4 @@ internal class InMemorySteamSessionStore : SteamSessionStore {
     override fun clear() { tokens = null }
 }
 
-/** Platform-provided session store, bound into Koin by [steamModule]. */
 expect fun steamSessionStore(): SteamSessionStore

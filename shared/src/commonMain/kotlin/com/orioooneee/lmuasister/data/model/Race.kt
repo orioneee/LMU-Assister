@@ -2,7 +2,6 @@ package com.orioooneee.lmuasister.data.model
 
 import kotlin.time.Instant
 
-/** The four event categories shown in the app. */
 enum class RaceType(val label: String) {
     DAILY("Daily"),
     WEEKLY("Weekly"),
@@ -19,20 +18,17 @@ enum class RaceType(val label: String) {
     }
 }
 
-/** Car class enriched from lmuportal `car_class` (real display name + badge colour). */
 data class ClassInfo(
     val id: String,
     val name: String,
     val colorHex: String?,
 )
 
-/** Cars available in a race, grouped by their class (from `cars_by_class`). */
 data class CarGroup(
     val carClass: String,
     val cars: List<String>,
 )
 
-/** Track details enriched from lmuportal `tracks`. */
 data class TrackInfo(
     val name: String,
     val shortName: String,
@@ -43,7 +39,6 @@ data class TrackInfo(
     val lengthKm: Double?,
     val numTurns: Int?,
     val mapUrl: String?,
-    /** Circuit emblem (logo) SVG — v2 asset. */
     val logoUrl: String? = null,
     /** Colored event card art (webp) — used as the track emblem banner. */
     val cardUrl: String? = null,
@@ -62,7 +57,6 @@ data class CarModel(
     val engine: String?,
 )
 
-/** One weather phase within a session. */
 data class WeatherSegment(
     val sky: Int,
     val tempC: Int?,
@@ -77,7 +71,6 @@ data class SessionWeather(
     val segments: List<WeatherSegment>,
 )
 
-/** Forecast for the three sessions — shown on the details screen. */
 data class RaceWeather(
     val practice: SessionWeather?,
     val qualifying: SessionWeather?,
@@ -86,7 +79,6 @@ data class RaceWeather(
     val isEmpty: Boolean get() = practice == null && qualifying == null && race == null
 }
 
-/** Everything else from the lmuschedule race object — shown on the details screen. */
 data class RaceSettings(
     val setup: String?,
     val assists: String?,
@@ -131,20 +123,17 @@ data class Race(
 ) {
     val title: String get() = series.ifBlank { circuit }
 
-    /** Class accent colour for chips/borders (first class with a known colour). */
     val accentColorHex: String? get() = classInfos.firstOrNull { it.colorHex != null }?.colorHex
 
     fun nextStart(now: Instant): Instant? = times.firstOrNull { it >= now }
 }
 
-/** One class's fastest-lap board: top entries + the id to open the full leaderboard. */
 data class ClassLeaderboard(
     val carClass: String,
     val leaderboardId: String?,
     val entries: List<LapEntry>,
 )
 
-/** All of a race's boards: an overall board plus one per car class (for the tabs). */
 data class RaceLeaderboards(
     val overall: ClassLeaderboard? = null,
     val byClass: List<ClassLeaderboard> = emptyList(),
@@ -156,7 +145,6 @@ data class RaceLeaderboards(
     }
 }
 
-/** One leaderboard row (fastest-lap board) for a race. */
 data class LapEntry(
     val rank: Int,
     val initials: String,

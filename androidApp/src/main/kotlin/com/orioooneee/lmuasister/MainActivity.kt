@@ -13,14 +13,10 @@ import com.orioooneee.lmuasister.data.steam.initSteamStorage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Wire Firebase Analytics + Crashlytics into the shared Telemetry facade.
         initTelemetry(applicationContext)
 
-        // Wire the encrypted token store before any Steam login can run.
         initSteamStorage(applicationContext)
 
-        // Transparent status + navigation bars with light (white) icons in both,
-        // to match the dark app background.
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),

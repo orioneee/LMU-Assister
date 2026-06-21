@@ -49,7 +49,6 @@ import com.orioooneee.lmuasister.ui.util.parseHexColor
  *  backend's badge colour so badges are consistent across versions (v2 doesn't send one). */
 fun ClassInfo.color(): Color = classColorFor("$id $name")
 
-/** Official LMU class colour by id/name keyword (Hypercar/LMGT3/GTE/LMP2/LMP3). */
 fun classColorFor(key: String): Color {
     val c = key.lowercase()
     return when {
@@ -62,7 +61,6 @@ fun classColorFor(key: String): Color {
     }
 }
 
-/** Accent for borders/labels — official colour of the first class, else brand amber. */
 fun Race.accentColor(): Color =
     classInfos.firstOrNull()?.let { classColorFor("${it.id} ${it.name}") } ?: Amber
 
@@ -85,7 +83,6 @@ private fun srColor(sr: String): Color = when (sr.trim().firstOrNull()?.lowercas
     else -> Color(0xFF8A93A6)
 }
 
-/** Readable text colour for a solid coloured badge — dark on light fills, white on dark. */
 fun onBadgeText(bg: Color): Color {
     val lum = 0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue
     return if (lum > 0.6f) Carbon else Color.White
@@ -100,7 +97,6 @@ fun difficultyColor(difficulty: String): Color = when {
     else -> SkillRookie
 }
 
-/** Solid LMU-style class badge with the short class code. */
 @Composable
 fun ClassChip(classInfo: ClassInfo) {
     val c = classInfo.color()
@@ -120,7 +116,6 @@ fun ClassChip(classInfo: ClassInfo) {
     }
 }
 
-/** Official-style SR badge: a dark "SR" segment + the tier in its colour. */
 @Composable
 fun SrBadge(sr: String) {
     if (sr.isBlank() || sr.equals("none", ignoreCase = true)) return
@@ -138,7 +133,6 @@ fun SrBadge(sr: String) {
     }
 }
 
-/** Row of class chips (multi-class races). */
 @Composable
 fun ClassChips(classes: List<ClassInfo>, max: Int = 3) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -162,7 +156,6 @@ fun SkillBadge(difficulty: String) {
     }
 }
 
-/** Neutral meta pill, e.g. duration / qualifying. */
 @Composable
 fun MetaChip(text: String) {
     if (text.isBlank()) return

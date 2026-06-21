@@ -12,7 +12,6 @@ package com.orioooneee.lmuasister.ui
 object TrackLogoIndex {
     private var map: Map<String, String> = emptyMap()
 
-    /** Populate from schedule rows: pairs of (track name / circuit, resolved logo url). */
     fun populate(entries: List<Pair<String?, String?>>) {
         val m = HashMap<String, String>()
         for ((name, url) in entries) {
@@ -29,9 +28,9 @@ object TrackLogoIndex {
     private fun normalize(s: String?): String? {
         if (s.isNullOrBlank()) return null
         var x = s.lowercase()
-        x = Regex("_\\d{4}.*$").replace(x, "")     // drop trailing _YEAR(+layout)
-        x = Regex("(wec|elms)$").replace(x, "")    // drop series suffix
-        x = Regex("[^a-z0-9]").replace(x, "")      // strip spaces/punctuation
+        x = Regex("_\\d{4}.*$").replace(x, "")
+        x = Regex("(wec|elms)$").replace(x, "")
+        x = Regex("[^a-z0-9]").replace(x, "")
         return x.ifBlank { null }
     }
 }

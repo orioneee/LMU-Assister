@@ -94,7 +94,6 @@ data class ClassInfoDto(
     val colorHex: String? = null,
 )
 
-/** One class bucket of `cars_by_class` — the car models available in that class. */
 @Serializable
 data class CarsByClassDto(
     // JSON key is the Kotlin keyword "class"; @SerialName overrides the snake-case strategy.

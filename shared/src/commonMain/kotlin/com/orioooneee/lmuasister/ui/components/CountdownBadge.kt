@@ -25,7 +25,6 @@ import lmuassister.shared.generated.resources.season_complete
 import lmuassister.shared.generated.resources.week_complete
 import org.jetbrains.compose.resources.stringResource
 
-/** Small pill showing the live time-to-start (amber), or "LIVE" (lime) once started. */
 @Composable
 fun CountdownBadge(next: Instant, now: Instant, modifier: Modifier = Modifier) {
     val live = next <= now
@@ -47,7 +46,6 @@ fun CountdownBadge(next: Instant, now: Instant, modifier: Modifier = Modifier) {
     }
 }
 
-/** Grey pill shown for finished events ("Week complete" / "Season complete"). */
 @Composable
 fun CompletedBadge(race: Race, modifier: Modifier = Modifier) {
     val label = if (race.type == RaceType.CHAMPIONSHIP) {

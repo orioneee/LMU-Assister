@@ -87,17 +87,11 @@ object PrivacyRoute
 
 private const val NAV_ANIM = 300
 
-/** Top-level tabs shown in the bottom navigation bar. */
 private enum class TopTab(val icon: ImageVector) {
     Schedule(IconCalendarOutline),
     Profile(IconPersonOutline),
 }
 
-/**
- * App shell: a bottom-navigation bar switches between the Schedule and Profile
- * top-level tabs, with race details + leaderboard pushed onto the same back stack
- * (the bar hides on those detail screens).
- */
 @Composable
 fun MainShell(
     viewModel: ScheduleViewModel = koinViewModel(),
@@ -112,18 +106,12 @@ fun MainShell(
     } == true
     val onProfile = currentDest?.hierarchy?.any { it.hasRoute(ProfileRoute::class) } == true
 
-    // Kick a fresh schedule update once on launch (cache is already painted instantly
-    // by the VM).
     LaunchedEffect(Unit) { viewModel.refresh() }
 
-    // One screen_view per destination change (drives Firebase's path/funnel reports).
     LaunchedEffect(currentDest) {
         currentDest?.let { Telemetry.screen(screenNameOf(it)) }
     }
 
-    // Pushed (detail) screens slide up from the bottom; the screen underneath cross-fades
-    // (push → it fades out, pop → it fades back in). On close the screen slides back down +
-    // fades. Tab switches keep the NavHost defaults (instant).
     val enterUp: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
         { slideInVertically(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { it } }
     val exitFade: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
@@ -154,9 +142,6 @@ fun MainShell(
         NavHost(
             navController = nav,
             startDestination = HomeRoute,
-            // Edge-to-edge: the host fills the whole screen (background draws under the
-            // status bar / behind the nav bar). Each screen applies [insets] itself —
-            // top padding to its header, bottom padding to its scroll content.
             modifier = Modifier.fillMaxSize(),
             enterTransition = { EnterTransition.None },
             exitTransition = { ExitTransition.None },
@@ -252,7 +237,6 @@ fun MainShell(
     }
 }
 
-/** Schedule tab: loading / error / the actual home screen, with pull-to-refresh. */
 @Composable
 private fun ScheduleTab(viewModel: ScheduleViewModel, insets: PaddingValues, onOpenRace: (Race) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -291,7 +275,6 @@ private fun ScheduleTab(viewModel: ScheduleViewModel, insets: PaddingValues, onO
     }
 }
 
-/** Maps a nav destination to a stable analytics screen name. */
 private fun screenNameOf(dest: NavDestination): String = when {
     dest.hasRoute(HomeRoute::class) -> "schedule"
     dest.hasRoute(ProfileRoute::class) -> "profile"

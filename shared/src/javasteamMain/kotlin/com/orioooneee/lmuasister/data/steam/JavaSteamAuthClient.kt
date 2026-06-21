@@ -127,7 +127,6 @@ internal class JavaSteamAuthClient : SteamAuthClient {
         }
     }
 
-    /** Connects, logs on with the refresh token, runs [block], then tears everything down. */
     private fun withLoggedOnSession(
         accountName: String,
         refreshToken: String,
@@ -213,7 +212,6 @@ private class FormAuthenticator(private val code: String?) : IAuthenticator {
     }
 }
 
-/** A throwaway CM connection with a daemon callback pump. */
 private class SteamSession {
     val client = SteamClient()
     private val manager = CallbackManager(client)

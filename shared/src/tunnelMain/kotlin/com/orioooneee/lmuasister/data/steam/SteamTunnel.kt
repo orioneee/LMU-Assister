@@ -56,7 +56,6 @@ internal class SteamTunnel(
     private var session: DefaultClientWebSocketSession? = null
     private var job: Job? = null
 
-    /** Opens the WS and starts relaying; suspends until the socket is connected. */
     suspend fun connect() {
         SteamLog.d("tunnel: connecting WS → $agentUrl (token=${SteamLog.short(token)})")
         job = scope.launch {

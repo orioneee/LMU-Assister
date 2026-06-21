@@ -46,11 +46,9 @@ private const val STATUS_READY = "ready"
 private const val HOTLAP_POLLS = 6
 private const val HOTLAP_POLL_DELAY_MS = 1500L
 
-/** On-disk schedule snapshot with the fetch time, for offline-first cold starts. */
 @Serializable
 private data class CachedSchedule(val ts: Long = 0, val data: ScheduleResponse = ScheduleResponse())
 
-/** On-disk per-race detail snapshots (leaderboard / hot-laps). */
 @Serializable
 private data class LbCache(
     val ts: Long = 0,
@@ -66,7 +64,6 @@ private data class CarsCache(val ts: Long = 0, val data: List<CarDto> = emptyLis
 
 private const val CARS_KEY = "cars_v2"
 
-/** Distinct car models (collapse liveries/teams), sorted by class → manufacturer → model. */
 private fun dedupCars(dtos: List<CarDto>): List<CarModel> =
     dtos.map { CarModel(it.id, it.name, it.manufacturer, it.model, it.carClass, it.series, it.engine) }
         .distinctBy { "${it.manufacturer}|${it.model}|${it.carClass}" }
@@ -82,9 +79,6 @@ class RaceRepository(
     private val tokenHolder: AppTokenHolder,
 ) {
 
-    // Offline-first: the whole schedule arrives in one call. We keep it in memory
-    // and persist it (1 wrapper with a timestamp) so a cold start can paint instantly
-    // from disk, then refresh from the network.
     private var mem: ScheduleResponse? = null
 
     private fun disk(): ScheduleResponse? = runCatching {
@@ -105,13 +99,10 @@ class RaceRepository(
     private suspend fun full(refresh: Boolean): ScheduleResponse =
         if (refresh) network(refresh = true) else cached() ?: network(refresh = false)
 
-    /** Cache-only week keys (memory/disk, no network) — for an instant first paint. */
     fun cachedWeeks(): List<String>? = cached()?.weeks?.map { it.key }
 
-    /** Force a network refetch; updates the in-memory + on-disk cache. */
     suspend fun refreshSchedule(): Result<Unit> = runCatching { network(refresh = true) }.map { }
 
-    /** Week keys (current + upcoming), for the week picker. */
     suspend fun availableWeeks(refresh: Boolean = false): List<String> =
         runCatching { full(refresh).weeks.map { it.key } }.getOrDefault(emptyList())
 
@@ -121,16 +112,12 @@ class RaceRepository(
         Schedule(resp.schedules[key].orEmpty().map { it.toModel(api::imageUrl) })
     }
 
-    // Per-race detail caches (offline-first, like the schedule): instant on reopen,
-    // and they survive restarts via disk so hot-laps don't rebuild every time.
     private val lbMem = mutableMapOf<String, RaceLeaderboards>()
     private val hlMem = mutableMapOf<String, List<Hotlap>>()
 
-    /** In-memory only (safe to call during composition) — null if not loaded this session. */
     fun peekLeaderboards(raceId: String): RaceLeaderboards? = lbMem[raceId]
     fun peekHotlaps(raceId: String): List<Hotlap>? = hlMem[raceId]
 
-    /** Memory, then disk — for the first paint before the network refresh. */
     fun cachedLeaderboards(raceId: String): RaceLeaderboards? =
         lbMem[raceId] ?: diskList<LbCache>("lb_$raceId")?.let { c ->
             RaceLeaderboards(c.overall?.toModel(), c.byClass.map { it.toModel() })
@@ -139,11 +126,6 @@ class RaceRepository(
     fun cachedHotlaps(raceId: String): List<Hotlap>? =
         hlMem[raceId] ?: diskList<HlCache>("hl_$raceId")?.data?.map { it.toModel() }?.also { hlMem[raceId] = it }
 
-    /**
-     * Fastest-lap boards — the fast `/race/<id>` call. Returns the overall board plus
-     * one board per car class (for the detail-screen tabs). Caches mem + disk; falls
-     * back to the legacy flat `leaderboard` field when the backend predates `leaderboards`.
-     */
     suspend fun leaderboards(raceId: String): Result<RaceLeaderboards> = runCatching {
         val resp = api.race(raceId)
         val overall = resp.leaderboards?.overall
@@ -154,11 +136,6 @@ class RaceRepository(
         lbMem.getValue(raceId)
     }
 
-    /**
-     * YouTube hot-laps for the race's track. The endpoint builds them asynchronously,
-     * so we poll until "ready"; if it's still pending we force a synchronous build.
-     * Independent of [leaderboard] so the two load in parallel. Caches mem + disk.
-     */
     suspend fun hotlaps(raceId: String): Result<List<Hotlap>> = runCatching {
         val dtos = pollHotlaps(raceId)
         hlMem[raceId] = dtos.map { it.toModel() }
@@ -180,11 +157,9 @@ class RaceRepository(
 
     private var carsMem: List<CarModel>? = null
 
-    /** Memory, then disk — for an instant first paint of the car carousel. */
     fun cachedCars(): List<CarModel>? =
         carsMem ?: diskList<CarsCache>(CARS_KEY)?.data?.let { dedupCars(it) }?.also { carsMem = it }
 
-    /** Fetch + dedup the roster to distinct models; caches mem + disk. */
     suspend fun cars(): Result<List<CarModel>> = runCatching {
         val resp = api.cars()
         val models = dedupCars(resp.cars)
@@ -195,11 +170,6 @@ class RaceRepository(
 
     private var liveryModelsMem: Map<String, String>? = null
 
-    /**
-     * Livery/team name → real car model — e.g. "BMWMH Custom Team 2025 #397" → "BMW M
-     * Hybrid V8". The leaderboard sends the livery as its `car`; this resolves it to the
-     * actual machine. Uses the cached roster first, fetching once if nothing is cached.
-     */
     suspend fun liveryToModel(): Map<String, String> {
         liveryModelsMem?.let { return it }
         val raw = diskList<CarsCache>(CARS_KEY)?.data?.takeIf { it.isNotEmpty() }
@@ -215,13 +185,11 @@ class RaceRepository(
             .also { if (it.isNotEmpty()) liveryModelsMem = it }
     }
 
-    /** Cursor-paginated full leaderboard, for the dedicated screen (Paging 3). */
     fun leaderboardPager(leaderboardId: String): Pager<String, LapEntry> =
         Pager(
             PagingConfig(
                 pageSize = LB_PAGE_SIZE,
                 initialLoadSize = LB_PAGE_SIZE,
-                // load the next page well before the user reaches the edge → no visible loader
                 prefetchDistance = LB_PAGE_SIZE,
                 enablePlaceholders = false,
             ),
@@ -229,15 +197,6 @@ class RaceRepository(
             LeaderboardPagingSource(api, leaderboardId)
         }
 
-    /**
-     * The signed-in player's own row on a board (rank + lap), or null. Waits a short
-     * moment for the app token (the session restores async at launch); if it isn't there
-     * in time, returns null and the screen just renders the public board.
-     */
-    /**
-     * The current signed-in app token, or null. Lets the UI tell an *active session*
-     * (show a skeleton while "your position" loads) apart from a signed-out user.
-     */
     val appToken: StateFlow<String?> get() = tokenHolder.token
 
     suspend fun leaderboardMe(leaderboardId: String): LapEntry? {
@@ -248,13 +207,10 @@ class RaceRepository(
     }
 }
 
-// Backend caps a page at 100 rows; big page + big prefetch keeps the loader off-screen.
 private const val LB_PAGE_SIZE = 100
 
-// How long to wait for the app token before fetching the board without "me".
 private const val LB_TOKEN_WAIT_MS = 2500L
 
-/** Backs the full-leaderboard screen — keyed by the backend's opaque cursor. */
 private class LeaderboardPagingSource(
     private val api: BackendApi,
     private val leaderboardId: String,
@@ -266,7 +222,7 @@ private class LeaderboardPagingSource(
         val page = api.leaderboardPage(leaderboardId, cursor = params.key, limit = params.loadSize)
         LoadResult.Page(
             data = page.entries.map { it.toModel() },
-            prevKey = null,                 // forward-only cursor
+            prevKey = null,
             nextKey = page.nextCursor?.takeIf { it.isNotBlank() },
         )
     } catch (e: Exception) {
@@ -316,8 +272,6 @@ private fun SettingsDto.toModel() = RaceSettings(
 )
 
 private fun TrackDto.toModel(resolveImage: (String?) -> String?): TrackInfo {
-    // Assets live at the same /track/<id>/ path as the minimap; if the backend doesn't
-    // send them yet, derive from map_url (…/map.svg → …/logo.svg | …/card.webp).
     fun sibling(file: String): String? =
         mapUrl?.takeIf { it.endsWith("/map.svg") }?.removeSuffix("map.svg")?.plus(file)
     return TrackInfo(

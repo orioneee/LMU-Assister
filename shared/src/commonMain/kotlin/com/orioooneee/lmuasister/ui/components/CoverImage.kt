@@ -28,10 +28,6 @@ import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.couldnt_load
 import org.jetbrains.compose.resources.stringResource
 
-/**
- * Image that fills its box (crops to square or wider) with a Coil loading spinner
- * and a friendly "couldn't load" state on failure.
- */
 @Composable
 fun CoverImage(
     url: String?,
@@ -39,7 +35,6 @@ fun CoverImage(
     contentDescription: String? = null,
     contentScale: ContentScale = ContentScale.Crop,
 ) {
-    // No cover for this race → quiet placeholder, not an alarming "couldn't load".
     if (url.isNullOrBlank()) {
         Box(modifier.then(Modifier.fillMaxSize()).background(Surface2), contentAlignment = Alignment.Center) {
             Icon(IconFlag, contentDescription = null, tint = TextLow.copy(alpha = 0.35f), modifier = Modifier.size(40.dp))

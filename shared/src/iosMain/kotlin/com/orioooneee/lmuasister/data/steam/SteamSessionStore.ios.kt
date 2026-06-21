@@ -46,9 +46,6 @@ private val json = Json { ignoreUnknownKeys = true }
 private const val SERVICE = "com.orioooneee.lmuasister.steam"
 private const val ACCOUNT = "tokens"
 
-// Steam login still runs through the backend tunnel on iOS, but the device-held refresh
-// token must survive relaunches for silent restore/reauth — so persist it in the Keychain
-// (encrypted at rest by iOS, AfterFirstUnlock + ThisDeviceOnly: no iCloud/backup sync).
 internal class IosKeychainSessionStore : SteamSessionStore {
 
     override fun save(tokens: SteamTokens) {
@@ -84,7 +81,6 @@ internal class IosKeychainSessionStore : SteamSessionStore {
     }
 }
 
-/** A generic-password query for our single item; [extra] adds operation-specific keys. */
 private inline fun baseQuery(extra: (CFMutableDictionaryRef?) -> Unit): CFDictionaryRef {
     val dict = CFDictionaryCreateMutable(null, 0, null, null)
     CFDictionaryAddValue(dict, kSecClass, kSecClassGenericPassword)

@@ -31,7 +31,6 @@ import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import org.koin.compose.koinInject
 
-/** Privacy policy — fetched as plain text from GET /api/v2/privacy and rendered in-app. */
 @Composable
 fun PrivacyPolicyScreen(insets: PaddingValues, onBack: () -> Unit) {
     val api = koinInject<BackendApi>()

@@ -12,7 +12,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNamingStrategy
 
-/** Shared lenient JSON — snake_case payload mapped to camelCase DTO properties. */
 @OptIn(ExperimentalSerializationApi::class)
 val AppJson: Json = Json {
     ignoreUnknownKeys = true
@@ -76,7 +75,6 @@ class BackendApi(private val client: HttpClient) {
         return AppJson.decodeFromString(body)
     }
 
-    /** Absolute URL for a proxied image path the backend returns ("/api/v1/img/…"). */
     fun imageUrl(path: String?): String? = when {
         path.isNullOrBlank() -> null
         path.startsWith("http") -> path

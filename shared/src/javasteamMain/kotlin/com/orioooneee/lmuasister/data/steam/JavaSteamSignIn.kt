@@ -37,7 +37,6 @@ internal class JavaSteamSignIn(
         store.clear()
     }
 
-    /** Mints a ticket from saved tokens and exchanges it — returns app token, or null. */
     private suspend fun silentToken(tokens: SteamTokens): String? =
         (exchange(tokens) as? SignInOutcome.Success)?.appToken
 

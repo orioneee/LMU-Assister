@@ -106,7 +106,6 @@ internal class TunnelSteamSignIn(
         }
     }
 
-    /** Opens a fresh tunnel, runs [block] with the tunnelKey, tears the tunnel down. */
     private suspend fun <T> withTunnel(block: suspend (key: String) -> T): T? {
         SteamLog.d("tunnel: GET /tunnel/ticket")
         val ticket = runCatching { backend.tunnelTicket() }

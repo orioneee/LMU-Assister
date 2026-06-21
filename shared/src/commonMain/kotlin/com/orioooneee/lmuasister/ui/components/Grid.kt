@@ -15,10 +15,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.orioooneee.lmuasister.data.model.Race
 
-/**
- * Column count for the race grids: as many [minCardWidth]-wide cards as fit,
- * down to a single full-width card on narrow screens, capped at [max].
- */
 @Composable
 fun rememberGridColumns(minCardWidth: Dp = 185.dp, max: Int = 5): Int {
     val widthDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
@@ -26,10 +22,6 @@ fun rememberGridColumns(minCardWidth: Dp = 185.dp, max: Int = 5): Int {
     return (widthDp.value / minCardWidth.value).toInt().coerceIn(1, max)
 }
 
-/**
- * One row of race cards, all stretched to the tallest card's height
- * (`IntrinsicSize.Max` + `fillMaxHeight`) so a row never has uneven cards.
- */
 @Composable
 fun EqualHeightRaceRow(
     races: List<Race>,
@@ -60,7 +52,6 @@ fun EqualHeightRaceRow(
     }
 }
 
-/** Adaptive time-grid columns (3..6) for a card in a [columns]-wide grid. */
 @Composable
 private fun rememberTimeColumns(columns: Int, spacing: Dp, contentPadding: Dp, perCol: Dp = 36.dp): Int {
     val widthDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }

@@ -312,7 +312,6 @@ private fun TrackEmblem(url: String) {
     }
 }
 
-/** Hot-laps as a wrapping flow of equal-height cards (thumbnail + all the info). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HotlapsFlow(hotlaps: List<Hotlap>) {
@@ -425,7 +424,6 @@ private fun classBadgeColor(label: String): Color {
     }
 }
 
-/** Solid class badge (HY / GT3 / LMP2 / LMP3) in its class colour. */
 @Composable
 private fun ClassBadgeChip(label: String) {
     val c = classBadgeColor(label)
@@ -436,7 +434,6 @@ private fun ClassBadgeChip(label: String) {
     }
 }
 
-/** Class display order for the cars ticker (Hypercar first, then LMP, GT). */
 private fun classRank(carClass: String): Int {
     val c = carClass.lowercase()
     return when {
@@ -449,10 +446,6 @@ private fun classRank(carClass: String): Int {
     }
 }
 
-/**
- * Auto-scrolling marquee of every car available in the race, sorted by class.
- * Each chip carries a class-coloured dot so the classes stay readable while it scrolls.
- */
 @Composable
 private fun CarsTicker(groups: List<CarGroup>) {
     val ordered = remember(groups) { groups.sortedBy { classRank(it.carClass) } }
@@ -498,10 +491,6 @@ private fun CarTickerChip(car: String, carClass: String) {
     }
 }
 
-/**
- * Full-card leaderboard skeleton matching the first-open state: a shimmer title,
- * the column header, a single row, and the "show more" button — all shimmer.
- */
 @Composable
 private fun LeaderboardSkeletonCard() {
     val brush = shimmerBrush()
@@ -542,7 +531,6 @@ private fun LeaderboardSkeletonCard() {
     }
 }
 
-/** Shimmer placeholder shaped like the hot-laps card flow ([count] cards). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HotlapsSkeleton(count: Int) {
@@ -601,7 +589,6 @@ private fun WeatherSession(label: String, sw: SessionWeather) {
             }
         }
         Spacer(Modifier.height(6.dp))
-        // proportional, colour-coded forecast timeline
         Row(
             Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(8.dp)),
         ) {
@@ -704,14 +691,12 @@ private fun LeaderboardCard(
     }
 }
 
-/** Resolution state of the signed-in player's "your position" row. */
 private sealed interface MeRow {
     data object Loading : MeRow
     data object None : MeRow
     data class Found(val entry: LapEntry) : MeRow
 }
 
-/** Label above the "your position" block (row / skeleton / empty all share it). */
 @Composable
 private fun YourPositionLabel() {
     Text(
@@ -722,7 +707,6 @@ private fun YourPositionLabel() {
     )
 }
 
-/** Neutral (grey) container shared by the skeleton + empty states, matching board rows. */
 @Composable
 private fun YourPositionPlaceholderBox(content: @Composable () -> Unit) {
     Box(
@@ -734,7 +718,6 @@ private fun YourPositionPlaceholderBox(content: @Composable () -> Unit) {
     ) { content() }
 }
 
-/** Shimmer stand-in for [YourPositionRow] while an active session resolves its row. */
 @Composable
 private fun YourPositionSkeleton() {
     val brush = shimmerBrush()
@@ -760,7 +743,6 @@ private fun YourPositionSkeleton() {
     }
 }
 
-/** Shown for a signed-in player with no lap on this board yet. */
 @Composable
 private fun YourPositionEmpty() {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -775,7 +757,6 @@ private fun YourPositionEmpty() {
     }
 }
 
-/** The signed-in player's own row, tinted and labelled, above the board preview. */
 @Composable
 private fun YourPositionRow(entry: LapEntry, leader: Long, liveryToModel: Map<String, String> = emptyMap()) {
     val accent = MaterialTheme.colorScheme.primary
@@ -792,7 +773,6 @@ private fun YourPositionRow(entry: LapEntry, leader: Long, liveryToModel: Map<St
     }
 }
 
-/** Segmented class selector — one chip per class, the active one filled in its class colour. */
 @Composable
 private fun LeaderboardTabs(tabs: List<ClassLeaderboard>, selected: Int, onSelect: (Int) -> Unit) {
     Row(
@@ -836,7 +816,6 @@ private fun FullLeaderboardButton(onClick: () -> Unit) {
     }
 }
 
-/** Class divider above a group of rows: colour dot + class name + a hairline rule. */
 @Composable
 internal fun ClassSectionHeader(carClass: String) {
     Row(
@@ -863,12 +842,6 @@ private fun classLabelFull(carClass: String): String {
     }
 }
 
-/**
- * One leaderboard row: rank (class-tinted) · driver + car · lap time + gap, with the
- * sector splits underneath. [liveryToModel] resolves the entry's livery/team name to the
- * real car model (e.g. "BMWMH Custom Team #397" → "BMW M Hybrid V8"); the raw string is
- * kept when the roster has no match. The car name auto-scrolls as a marquee when long.
- */
 @Composable
 internal fun LeaderboardRow(
     e: LapEntry,
@@ -931,8 +904,6 @@ internal fun LeaderboardRow(
                 )
             }
         }
-        // Sector splits as a subtle, full-width detail line under the row — shown only
-        // for complete 3-sector entries, indented to align with the driver column.
         if (e.sectors.size == 3) {
             Row(
                 Modifier.fillMaxWidth().padding(start = POS_COL_W, top = 6.dp),
@@ -944,7 +915,6 @@ internal fun LeaderboardRow(
     }
 }
 
-/** One "S1 32.575" sector split for the leaderboard detail line. */
 @Composable
 private fun SectorSplit(index: Int, seconds: Double) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1000,7 +970,6 @@ private fun Card(title: String? = null, leading: (@Composable () -> Unit)? = nul
     }
 }
 
-/** Round country flag — uses circle-flags (already circular), not a square crop. */
 @Composable
 private fun FlagCircle(url: String) {
     Box(
@@ -1010,14 +979,12 @@ private fun FlagCircle(url: String) {
     }
 }
 
-/** ISO-3166 alpha-2 code → circle-flags SVG URL (preferred when the backend sends it). */
 private fun flagUrlFromCode(code: String): String? {
     val cc = code.trim().lowercase()
     if (cc.length != 2 || cc.any { it !in 'a'..'z' }) return null
     return "https://cdn.jsdelivr.net/gh/HatScripts/circle-flags/flags/$cc.svg"
 }
 
-/** Country name → circle-flags SVG URL (pre-cropped to a circle), null if unknown. */
 private fun flagUrl(country: String): String? {
     val code = when (country.trim().lowercase()) {
         "france" -> "fr"
@@ -1045,7 +1012,6 @@ private fun flagUrl(country: String): String? {
     return "https://cdn.jsdelivr.net/gh/HatScripts/circle-flags/flags/$code.svg"
 }
 
-/** Zebra-striped key/value rows for readability (alternating row shade). */
 @Composable
 private fun DetailRows(rows: List<Pair<String, String>>) {
     Column(Modifier.fillMaxWidth()) {

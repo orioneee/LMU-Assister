@@ -104,7 +104,6 @@ fun HomeScreen(
     val uriHandler = LocalUriHandler.current
     val openRepo = { uriHandler.openUri(REPO_URL) }
 
-    // No upcoming races at all → just the (optional) week pills + empty state.
     if (tabs.isEmpty()) {
         Column(Modifier.fillMaxSize().background(Carbon)) {
             Spacer(Modifier.height(topInset + 12.dp))
@@ -119,8 +118,6 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val isCurrentWeek = weeks.isEmpty() || selectedWeek == weeks.first().key
 
-    // Collapsing header: the week pills + tier tabs translate up with the list as it
-    // scrolls (enter-always), instead of staying pinned at the top.
     val headerHeight = remember { mutableStateOf(0f) }
     val headerOffset = remember { mutableStateOf(0f) }
     val connection = remember {
@@ -131,19 +128,17 @@ fun HomeScreen(
                 val old = headerOffset.value
                 val new = (old + available.y).coerceIn(-h, 0f)
                 headerOffset.value = new
-                return Offset(0f, new - old) // consume the part used to move the header
+                return Offset(0f, new - old)
             }
         }
     }
 
     Box(Modifier.fillMaxSize().clipToBounds().background(Carbon).nestedScroll(connection)) {
-        // Pager content, pushed down by the currently-visible header height.
         Box(Modifier.fillMaxSize().offset { IntOffset(0, (headerHeight.value + headerOffset.value).roundToInt()) }) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                 TabContent(tabs[page], schedule, heroHeight, isCurrentWeek, now, bottomInset, onOpenRace, onRefresh)
             }
         }
-        // The header itself, translating up as the user scrolls.
         Column(
             Modifier
                 .fillMaxWidth()
@@ -154,7 +149,6 @@ fun HomeScreen(
             Spacer(Modifier.height(topInset + 12.dp))
             ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo)
             Spacer(Modifier.height(12.dp))
-            // Tabs only for Special / Championship — the main Daily+Weekly grid needs none.
             if (tabs.size > 1) {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -172,7 +166,6 @@ fun HomeScreen(
     }
 }
 
-/** Top bar of the schedule: week tabs on the left, a GitHub-repo link in the top-right. */
 @Composable
 private fun ScheduleTopBar(
     weeks: List<WeekTab>,
@@ -227,7 +220,6 @@ private fun buildTabs(schedule: Schedule, now: Instant): List<HomeTab> = buildLi
     if (schedule.championship.any { it.nextStart(now) != null }) add(ChampTab)
 }
 
-/** SR tier order for sorting: bronze(0) → silver(1) → gold(2) → platinum(3) → unranked(4). */
 private fun srRank(sr: String?): Int = when (sr?.trim()?.firstOrNull()?.lowercaseChar()) {
     'b' -> 0
     's' -> 1
@@ -257,8 +249,6 @@ private fun TabContent(
         SpecialTab -> listOf(Section(null, schedule.special))
         ChampTab -> listOf(Section(null, schedule.championship))
     }
-        // Only show races with an upcoming start — hide finished weeks/seasons and
-        // anything with no start times.
         .map { sec -> sec.copy(races = sec.races.filter { it.nextStart(now) != null }) }
         .filter { it.races.isNotEmpty() }
 
@@ -274,7 +264,6 @@ private fun TabContent(
         when {
             all.isEmpty() -> item { NoRaces(Modifier.fillParentMaxSize(), onRefresh) }
 
-            // single event on this tab → hero + its start times in one card
             all.size == 1 -> {
                 val race = all.first()
                 item {
@@ -295,7 +284,6 @@ private fun TabContent(
                     emptySet()
                 }
                 sections.forEach { sec ->
-                    // group by SR tier (bronze → silver → gold → platinum), each by start time
                     val sorted = sec.races.sortedWith(
                         compareBy({ srRank(it.settings.safetyRank) }, { nextKey(it) }),
                     )

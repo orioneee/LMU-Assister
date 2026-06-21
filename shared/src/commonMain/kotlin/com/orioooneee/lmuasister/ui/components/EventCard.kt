@@ -63,7 +63,6 @@ import org.jetbrains.compose.resources.stringResource
 private fun Race.trackLabel(): String = track?.shortName?.takeIf { it.isNotBlank() } ?: circuit
 private fun Race.durationLabel(): String = if (raceLength > 0) "${raceLength}m" else ""
 
-/** Soft drop shadow so overlaid card text stays readable on bright covers. */
 private val CARD_TEXT_SHADOW = Shadow(color = Color.Black.copy(alpha = 0.7f), offset = Offset(0f, 2f), blurRadius = 6f)
 
 @Composable
@@ -72,7 +71,6 @@ private fun Race.nextLabel(): String {
     return nextStart(now)?.formatStart().orEmpty()
 }
 
-/** Compact vertical card (fits two-up on phones) with the day's times grid. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RaceCard(
@@ -83,8 +81,6 @@ fun RaceCard(
     timeColumns: Int = 3,
     onClick: () -> Unit = {},
 ) {
-    // Difficulty colour-codes the whole card (green → yellow → orange/red) so the
-    // skill level reads at a glance: a tinted border + a faint wash.
     val diff = difficultyColor(race.difficulty)
     Column(
         modifier = modifier
@@ -97,8 +93,6 @@ fun RaceCard(
     ) {
         Box(Modifier.fillMaxWidth().height(175.dp).background(Surface2)) {
             CoverImage(race.imageUrl, Modifier.fillMaxSize(), race.title)
-            // scrim so the overlaid title/track stay readable — stronger on the left where
-            // the text sits, lighter on the right so the corner emblem still reads
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.horizontalGradient(
@@ -110,10 +104,7 @@ fun RaceCard(
                     ),
                 ),
             )
-            // Vertical layout so the title always sits BELOW the badges (never overlaps,
-            // however many class chips wrap): badges → spacer → title/track → SR + duration.
             Column(Modifier.fillMaxSize().padding(8.dp)) {
-                // top: class badges flow from the left; the track emblem pins to the right
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                     FlowRow(
                         Modifier.weight(1f),
@@ -129,7 +120,6 @@ fun RaceCard(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                // title + track, with a soft shadow for readability on any cover
                 Text(
                     race.title,
                     style = MaterialTheme.typography.titleSmall.copy(shadow = CARD_TEXT_SHADOW),
@@ -147,7 +137,6 @@ fun RaceCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(8.dp))
-                // bottom: SR on the left, race duration on the right
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     race.settings.safetyRank?.let { SrBadge(it) }
                     Spacer(Modifier.weight(1f))
@@ -164,8 +153,6 @@ fun RaceCard(
     }
 }
 
-/** Small circuit emblem (logo) for the card's top-right corner — shown only once Coil has
- *  it, so a missing logo leaves no gap (mirrors the details screen). */
 @Composable
 private fun CardTrackEmblem(url: String) {
     val painter = rememberAsyncImagePainter(model = url)
@@ -180,7 +167,6 @@ private fun CardTrackEmblem(url: String) {
     }
 }
 
-/** Accent "NEXT" pill marking the soonest upcoming race (overlaid on the cover). */
 @Composable
 private fun NextBadge() {
     Box(
@@ -199,10 +185,6 @@ private fun NextBadge() {
     }
 }
 
-/**
- * Compact card for the Home "Featured" carousel.
- * Fixed width AND height so every card in the row is identical — no top class strip.
- */
 @Composable
 fun RaceCardCompact(race: Race, onClick: () -> Unit = {}) {
     Column(
@@ -288,10 +270,6 @@ fun HeroRaceCard(
     )
 }
 
-/**
- * Single-event card: the hero image and the day's start-times grid in ONE bordered
- * card (instead of a loose hero with the times floating beneath it).
- */
 @Composable
 fun HeroRaceTimesCard(
     race: Race,
@@ -323,7 +301,6 @@ fun HeroRaceTimesCard(
     }
 }
 
-/** The hero's image + gradient + overlay text. [modifier] supplies size/clip/border. */
 @Composable
 private fun HeroContent(
     race: Race,
