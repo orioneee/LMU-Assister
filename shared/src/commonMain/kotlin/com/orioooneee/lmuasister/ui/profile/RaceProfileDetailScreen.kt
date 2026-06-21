@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,10 +20,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -47,9 +55,11 @@ import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
+import com.orioooneee.lmuasister.data.remote.LapDto
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
 import com.orioooneee.lmuasister.data.remote.RaceSessionDetailDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
+import com.orioooneee.lmuasister.data.remote.ReasonDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
 import com.orioooneee.lmuasister.ui.components.BlockSkeleton
@@ -68,6 +78,7 @@ import com.orioooneee.lmuasister.ui.theme.Surface2
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
+import com.orioooneee.lmuasister.ui.util.formatIsoDateTime
 import com.orioooneee.lmuasister.ui.util.formatLap
 
 private val PosGreen = Color(0xFF53D769)
@@ -324,6 +335,11 @@ private fun TrackCard(t: TrackDto) {
 
 @Composable
 private fun SummaryCard(d: RaceDetailDto) {
+    var showBreakdown by remember { mutableStateOf(false) }
+    var showLaps by remember { mutableStateOf(false) }
+    val hasBreakdown = d.srReasons.isNotEmpty() || d.drReasons.isNotEmpty()
+    // Any laps at all — laps without a time still get a row (shown as "—").
+    val hasLaps = d.lapProgress.isNotEmpty()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -340,6 +356,7 @@ private fun SummaryCard(d: RaceDetailDto) {
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            formatIsoDateTime(d.date)?.let { MetaChip(it) }
             d.eventType?.let { MetaChip(it.replaceFirstChar(Char::uppercaseChar)) }
             d.split?.let { MetaChip(if (d.totalSplits != null) "Split $it/${d.totalSplits}" else "Split $it") }
         }
@@ -350,7 +367,365 @@ private fun SummaryCard(d: RaceDetailDto) {
             DeltaStat("DR", d.drChange)
             DeltaStat("SR", d.srChange)
         }
+        // Average pace over valid laps (skips the warm-up laps and pit laps), with the gap to
+        // the best lap. The number of warm-up laps to drop is adjustable (default 1).
+        val maxSkip = maxOpeningSkip(d.lapProgress)
+        if (maxSkip >= 0) {
+            var showPaceInfo by remember { mutableStateOf(false) }
+            var warmup by remember { mutableStateOf(if (maxSkip >= 1) 1 else 0) }
+            val skip = warmup.coerceIn(0, maxSkip)
+            val pace = paceFrom(d.lapProgress, skip)!!
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("PACE", style = MaterialTheme.typography.labelSmall, color = TextLow, fontWeight = FontWeight.Bold)
+                        InfoDot { showPaceInfo = true }
+                        Text("· ${pace.validLaps} valid laps", style = MaterialTheme.typography.labelSmall, color = TextLow)
+                    }
+                    // Warm-up-laps stepper: how many opening laps to leave out of the average.
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Warm-up laps", style = MaterialTheme.typography.labelSmall, color = TextLow)
+                        StepButton("−") { warmup = (skip - 1).coerceAtLeast(0) }
+                        Text(
+                            "$skip",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextHigh,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.width(16.dp),
+                        )
+                        StepButton("+") { warmup = (skip + 1).coerceAtMost(maxSkip) }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    Stat("Avg", formatLap(pace.avgMs))
+                    StatColored("Δ avg", deltaSeconds(pace.deltaMs), Amber)
+                }
+            }
+            if (showPaceInfo) PaceInfoDialog { showPaceInfo = false }
+        }
+        if (hasLaps || hasBreakdown) {
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                // All per-lap times + extra stats for this race.
+                if (hasLaps) SheetLink("Lap times") { showLaps = true }
+                // Why the SR/DR moved — only when the backend sent a breakdown.
+                if (hasBreakdown) SheetLink("Rating breakdown") { showBreakdown = true }
+            }
+        }
     }
+
+    if (showLaps) LapsSheet(d) { showLaps = false }
+    if (showBreakdown) RatingBreakdownSheet(d) { showBreakdown = false }
+}
+
+/** An amber "Label ›" link that opens a detail bottom sheet. */
+@Composable
+private fun SheetLink(label: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Amber, fontWeight = FontWeight.SemiBold)
+        Text("›", style = MaterialTheme.typography.labelMedium, color = Amber, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** Bottom sheet listing every lap (time + sectors + pit flag) plus the headline lap stats. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LapsSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
+    val laps = d.lapProgress
+    val bestMs = laps.mapNotNull { it.lapTimeMs?.takeIf { t -> t > 0L } }.minOrNull()
+    // Fastest time per sector across all laps — used to green-highlight the best sector each lap.
+    val bestSectors = bestSectorsByIndex(laps)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Surface1,
+        scrimColor = Color.Black.copy(alpha = 0.55f),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text("Lap times", style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                Stat("Laps", laps.size.toString())
+                bestMs?.let { Stat("Best", formatLap(it)) }
+                paceFrom(d.lapProgress, 1)?.let { Stat("Avg", formatLap(it.avgMs)) }
+                d.finishStatus?.takeIf { it.isNotBlank() }?.let { Stat("Result", it) }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, Outline, RoundedCornerShape(10.dp)),
+            ) {
+                laps.forEachIndexed { i, lap ->
+                    LapRow(lap, alt = i % 2 == 1, isBest = bestMs != null && lap.lapTimeMs == bestMs, bestSectors = bestSectors)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List<Long?>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (alt) Surface2 else Color.Transparent)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(lap.lap?.toString() ?: "—", style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
+            lap.position?.let { Text("P$it", style = MaterialTheme.typography.labelSmall, color = TextLow, modifier = Modifier.width(30.dp)) }
+            if (lap.pit) PitBadge()
+            Spacer(Modifier.weight(1f))
+            Text(
+                lap.lapTimeMs?.let { formatLap(it) } ?: "—",
+                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                color = if (isBest) PosGreen else TextHigh,
+                fontWeight = if (isBest) FontWeight.Bold else FontWeight.Normal,
+            )
+        }
+        if (lap.sectorsMs.any { (it ?: 0L) > 0L }) {
+            // Each sector green when it's the fastest of that sector across the whole race.
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                lap.sectorsMs.forEachIndexed { i, s ->
+                    val isBestSector = s != null && s > 0L && bestSectors.getOrNull(i) == s
+                    Text(
+                        s?.takeIf { it > 0L }?.let { sectorFmt(it) } ?: "—",
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                        color = if (isBestSector) PosGreen else TextLow,
+                        fontWeight = if (isBestSector) FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Fastest time per sector index across all laps (null where a sector was never set). */
+private fun bestSectorsByIndex(laps: List<LapDto>): List<Long?> {
+    val width = laps.maxOfOrNull { it.sectorsMs.size } ?: 0
+    return (0 until width).map { i ->
+        laps.mapNotNull { it.sectorsMs.getOrNull(i)?.takeIf { v -> v > 0L } }.minOrNull()
+    }
+}
+
+@Composable
+private fun PitBadge() {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(Surface2)
+            .border(1.dp, Outline, RoundedCornerShape(4.dp))
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+    ) {
+        Text("PIT", style = MaterialTheme.typography.labelSmall, color = Amber, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** A sector time in milliseconds as "S.mmm" seconds. */
+private fun sectorFmt(ms: Long): String {
+    val s = ms / 1000
+    val frac = (ms % 1000).toString().padStart(3, '0')
+    return "$s.$frac"
+}
+
+/** Bottom sheet that explains the player's own SR/DR change for this race, component by
+ *  component (signed weight + reason), grouped into an SR section and a DR section. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RatingBreakdownSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Surface1,
+        scrimColor = Color.Black.copy(alpha = 0.55f),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Text(
+                "Rating breakdown",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextHigh,
+                fontWeight = FontWeight.Bold,
+            )
+            BreakdownSection("SR", d.srChange, d.srReasons)
+            BreakdownSection("DR", d.drChange, d.drReasons)
+        }
+    }
+}
+
+@Composable
+private fun BreakdownSection(label: String, total: Double?, reasons: List<ReasonDto>) {
+    if (reasons.isEmpty() && total == null) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(label, style = MaterialTheme.typography.titleSmall, color = TextHigh, fontWeight = FontWeight.Bold)
+            total?.let {
+                val color = if (it > 0) PosGreen else if (it < 0) NegRed else TextMed
+                Text(signedOneDecimal(it), style = MaterialTheme.typography.titleSmall, color = color, fontWeight = FontWeight.Bold)
+            }
+        }
+        if (reasons.isEmpty()) {
+            Text("No breakdown for this race.", style = MaterialTheme.typography.bodySmall, color = TextLow)
+        } else {
+            // Zebra-striped rows, like the classification tables.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, Outline, RoundedCornerShape(10.dp)),
+            ) {
+                reasons.forEachIndexed { i, r -> ReasonRow(r, alt = i % 2 == 1) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReasonRow(r: ReasonDto, alt: Boolean) {
+    val positive = r.positive || (r.impact ?: 0.0) > 0.0
+    val color = if (positive) PosGreen else NegRed
+    // `impact` is a 1–4 weight, not a real point value — render it as that many arrows
+    // (up when it helped the rating, down when it hurt) instead of a misleading number.
+    val count = (r.impact ?: 0.0).let { if (it < 0) -it else it }.toInt().coerceIn(1, 4)
+    val arrows = (if (positive) "▲" else "▼").repeat(count)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (alt) Surface2 else Color.Transparent)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            arrows,
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            modifier = Modifier.width(56.dp),
+        )
+        Text(
+            r.reason?.takeIf { it.isNotBlank() } ?: "—",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextMed,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/** "+2.0" / "−3.2" — one decimal, explicit sign, minus rendered as U+2212. */
+private fun signedOneDecimal(v: Double): String {
+    val abs = if (v < 0) -v else v
+    val r = (abs * 10).toLong()
+    val sign = if (v < 0) "−" else "+"
+    return "$sign${r / 10}.${r % 10}"
+}
+
+/** Player's average pace over valid laps + the gap to the best valid lap. */
+private class PaceStats(
+    val avgMs: Long,
+    val deltaMs: Long,   // avg − best valid lap
+    val validLaps: Int,
+)
+
+/** Average pace over VALID laps: timed laps that aren't among the first [skipOpening] laps and
+ *  aren't pit laps. `delta` is avg − best valid lap. null when fewer than two valid laps remain. */
+private fun paceFrom(laps: List<LapDto>, skipOpening: Int): PaceStats? {
+    val timed = laps.filter { (it.lapTimeMs ?: 0L) > 0L }.sortedBy { it.lap ?: Int.MAX_VALUE }
+    val valid = timed.drop(skipOpening.coerceAtLeast(0)).filter { !it.pit }
+    if (valid.size < 2) return null
+    val times = valid.map { it.lapTimeMs!! }
+    val avg = times.sum() / times.size
+    return PaceStats(avgMs = avg, deltaMs = avg - times.min(), validLaps = valid.size)
+}
+
+/** Largest "skip first N laps" value that still leaves ≥2 valid (non-pit) laps, or -1 when
+ *  there isn't enough lap data to show a pace card at all. Bounds the skip stepper. */
+private fun maxOpeningSkip(laps: List<LapDto>): Int {
+    val timed = laps.filter { (it.lapTimeMs ?: 0L) > 0L }.sortedBy { it.lap ?: Int.MAX_VALUE }
+    var max = -1
+    for (skip in 0..timed.size) {
+        if (timed.drop(skip).count { !it.pit } >= 2) max = skip
+    }
+    return max
+}
+
+/** A non-negative millisecond gap as "+S.mmm" seconds. */
+private fun deltaSeconds(ms: Long): String {
+    val s = ms / 1000
+    val frac = (ms % 1000).toString().padStart(3, '0')
+    return "+$s.$frac"
+}
+
+/** Compact square +/− button for the warm-up-laps stepper. */
+@Composable
+private fun StepButton(symbol: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(20.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Surface2)
+            .border(1.dp, Outline, RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(symbol, style = MaterialTheme.typography.labelMedium, color = Amber, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** Small tappable "ⓘ" badge (hand-rolled to avoid a material-icons dependency). */
+@Composable
+private fun InfoDot(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(15.dp)
+            .clip(CircleShape)
+            .border(1.dp, TextLow, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("i", style = MaterialTheme.typography.labelSmall, color = TextLow, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** Explains how the average pace is computed (which laps count). */
+@Composable
+private fun PaceInfoDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Got it", color = Amber, fontWeight = FontWeight.SemiBold) } },
+        title = { Text("Average pace", color = TextHigh, fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                "The average uses your valid laps only — it leaves out the first few warm-up laps " +
+                    "(adjustable, default 1) and any in/out laps around a pit stop. Δ avg is how far " +
+                    "your average sits off your best valid lap.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMed,
+            )
+        },
+        containerColor = Surface1,
+    )
 }
 
 private fun gainLost(grid: Int?, finish: Int?): Pair<String, Color>? {
@@ -467,8 +842,20 @@ private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean) {
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 r.carClass?.takeIf { it.isNotBlank() }?.let { ClassMiniBadge(it) }
+                // Position within the driver's own class (the leading number is the overall position).
+                r.classPosition?.takeIf { it > 0 }?.let { ClassPosBadge(it, r.carClass) }
                 r.driverRating?.let { RatingMiniBadge("DR", it) }
                 r.safetyRating?.let { RatingMiniBadge("SR", it) }
+            }
+            // Best-lap sector splits, when the backend provides them.
+            val sectors = r.bestLapSectorsMs.filterNotNull().filter { it > 0L }
+            if (sectors.isNotEmpty()) {
+                Text(
+                    sectors.mapIndexed { i, s -> "S${i + 1} ${sectorFmt(s)}" }.joinToString("  "),
+                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                    color = TextLow,
+                    maxLines = 1,
+                )
             }
         }
         (r.bestLapMs ?: r.finishTimeMs)?.let {
@@ -488,6 +875,15 @@ private fun ClassMiniBadge(carClass: String) {
     val c = classColorFor(carClass)
     Box(Modifier.clip(RoundedCornerShape(5.dp)).background(c).padding(horizontal = 5.dp, vertical = 2.dp)) {
         Text(carClass.uppercase(), style = MaterialTheme.typography.labelSmall, color = onBadgeText(c), fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/** Outlined "P{n}" chip (in the class colour) for the driver's position within their own class. */
+@Composable
+private fun ClassPosBadge(classPos: Int, carClass: String?) {
+    val c = carClass?.takeIf { it.isNotBlank() }?.let { classColorFor(it) } ?: TextMed
+    Box(Modifier.clip(RoundedCornerShape(5.dp)).border(1.dp, c, RoundedCornerShape(5.dp)).padding(horizontal = 4.dp, vertical = 2.dp)) {
+        Text("P$classPos", style = MaterialTheme.typography.labelSmall, color = c, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 

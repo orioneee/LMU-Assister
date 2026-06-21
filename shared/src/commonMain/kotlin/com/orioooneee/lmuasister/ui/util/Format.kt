@@ -44,6 +44,12 @@ fun formatEpochDateTime(ms: Long): String {
     return "${dt.day} $mon ${dt.year}, ${two(dt.hour)}:${two(dt.minute)}"
 }
 
+/** ISO-8601 instant (e.g. "2026-06-21T15:50:00Z") -> "21 Jun 2026, 17:50" (local).
+ *  null when the string is absent or unparseable. */
+fun formatIsoDateTime(iso: String?): String? =
+    iso?.takeIf { it.isNotBlank() }
+        ?.let { runCatching { formatEpochDateTime(Instant.parse(it).toEpochMilliseconds()) }.getOrNull() }
+
 /** Lap time in ms -> "1:42.623". */
 fun formatLap(ms: Long): String {
     if (ms <= 0) return "—"

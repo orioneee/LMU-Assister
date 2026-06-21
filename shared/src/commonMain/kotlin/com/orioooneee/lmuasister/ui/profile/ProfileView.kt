@@ -62,6 +62,7 @@ import com.orioooneee.lmuasister.ui.theme.Surface3
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
+import com.orioooneee.lmuasister.ui.util.formatIsoDateTime
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.susp_active_count
 import lmuassister.shared.generated.resources.susp_banned
@@ -379,7 +380,12 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        PositionBadge(race.position, race.fieldSize, race.finishStatus)
+        // History shows the in-class finishing position. The denominator is the CLASS field size;
+        // field_size is the overall grid (all classes), so only show "of N" when the backend sends
+        // the class count — otherwise no denominator at all.
+        val classPos = race.classPosition?.takeIf { it > 0 } ?: race.position
+        val subtitle = race.classFieldSize?.takeIf { it > 0 }?.let { "of $it" }
+        PositionBadge(classPos, subtitle, race.finishStatus)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(
                 race.title,
@@ -389,6 +395,9 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
                 maxLines = 1,
                 modifier = Modifier.fillMaxWidth().basicMarquee(),
             )
+            formatIsoDateTime(race.date)?.let {
+                Text(it, style = MaterialTheme.typography.labelSmall, color = TextLow, maxLines = 1)
+            }
             CarLine(race.carClass, race.carName ?: race.car)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 TrackLogo(race.trackLogo, race.track)
@@ -530,7 +539,7 @@ private fun formatLap(ms: Long): String {
 }
 
 @Composable
-private fun PositionBadge(position: Int, fieldSize: Int, finishStatus: String?) {
+private fun PositionBadge(position: Int, subtitle: String?, finishStatus: String?) {
     val dnf = statusLabel(finishStatus)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         if (dnf != null) {
@@ -560,9 +569,9 @@ private fun PositionBadge(position: Int, fieldSize: Int, finishStatus: String?) 
                 fontWeight = FontWeight.Black,
             )
         }
-        if (fieldSize > 0) {
+        subtitle?.let {
             Spacer(Modifier.height(2.dp))
-            Text("of $fieldSize", style = MaterialTheme.typography.labelSmall, color = TextLow)
+            Text(it, style = MaterialTheme.typography.labelSmall, color = TextLow)
         }
     }
 }

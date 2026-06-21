@@ -96,6 +96,26 @@ data class RatingDto(
     val rating: Double? = null,
 )
 
+/** One component of an SR/DR change for a race: a signed weight + the human reason it moved.
+ *  e.g. impact +2.0 "Clean racing" (positive) or -3.2 "Contact with another car" (negative). */
+@Serializable
+data class ReasonDto(
+    val impact: Double? = null,  // signed weight of this component
+    val positive: Boolean = false,
+    val reason: String? = null,  // human-readable explanation
+)
+
+/** One lap from the player's race: time + sectors + whether it was a pit lap. Drives the
+ *  average-pace stat (valid laps = not the opening lap and not pit laps). */
+@Serializable
+data class LapDto(
+    val lap: Int? = null,        // 1-based lap number
+    val position: Int? = null,
+    @SerialName("lap_time_ms") val lapTimeMs: Long? = null,
+    @SerialName("sectors_ms") val sectorsMs: List<Long?> = emptyList(),
+    val pit: Boolean = false,    // in/out lap around a pit stop — excluded from average pace
+)
+
 /** Per-session line (practice / qualifying / race) for a recent race. */
 @Serializable
 data class SessionSummaryDto(
@@ -103,6 +123,8 @@ data class SessionSummaryDto(
     @SerialName("class_position") val classPosition: Int? = null,
     @SerialName("grid_position") val gridPosition: Int? = null,
     @SerialName("best_lap_ms") val bestLapMs: Long? = null,
+    @SerialName("best_lap_sectors_ms") val bestLapSectorsMs: List<Long?> = emptyList(),
+    @SerialName("best_sectors_ms") val bestSectorsMs: List<Long?> = emptyList(),
     @SerialName("finish_time_ms") val finishTimeMs: Long? = null,
     @SerialName("finish_status") val finishStatus: String? = null,
 )
@@ -129,9 +151,11 @@ data class RecentRaceDto(
     // total splits for the event — NOT sent by /profile or /profile/races (list endpoints);
     // only the race-detail endpoint fills it, so it stays nullable here.
     @SerialName("total_splits") val totalSplits: Int? = null,
-    @SerialName("field_size") val fieldSize: Int,
+    @SerialName("field_size") val fieldSize: Int,            // overall entries (all classes)
+    @SerialName("class_field_size") val classFieldSize: Int? = null, // entries in own class
     // Kept defaulted: a no-result race sends position: null, which coerces to 0 (see [ProfileJson]).
-    val position: Int = 0,
+    val position: Int = 0,                                   // overall finishing position
+    @SerialName("class_position") val classPosition: Int? = null, // position within own class
     @SerialName("grid_position") val gridPosition: Int? = null,
     @SerialName("car_class") val carClass: String? = null,
     // Car model name, e.g. "McLaren 720S GT3" (backend may send either key).
@@ -177,9 +201,16 @@ data class RaceDetailDto(
     val position: Int? = null,
     @SerialName("grid_position") val gridPosition: Int? = null,
     @SerialName("best_lap_ms") val bestLapMs: Long? = null,
+    @SerialName("best_lap_sectors_ms") val bestLapSectorsMs: List<Long?> = emptyList(),
+    @SerialName("best_sectors_ms") val bestSectorsMs: List<Long?> = emptyList(),
     @SerialName("finish_status") val finishStatus: String? = null,
     @SerialName("sr_change") val srChange: Double? = null,
     @SerialName("dr_change") val drChange: Double? = null,
+    // Why SR/DR moved this race — one entry per component (clean racing, contact, off-track…).
+    @SerialName("sr_reasons") val srReasons: List<ReasonDto> = emptyList(),
+    @SerialName("dr_reasons") val drReasons: List<ReasonDto> = emptyList(),
+    // The player's per-lap times (for the average-pace / delta-to-best stat).
+    @SerialName("lap_progress") val lapProgress: List<LapDto> = emptyList(),
     @SerialName("hero_image") val heroImage: String? = null,
     // keyed "practice" / "qualifying" / "race" — YOUR split, fully here
     val sessions: Map<String, RaceSessionDetailDto> = emptyMap(),
@@ -212,6 +243,10 @@ data class ClassificationRowDto(
     @SerialName("car_number") val carNumber: String? = null,
     @SerialName("car_class") val carClass: String? = null,
     @SerialName("best_lap_ms") val bestLapMs: Long? = null,
+    // Sector splits of this driver's best lap (S1/S2/S3, ms) — shown under the driver row.
+    @SerialName("best_lap_sectors_ms") val bestLapSectorsMs: List<Long?> = emptyList(),
+    // Theoretical optimum: the fastest each sector across all laps (≤ best lap → potential).
+    @SerialName("best_sectors_ms") val bestSectorsMs: List<Long?> = emptyList(),
     @SerialName("finish_time_ms") val finishTimeMs: Long? = null,
     @SerialName("finish_status") val finishStatus: String? = null,
     @SerialName("sr_change") val srChange: Double? = null,

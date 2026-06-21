@@ -10,6 +10,8 @@ import com.orioooneee.lmuasister.data.remote.ClassLeaderboardDto
 import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
 import com.orioooneee.lmuasister.data.remote.HotlapDto
 import com.orioooneee.lmuasister.data.remote.HotlapsResponse
+import com.orioooneee.lmuasister.data.remote.LapDto
+import com.orioooneee.lmuasister.data.remote.ReasonDto
 import com.orioooneee.lmuasister.data.remote.LeaderboardEntryDto
 import com.orioooneee.lmuasister.data.remote.LeaderboardPageResponse
 import com.orioooneee.lmuasister.data.remote.LeaderboardsDto
@@ -381,7 +383,9 @@ internal object MockData {
             split = split,
             totalSplits = splits,
             fieldSize = field,
+            classFieldSize = field,   // mock races are single-class, so class == overall
             position = finish,
+            classPosition = finish,
             gridPosition = grid,
             carClass = cls,
             car = car,
@@ -435,6 +439,30 @@ internal object MockData {
             finishStatus = card.finishStatus,
             srChange = card.srChange,
             drChange = card.drChange,
+            // impact is a 1–4 weight (rendered as arrows), not a real point value.
+            srReasons = listOf(
+                ReasonDto(impact = 2.0, positive = true, reason = "Clean racing — no incidents"),
+                ReasonDto(impact = 3.0, positive = false, reason = "Contact with another car (T6)"),
+                ReasonDto(impact = 1.0, positive = false, reason = "Off track (T10)"),
+            ),
+            drReasons = listOf(
+                ReasonDto(impact = 4.0, positive = (card.drChange ?: 0.0) >= 0.0,
+                    reason = "Finished P${card.position} from P${card.gridPosition ?: card.position}"),
+                ReasonDto(impact = 1.0, positive = true, reason = "Beat higher-rated drivers"),
+            ),
+            lapProgress = run {
+                val base = card.bestLapMs ?: 137_000L
+                (1..12).map { n ->
+                    val pit = n == 6
+                    val ms = when {
+                        n == 1 -> base + 3_500L     // opening lap is slower
+                        pit -> base + 21_000L       // in/out lap around the stop
+                        n == 3 -> base              // the best lap of the run
+                        else -> base + 400L + n * 35L
+                    }
+                    LapDto(lap = n, position = card.position, lapTimeMs = ms, sectorsMs = sectors(ms), pit = pit)
+                }
+            },
             sessions = mapOf(
                 "qualifying" to RaceSessionDetailDto(
                     me = summary(card.gridPosition ?: 12, card.gridPosition ?: 12, (card.bestLapMs ?: 0)),
@@ -461,6 +489,7 @@ internal object MockData {
         return (lo..hi).map { pos ->
             val isMe = pos == mePos
             val d = if (isMe) Drv(PLAYER_NAME, PLAYER_CC, "PER") else drivers[r.nextInt(drivers.size)]
+            val lap = base + pos * 110L + r.nextInt(200)
             ClassificationRowDto(
                 position = pos,
                 classPosition = pos,
@@ -470,10 +499,18 @@ internal object MockData {
                 isMe = isMe,
                 car = if (isMe) (card.car ?: carsByClass.getValue(cls).first()) else carsByClass.getValue(cls).random(r),
                 carClass = cls,
-                bestLapMs = base + pos * 110L + r.nextInt(200),
+                bestLapMs = lap,
+                bestLapSectorsMs = sectors(lap),
                 finishStatus = "Finished",
             )
         }
+    }
+
+    /** Split a lap time into three plausible sector times (34% / 33% / remainder). */
+    private fun sectors(lapMs: Long): List<Long> {
+        val s1 = lapMs * 34 / 100
+        val s2 = lapMs * 33 / 100
+        return listOf(s1, s2, lapMs - s1 - s2)
     }
 
     // ───────────────────────── cars ─────────────────────────
