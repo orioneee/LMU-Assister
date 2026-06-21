@@ -195,10 +195,14 @@ data class ClassificationRowDto(
     val nationality: String? = null,
     val isMe: Boolean = false,
     val car: String? = null,
+    val carNumber: String? = null,
     val carClass: String? = null,
     val bestLapMs: Long? = null,
     val finishTimeMs: Long? = null,
     val finishStatus: String? = null,
     val srChange: Double? = null,
     val drChange: Double? = null,
+    // Per-driver absolute ratings (driver_rating / safety_rating), same shape as the profile owner's.
+    val driverRating: RatingDto? = null,
+    val safetyRating: RatingDto? = null,
 )

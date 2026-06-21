@@ -2,6 +2,7 @@ package com.orioooneee.lmuasister.ui.profile
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +44,7 @@ import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
+import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
 import com.orioooneee.lmuasister.ui.components.BlockSkeleton
@@ -267,7 +269,7 @@ private fun SessionCard(label: String, rows: List<ClassificationRowDto>) {
                 .background(Surface1)
                 .border(1.dp, Outline, RoundedCornerShape(12.dp)),
         ) {
-            shown.forEach { ClassificationLine(it) }
+            shown.forEachIndexed { i, row -> ClassificationLine(row, alt = i % 2 == 1) }
             if (canToggle) {
                 Row(
                     modifier = Modifier
@@ -291,43 +293,99 @@ private fun SessionCard(label: String, rows: List<ClassificationRowDto>) {
 }
 
 @Composable
-private fun ClassificationLine(r: ClassificationRowDto) {
+private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean) {
+    // Zebra striping like the race leaderboards; the player's own row always wins with an amber tint.
+    val bg = when {
+        r.isMe -> Amber.copy(alpha = 0.12f)
+        alt -> Surface2
+        else -> Color.Transparent
+    }
+    val posColor = if (r.isMe) Amber else r.carClass?.let { classColorFor(it) } ?: TextHigh
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (r.isMe) Amber.copy(alpha = 0.12f) else Color.Transparent)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .background(bg)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             r.position?.toString() ?: "—",
             style = MaterialTheme.typography.labelMedium,
-            color = if (r.isMe) Amber else TextHigh,
+            color = posColor,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(24.dp),
+            maxLines = 1,
+            modifier = Modifier.width(22.dp),
         )
         flagFor(r.nationality)?.let { FlagCircle(it, 16.dp) }
-        Text(
-            r.name ?: "—",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (r.isMe) TextHigh else TextMed,
-            fontWeight = if (r.isMe) FontWeight.SemiBold else FontWeight.Normal,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        r.carClass?.let {
-            Text(it.uppercase(), style = MaterialTheme.typography.labelSmall, color = TextLow, maxLines = 1)
+        // Name + badges share the flexible middle column; the name marquees if it can't fit.
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                r.name ?: "—",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (r.isMe) TextHigh else TextMed,
+                fontWeight = if (r.isMe) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                r.carClass?.takeIf { it.isNotBlank() }?.let { ClassMiniBadge(it) }
+                r.driverRating?.let { RatingMiniBadge("DR", it) }
+                r.safetyRating?.let { RatingMiniBadge("SR", it) }
+            }
         }
         (r.bestLapMs ?: r.finishTimeMs)?.let {
             Text(
                 formatLap(it),
                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
                 color = TextMed,
+                maxLines = 1,
             )
         }
     }
+}
+
+/** Compact class chip (colored like the schedule badges) for a single classification line. */
+@Composable
+private fun ClassMiniBadge(carClass: String) {
+    val c = classColorFor(carClass)
+    Box(Modifier.clip(RoundedCornerShape(5.dp)).background(c).padding(horizontal = 5.dp, vertical = 2.dp)) {
+        Text(carClass.uppercase(), style = MaterialTheme.typography.labelSmall, color = onBadgeText(c), fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/** Compact DR/SR pill, same two-tone look as the profile header but tighter for a list row. */
+@Composable
+private fun RatingMiniBadge(label: String, rating: RatingDto) {
+    if (rating.rank.isBlank()) return
+    val color = rankColor(rating.rank)
+    val letter = rating.rank.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty()
+    val value = letter + rating.tier.toString()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.clip(RoundedCornerShape(5.dp)).border(1.dp, Outline, RoundedCornerShape(5.dp)),
+    ) {
+        Box(Modifier.background(Surface2).padding(horizontal = 4.dp, vertical = 2.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextLow)
+        }
+        Box(Modifier.background(color).padding(horizontal = 4.dp, vertical = 2.dp)) {
+            Text(value, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = onBadgeText(color), maxLines = 1)
+        }
+    }
+}
+
+private val Gold = Color(0xFFE6B422)
+private val Silver = Color(0xFFC9D1DA)
+private val Bronze = Color(0xFFCD7F32)
+private val Platinum = Color(0xFF6FE3F0)
+
+private fun rankColor(rank: String): Color = when (rank.trim().firstOrNull()?.lowercaseChar()) {
+    'b' -> Bronze
+    's' -> Silver
+    'g' -> Gold
+    'p' -> Platinum
+    else -> TextMed
 }
 
 

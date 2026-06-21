@@ -234,7 +234,7 @@ private fun RatingPill(label: String, rating: RatingDto?) {
     if (rating == null || rating.rank.isBlank()) return
     val color = rankColor(rating.rank)
     val letter = rating.rank.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty()
-    val value = letter + if (rating.tier > 0) rating.tier.toString() else ""
+    val value = letter + rating.tier.toString()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Outline, RoundedCornerShape(6.dp)),
