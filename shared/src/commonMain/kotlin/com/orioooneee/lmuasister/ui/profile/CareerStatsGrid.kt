@@ -25,8 +25,11 @@ import androidx.compose.ui.unit.dp
 import com.orioooneee.lmuasister.data.remote.StatTotalsDto
 import com.orioooneee.lmuasister.ui.IconChevronRight
 import com.orioooneee.lmuasister.ui.theme.Amber
+import com.orioooneee.lmuasister.ui.theme.ClassGt3
 import com.orioooneee.lmuasister.ui.theme.ClassLmp2
+import com.orioooneee.lmuasister.ui.theme.ClassLmp3
 import com.orioooneee.lmuasister.ui.theme.ClassMixed
+import com.orioooneee.lmuasister.ui.theme.Lime
 import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.SkillBeginner
 import com.orioooneee.lmuasister.ui.theme.SkillInter
@@ -38,13 +41,24 @@ import com.orioooneee.lmuasister.ui.theme.TextLow
 
 private val StatCyan = Color(0xFF6FE3F0)
 
-/** Stat categories that have a drill-down list endpoint (GET /profile/races/<key>). */
-enum class StatCategory(val key: String, val title: String) {
-    Wins("wins", "Wins"),
-    Podiums("podiums", "Podiums"),
-    Poles("poles", "Poles"),
-    FastestLaps("fastest_laps", "Fastest laps"),
-    Top5("top5", "Top 5"),
+/** Stat categories that have a drill-down list endpoint (GET /profile/races/<key>).
+ *  [title] is the plural counter label (profile tiles); [chip] is the singular per-race label
+ *  (race-detail chips). [color] is the shared accent used by both. */
+// Declaration order mirrors the profile stat tiles, so chips sorted by ordinal match that layout.
+enum class StatCategory(val key: String, val title: String, val chip: String, val color: Color) {
+    GrandSlam("grand_slam", "Grand Slam", "Grand Slam", Lime),
+    Wins("wins", "Wins", "Win", SkillInter),
+    Poles("poles", "Poles", "Pole", StatCyan),
+    Podiums("podiums", "Podiums", "Podium", Amber),
+    FastestLaps("fastest_laps", "Fastest laps", "Fastest lap", ClassMixed),
+    Top5("top5", "Top 5", "Top 5", ClassLmp2),
+    PolesConverted("poles_converted", "Poles converted", "Pole converted", ClassGt3),
+    WinsNoPole("wins_no_pole", "Wins without pole", "Win without pole", ClassLmp3),
+    Dnf("dnf", "DNF", "DNF", SkillPro);
+
+    companion object {
+        fun byKey(key: String): StatCategory? = entries.firstOrNull { it.key == key }
+    }
 }
 
 private data class StatCell(
@@ -52,7 +66,13 @@ private data class StatCell(
     val value: Int,
     val color: Color,
     val category: StatCategory? = null,
+    // Overrides the big number with a custom string (e.g. a percentage). null → show [value].
+    val display: String? = null,
 )
+
+/** Whole-percent share, e.g. 5 of 13 → "38%". "—" when there's nothing to divide by. */
+private fun pctOf(part: Int, whole: Int): String =
+    if (whole <= 0) "—" else "${(part * 100 + whole / 2) / whole}%"
 
 private const val COLUMNS = 3
 
@@ -65,15 +85,20 @@ fun CareerStatsGrid(
     onOpenCategory: (StatCategory) -> Unit = {},
 ) {
     val cells = listOf(
+        // Static counters first…
         StatCell("RACES", totals.races, TextHigh),
+        StatCell("LAPS", totals.lapsCompleted, TextHigh),
+        StatCell("LAPS LED", totals.lapsLead, SkillBeginner),
+        // …then every drill-down tile, DNF last.
+        StatCell("GRAND SLAM", totals.grandSlams, Lime, StatCategory.GrandSlam),
         StatCell("WINS", totals.wins, SkillInter, StatCategory.Wins),
         StatCell("POLES", totals.polePositions, StatCyan, StatCategory.Poles),
         StatCell("PODIUMS", totals.podiums, Amber, StatCategory.Podiums),
         StatCell("FAST LAPS", totals.fastestLaps, ClassMixed, StatCategory.FastestLaps),
         StatCell("TOP 5", totals.top5, ClassLmp2, StatCategory.Top5),
-        StatCell("LAPS LED", totals.lapsLead, SkillBeginner),
-        StatCell("LAPS", totals.lapsCompleted, TextHigh),
-        StatCell("DNF", totals.dnfs, SkillPro),
+        StatCell("POLE→WIN", totals.polesConverted, ClassGt3, StatCategory.PolesConverted, display = pctOf(totals.polesConverted, totals.polePositions)),
+        StatCell("WIN W/O POLE", totals.winsNoPole, ClassLmp3, StatCategory.WinsNoPole),
+        StatCell("DNF", totals.dnfs, SkillPro, StatCategory.Dnf),
     )
 
     Column(
@@ -123,7 +148,7 @@ private fun StatTile(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                cell.value.toString(),
+                cell.display ?: cell.value.toString(),
                 style = MaterialTheme.typography.headlineSmall,
                 color = cell.color,
                 fontWeight = FontWeight.Bold,

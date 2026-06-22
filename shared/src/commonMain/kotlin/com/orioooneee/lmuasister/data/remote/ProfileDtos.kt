@@ -54,6 +54,9 @@ data class StatTotalsDto(
     val lapsCompleted: Int,
     val lapsLead: Int,
     val fastestLaps: Int,
+    val grandSlams: Int = 0,     // ours (pole + win + fastest lap + led every lap); default for older payloads
+    val polesConverted: Int = 0, // started on pole AND won
+    val winsNoPole: Int = 0,     // won without starting on pole
 )
 
 /** GET /api/v2/profile → `rating_history`: two series of points (driver / safety). */
@@ -219,6 +222,9 @@ data class RaceDetailDto(
     // The player's per-lap times (for the average-pace / delta-to-best stat).
     @SerialName("lap_progress") val lapProgress: List<LapDto> = emptyList(),
     @SerialName("hero_image") val heroImage: String? = null,
+    // Highlight categories this race earned (keys from RACE_CATEGORIES: wins / poles / grand_slam…),
+    // shown as colored chips. Ordered by the backend.
+    val categories: List<String> = emptyList(),
     // keyed "practice" / "qualifying" / "race" — YOUR split, fully here
     val sessions: Map<String, RaceSessionDetailDto> = emptyMap(),
 )
@@ -256,6 +262,13 @@ data class ClassificationRowDto(
     @SerialName("best_sectors_ms") val bestSectorsMs: List<Long?> = emptyList(),
     @SerialName("finish_time_ms") val finishTimeMs: Long? = null,
     @SerialName("finish_status") val finishStatus: String? = null,
+    // Class-relative gaps from the backend: gap_* = to the class leader, interval_* = to the car
+    // ahead in class. _ms is a time delta (race: same-lap finish gap / quali: best-lap delta);
+    // _laps is "N laps down" (race only). Leader/no-time rows carry null/0.
+    @SerialName("gap_ms") val gapMs: Long? = null,
+    @SerialName("gap_laps") val gapLaps: Int = 0,
+    @SerialName("interval_ms") val intervalMs: Long? = null,
+    @SerialName("interval_laps") val intervalLaps: Int = 0,
     @SerialName("sr_change") val srChange: Double? = null,
     @SerialName("dr_change") val drChange: Double? = null,
     // This driver's per-lap progress (carries class_position per lap, unlike the top-level copy).

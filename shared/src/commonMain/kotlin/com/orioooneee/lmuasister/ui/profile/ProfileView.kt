@@ -30,10 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
@@ -41,7 +41,6 @@ import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.remote.RaceSessionsDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
-import com.orioooneee.lmuasister.data.remote.SessionSummaryDto
 import com.orioooneee.lmuasister.data.remote.SteamProfile
 import com.orioooneee.lmuasister.ui.IconFlag
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
@@ -62,7 +61,7 @@ import com.orioooneee.lmuasister.ui.theme.Surface3
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
-import com.orioooneee.lmuasister.ui.util.formatIsoDateTime
+import com.orioooneee.lmuasister.ui.util.formatIsoTimeAndDate
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.susp_active_count
 import lmuassister.shared.generated.resources.susp_banned
@@ -386,7 +385,19 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
         // the class count — otherwise no denominator at all.
         val classPos = race.classPosition?.takeIf { it > 0 } ?: race.position
         val subtitle = race.classFieldSize?.takeIf { it > 0 }?.let { "of $it" }
-        PositionBadge(classPos, subtitle, race.finishStatus)
+        // Left column: date/time over the position badge, grid→finish delta underneath.
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Time on top, date below: "18:50" / "21.06.2026".
+            formatIsoTimeAndDate(race.date)?.let { (time, date) ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(time, style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 13.sp), color = TextMed, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    // Smaller so "21.06.2026" doesn't run much wider than the time above it.
+                    Text(date, style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, lineHeight = 10.sp), color = TextLow, maxLines = 1)
+                }
+            }
+            PositionBadge(classPos, subtitle, race.finishStatus)
+            if (finished) GridToFinish(race.gridPosition, race.position)
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(
                 race.title,
@@ -396,9 +407,6 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
                 maxLines = 1,
                 modifier = Modifier.fillMaxWidth().basicMarquee(),
             )
-            formatIsoDateTime(race.date)?.let {
-                Text(it, style = MaterialTheme.typography.labelSmall, color = TextLow, maxLines = 1)
-            }
             CarLine(race.carClass, race.carName ?: race.car)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 TrackLogo(race.trackLogo, race.track)
@@ -415,7 +423,6 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
         ) {
             race.eventType?.takeIf { it.isNotBlank() }?.let { MetaChip(it.replaceFirstChar(Char::uppercaseChar)) }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                if (finished) GridToFinish(race.gridPosition, race.position)
                 DeltaText("DR", race.drChange)
                 DeltaText("SR", race.srChange)
             }
@@ -424,9 +431,16 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
     }
 }
 
+// Class tokens to drop from a car name — the class is already shown as a separate pill.
+private val CAR_CLASS_TOKENS = Regex("""\b(LMGT3|LMGTE|LMGT|LMP1|LMP2|LMP3|LMDh|LMH|GTE|GT3|GTP|Hypercar)\b""", RegexOption.IGNORE_CASE)
+
+/** "Ford Mustang LMGT3" → "Ford Mustang", "McLaren 720S LMGT3 Evo" → "McLaren 720S Evo". */
+private fun stripCarClass(name: String): String =
+    name.replace(CAR_CLASS_TOKENS, "").replace(Regex("\\s{2,}"), " ").trim()
+
 @Composable
 private fun CarLine(carClass: String?, carName: String?) {
-    val name = carName?.takeIf { it.isNotBlank() }
+    val name = carName?.takeIf { it.isNotBlank() }?.let { stripCarClass(it) }?.takeIf { it.isNotBlank() }
     if (carClass == null && name == null) return
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -449,47 +463,32 @@ private fun CarLine(carClass: String?, carName: String?) {
 @Composable
 private fun SessionsBreakdown(sessions: RaceSessionsDto?, includeRace: Boolean) {
     if (sessions == null) return
-    val rows = listOfNotNull(
-        sessions.qualifying?.let { "Quali" to it },
-        if (includeRace) sessions.race?.let { "Race" to it } else null,
-    ).filter { (_, s) -> s.position != null || s.bestLapMs != null || s.finishTimeMs != null }
-    if (rows.isEmpty()) return
+    // Positions only (times dropped) on a single row: "QUALI 8   RACE 5".
+    val quali = sessions.qualifying?.position
+    val race = if (includeRace) sessions.race?.position else null
+    if (quali == null && race == null) return
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Surface2)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        rows.forEach { (label, s) -> SessionLine(label, s) }
+        quali?.let { SessionPosBadge("QUALI", it) }
+        race?.let { SessionPosBadge("RACE", it) }
     }
 }
 
+/** Two-tone "QUALI · 8" / "RACE · 5" pill for one session's finishing position. */
 @Composable
-private fun SessionLine(label: String, s: SessionSummaryDto) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = TextLow,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(46.dp),
-        )
-        Text(
-            s.position?.toString() ?: "—",
-            style = MaterialTheme.typography.labelMedium,
-            color = TextHigh,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.width(32.dp),
-        )
-        (s.bestLapMs ?: s.finishTimeMs)?.let {
-            Text(
-                formatLap(it),
-                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                color = TextMed,
-            )
+private fun SessionPosBadge(label: String, position: Int) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Outline, RoundedCornerShape(6.dp)),
+    ) {
+        Box(Modifier.background(Surface2).padding(horizontal = 6.dp, vertical = 3.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextLow, fontWeight = FontWeight.Bold)
+        }
+        Box(Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) {
+            Text(position.toString(), style = MaterialTheme.typography.labelMedium, color = TextHigh, fontWeight = FontWeight.Bold)
         }
     }
 }

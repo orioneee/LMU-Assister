@@ -9,6 +9,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -334,6 +336,43 @@ private fun TrackCard(t: TrackDto) {
 }
 
 
+/** Wrapping row of highlight-category chips (win / pole / grand slam…), each tinted with the
+ *  same accent as its profile stat tile. Unknown keys are skipped. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CategoryChips(keys: List<String>) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        // Order chips like the profile stat tiles (StatCategory declaration order), not the
+        // backend's order. Unknown keys are dropped.
+        keys.mapNotNull { StatCategory.byKey(it) }
+            .sortedBy { it.ordinal }
+            .forEach { CategoryChip(it.chip, it.color) }
+    }
+}
+
+@Composable
+private fun CategoryChip(label: String, color: Color) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.15f))
+            .border(1.dp, color.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(
+            label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+    }
+}
+
 @Composable
 private fun SummaryCard(d: RaceDetailDto) {
     var showBreakdown by remember { mutableStateOf(false) }
@@ -351,6 +390,8 @@ private fun SummaryCard(d: RaceDetailDto) {
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Highlight chips this race earned (win / pole / grand slam…), colored like the profile stats.
+        if (d.categories.isNotEmpty()) CategoryChips(d.categories)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             d.carClass?.let { ClassPill(it) }
             (d.carName ?: d.car)?.takeIf { it.isNotBlank() }?.let {
@@ -870,14 +911,33 @@ private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean) {
             }
         }
         (r.bestLapMs ?: r.finishTimeMs)?.let {
-            Text(
-                formatLap(it),
-                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                color = TextMed,
-                maxLines = 1,
-            )
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    formatLap(it),
+                    style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                    color = TextMed,
+                    maxLines = 1,
+                )
+                // Class-relative gap to the leader (race: finish gap / quali: best-lap delta).
+                gapToLeaderLabel(r)?.let { gap ->
+                    Text(
+                        gap,
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                        color = TextLow,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
+}
+
+/** Class-relative gap to the leader: "+N LAPS" when laps down, "+S.mmm" for a time gap,
+ *  null for the class leader (or a row with no gap data). */
+private fun gapToLeaderLabel(r: ClassificationRowDto): String? = when {
+    r.gapLaps > 0 -> "+${r.gapLaps} " + if (r.gapLaps == 1) "LAP" else "LAPS"
+    (r.gapMs ?: 0L) > 0L -> deltaSeconds(r.gapMs!!)
+    else -> null
 }
 
 /** Compact class chip (colored like the schedule badges) for a single classification line. */

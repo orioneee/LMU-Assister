@@ -21,10 +21,11 @@
 
 <table>
 <tr>
-<td align="center" width="25%"><img src="screenshot_schedule.jpg" alt="Schedule" width="200"><br><sub><b>Schedule</b></sub></td>
-<td align="center" width="25%"><img src="screenshot_profile_v2.jpg" alt="Profile" width="200"><br><sub><b>Profile</b></sub></td>
-<td align="center" width="25%"><img src="screenshot_race_details.jpg" alt="Race details" width="200"><br><sub><b>Race details</b></sub></td>
-<td align="center" width="25%"><img src="screenshot_race_result_v2.jpg" alt="Race result" width="200"><br><sub><b>Your race result</b></sub></td>
+<td align="center" width="20%"><img src="shot_schedule_v3.jpg" alt="Schedule" width="180"><br><sub><b>Schedule</b></sub></td>
+<td align="center" width="20%"><img src="shot_tracks_v3.jpg" alt="Tracks" width="180"><br><sub><b>Tracks</b></sub></td>
+<td align="center" width="20%"><img src="shot_track_detail_v3.jpg" alt="Track detail" width="180"><br><sub><b>Track detail</b></sub></td>
+<td align="center" width="20%"><img src="shot_profile_v3.jpg" alt="Profile" width="180"><br><sub><b>Profile</b></sub></td>
+<td align="center" width="20%"><img src="shot_race_detail_v3.jpg" alt="Race detail" width="180"><br><sub><b>Your race result</b></sub></td>
 </tr>
 </table>
 

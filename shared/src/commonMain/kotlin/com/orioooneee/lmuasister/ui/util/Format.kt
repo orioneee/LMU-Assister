@@ -50,6 +50,12 @@ fun formatIsoDateTime(iso: String?): String? =
     iso?.takeIf { it.isNotBlank() }
         ?.let { runCatching { formatEpochDateTime(Instant.parse(it).toEpochMilliseconds()) }.getOrNull() }
 
+/** ISO-8601 instant -> ("18:50", "01.01.2026") local (time, date), or null if unparseable. */
+fun formatIsoTimeAndDate(iso: String?): Pair<String, String>? =
+    iso?.takeIf { it.isNotBlank() }
+        ?.let { runCatching { Instant.parse(it).local() }.getOrNull() }
+        ?.let { dt -> "${two(dt.hour)}:${two(dt.minute)}" to "${two(dt.day)}.${two(dt.month.ordinal + 1)}.${dt.year}" }
+
 /** Lap time in ms -> "1:42.623". */
 fun formatLap(ms: Long): String {
     if (ms <= 0) return "—"
