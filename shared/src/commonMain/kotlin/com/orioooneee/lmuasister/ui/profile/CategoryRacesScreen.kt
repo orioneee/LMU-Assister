@@ -109,7 +109,7 @@ fun CategoryRacesScreen(
                 current.error != null -> item {
                     Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
                         Text(
-                            current.error!!,
+                            current.error,
                             style = MaterialTheme.typography.bodySmall,
                             color = Amber,
                             modifier = Modifier.clip(RoundedCornerShape(8.dp))

@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -62,6 +63,7 @@ import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.formatIsoTimeAndDate
+import com.orioooneee.lmuasister.ui.util.formatKm
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.susp_active_count
 import lmuassister.shared.generated.resources.susp_banned
@@ -103,9 +105,10 @@ fun ProfileView(
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
     onOpenSuspensions: (active: Boolean) -> Unit = {},
     onOpenCategory: (StatCategory) -> Unit = {},
+    onOpenTracks: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        ProfileHeader(profile, accountName, onOpenSuspensions)
+        ProfileHeader(profile, accountName, onOpenSuspensions, onOpenTracks)
         RatingsRow(profile.driverRating, profile.safetyRating)
 
         profile.ratingHistory?.takeIf { it.dr.isNotEmpty() || it.sr.isNotEmpty() }?.let {
@@ -180,12 +183,18 @@ fun ProfileSkeleton() {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ProfileHeader(profile: SteamProfile, accountName: String, onOpenSuspensions: (active: Boolean) -> Unit) {
+private fun ProfileHeader(
+    profile: SteamProfile,
+    accountName: String,
+    onOpenSuspensions: (active: Boolean) -> Unit,
+    onOpenTracks: () -> Unit,
+) {
     val accent = rankColor(profile.driverRating?.rank.orEmpty())
     val name = profile.displayName ?: profile.name ?: profile.username ?: accountName.ifBlank { "Driver" }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        CountryFlag(profile.nationality, accent)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Avatar sized to the name line, sitting inline with it.
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            CountryFlag(profile.nationality, accent, size = 28.dp)
             Text(
                 name,
                 style = MaterialTheme.typography.titleLarge,
@@ -193,32 +202,42 @@ private fun ProfileHeader(profile: SteamProfile, accountName: String, onOpenSusp
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
-            val badges = profile.badges.ifEmpty { listOfNotNull(profile.badge) }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                badges.take(3).forEach { OutlinePill(prettyBadge(it), Amber) }
-                RatingPill("DR", profile.driverRating)
-                RatingPill("SR", profile.safetyRating)
+        }
+        // Ratings + distance first, flush to the left edge (not indented under the avatar).
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            RatingPill("DR", profile.driverRating)
+            RatingPill("SR", profile.safetyRating)
+            // Tap the distance badge to open the per-track breakdown screen.
+            if (profile.totalDistanceKm > 0) {
+                ClickablePill("${formatKm(profile.totalDistanceKm)} km", DistAccent, onClick = onOpenTracks)
             }
-            SuspensionFlags(profile, onOpenSuspensions)
+        }
+        // Status badges (e.g. "Sr Probation") sit on the SAME row as the suspensions, after them.
+        val badges = profile.badges.ifEmpty { listOfNotNull(profile.badge) }
+        SuspensionFlags(profile, onOpenSuspensions) {
+            badges.take(3).forEach { OutlinePill(prettyBadge(it), Amber) }
         }
     }
+
 }
 
+
 @Composable
-private fun CountryFlag(nationality: String?, accent: Color) {
+private fun CountryFlag(nationality: String?, accent: Color, size: Dp = 68.dp) {
     val box = Modifier
-        .size(68.dp)
+        .size(size)
         .clip(CircleShape)
         .background(Surface2)
-        .border(2.dp, accent.copy(alpha = 0.7f), CircleShape)
+        .border(1.5.dp, accent.copy(alpha = 0.7f), CircleShape)
     val cc = nationality?.takeIf { it.length == 2 && it.all(Char::isLetter) }?.lowercase()
     if (cc == null) {
         Box(box, contentAlignment = Alignment.Center) {
-            Icon(IconFlag, contentDescription = null, tint = TextLow, modifier = Modifier.size(26.dp))
+            Icon(IconFlag, contentDescription = null, tint = TextLow, modifier = Modifier.size(size * 0.5f))
         }
         return
     }
@@ -256,38 +275,44 @@ private fun RatingPill(label: String, rating: RatingDto?) {
 }
 
 private val FlagGray = Color(0xFF8A8F98)
+private val DistAccent = Color(0xFF7FB2E8) // total distance badge — soft blue
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SuspensionFlags(profile: SteamProfile, onOpen: (active: Boolean) -> Unit) {
+private fun SuspensionFlags(
+    profile: SteamProfile,
+    onOpen: (active: Boolean) -> Unit,
+    trailing: @Composable () -> Unit = {},
+) {
     val all = profile.suspensions
     val active = all.filter { it.active }
     val past = all.filter { !it.active }
 
-    // No detailed list (e.g. legacy cache): keep the simple count-based status.
-    if (all.isEmpty()) {
-        if (profile.activeSuspensions > 0) {
-            ClickablePill(stringResource(Res.string.susp_active_count, profile.activeSuspensions)) { onOpen(true) }
-        } else {
-            ClickablePill(stringResource(Res.string.susp_license_clean), PosGreen, onClick = null)
-        }
-        return
-    }
-
+    // One row: suspension status first, then any [trailing] badges (wrap if they don't fit).
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (active.isNotEmpty()) {
-            val label = if (active.any { it.permanent }) stringResource(Res.string.susp_banned)
-            else stringResource(Res.string.susp_active_count, active.size)
-            ClickablePill(label, NegRed) { onOpen(true) }
+        if (all.isEmpty()) {
+            // No detailed list (e.g. legacy cache): keep the simple count-based status.
+            if (profile.activeSuspensions > 0) {
+                ClickablePill(stringResource(Res.string.susp_active_count, profile.activeSuspensions)) { onOpen(true) }
+            } else {
+                ClickablePill(stringResource(Res.string.susp_license_clean), PosGreen, onClick = null)
+            }
         } else {
-            ClickablePill(stringResource(Res.string.susp_no_active), PosGreen, onClick = null)
+            if (active.isNotEmpty()) {
+                val label = if (active.any { it.permanent }) stringResource(Res.string.susp_banned)
+                else stringResource(Res.string.susp_active_count, active.size)
+                ClickablePill(label, NegRed) { onOpen(true) }
+            } else {
+                ClickablePill(stringResource(Res.string.susp_no_active), PosGreen, onClick = null)
+            }
+            if (past.isNotEmpty()) {
+                ClickablePill(stringResource(Res.string.susp_past_count, past.size), FlagGray) { onOpen(false) }
+            }
         }
-        if (past.isNotEmpty()) {
-            ClickablePill(stringResource(Res.string.susp_past_count, past.size), FlagGray) { onOpen(false) }
-        }
+        trailing()
     }
 }
 

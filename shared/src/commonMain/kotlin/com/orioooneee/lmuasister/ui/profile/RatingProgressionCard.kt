@@ -86,6 +86,33 @@ private fun filterRange(points: List<RatingPointDto>, range: RangeOpt): List<Rat
     return points.filter { p -> p.instantOrNull()?.let { it >= cutoff } ?: false }
 }
 
+/** Smooth path through [pts] via a Catmull-Rom spline converted to cubic béziers. The curve
+ *  passes through every point (no data is faked) but flows instead of zig-zagging race-to-race.
+ *  Falls back to straight segments for <3 points. */
+private fun smoothPath(pts: List<Offset>): Path {
+    val path = Path()
+    if (pts.isEmpty()) return path
+    path.moveTo(pts[0].x, pts[0].y)
+    if (pts.size < 3) {
+        for (i in 1 until pts.size) path.lineTo(pts[i].x, pts[i].y)
+        return path
+    }
+    val last = pts.size - 1
+    for (i in 0 until last) {
+        val p0 = pts[if (i == 0) 0 else i - 1]
+        val p1 = pts[i]
+        val p2 = pts[i + 1]
+        val p3 = pts[if (i + 2 > last) last else i + 2]
+        // Standard Catmull-Rom → bézier control points (tangent = (next - prev) / 6).
+        val c1x = p1.x + (p2.x - p0.x) / 6f
+        val c1y = p1.y + (p2.y - p0.y) / 6f
+        val c2x = p2.x - (p3.x - p1.x) / 6f
+        val c2y = p2.y - (p3.y - p1.y) / 6f
+        path.cubicTo(c1x, c1y, c2x, c2y, p2.x, p2.y)
+    }
+    return path
+}
+
 /** DR/SR progression chart with a rank-tier Y axis, a DR/SR toggle and time-range chips. */
 @Composable
 fun RatingProgressionCard(history: RatingHistoryDto, modifier: Modifier = Modifier) {
@@ -198,12 +225,15 @@ private fun RatingChart(points: List<RatingPointDto>, accent: Color) {
             )
         }
 
-        // Gradient fill under the line
+        // Smooth (Catmull-Rom) line through every race point so the curve flows, not zig-zags.
+        val pts = values.mapIndexed { i, s -> Offset(xAt(i), yAt(s)) }
+        val line = smoothPath(pts)
+
+        // Gradient fill: the same smooth curve, closed down to the baseline.
         val fill = Path().apply {
-            moveTo(xAt(0), yAt(values[0]))
-            for (i in 1 until values.size) lineTo(xAt(i), yAt(values[i]))
-            lineTo(xAt(values.size - 1), baseline)
-            lineTo(xAt(0), baseline)
+            addPath(line)
+            lineTo(pts.last().x, baseline)
+            lineTo(pts.first().x, baseline)
             close()
         }
         drawPath(
@@ -215,11 +245,6 @@ private fun RatingChart(points: List<RatingPointDto>, accent: Color) {
             ),
         )
 
-        // The line itself
-        val line = Path().apply {
-            moveTo(xAt(0), yAt(values[0]))
-            for (i in 1 until values.size) lineTo(xAt(i), yAt(values[i]))
-        }
         drawPath(line, color = accent, style = Stroke(width = 2.dp.toPx()))
 
         // Dots per race

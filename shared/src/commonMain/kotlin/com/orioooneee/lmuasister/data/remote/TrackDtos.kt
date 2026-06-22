@@ -52,6 +52,9 @@ data class TrackDetailResponse(
 @Serializable
 data class TrackPersonalDto(
     val races: Int = 0,
+    // Career laps + distance on this track (snake_case `laps` / `distance_km` via AppJson).
+    val laps: Int = 0,
+    val distanceKm: Double = 0.0,
     // Absolute best lap across all classes (may be a faster prototype class).
     val bestLap: TrackAttemptDto? = null,
     // Best lap per class the driver has run — key is the class name ("GT3", "LMP2"…).

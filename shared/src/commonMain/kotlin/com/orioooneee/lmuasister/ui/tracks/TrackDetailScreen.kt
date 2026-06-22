@@ -25,12 +25,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.remote.TrackAttemptDto
 import com.orioooneee.lmuasister.data.remote.TrackDetailResponse
@@ -44,7 +42,6 @@ import com.orioooneee.lmuasister.ui.components.onBadgeText
 import com.orioooneee.lmuasister.ui.details.CircleButton
 import com.orioooneee.lmuasister.ui.profile.SteamLoginUiState
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
-import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.Surface1
@@ -53,6 +50,7 @@ import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.formatIsoDateTime
+import com.orioooneee.lmuasister.ui.util.formatKm
 import com.orioooneee.lmuasister.ui.util.formatLap
 import org.koin.compose.koinInject
 
@@ -132,9 +130,9 @@ private fun TrackContent(
         item { TrackCard(d.track) }
         when {
             hasRecords -> {
-                item { RacesHeader(personal!!.races) }
-                personal!!.bestLap?.bestLapMs?.let { _ ->
-                    item { BestLapCard(personal.bestLap!!, byClass = personal.bestByClass, onOpenRace = onOpenRace) }
+                item { RacesHeader(personal.races, personal.laps, personal.distanceKm) }
+                personal.bestLap?.bestLapMs?.let { _ ->
+                    item { BestLapCard(personal.bestLap, byClass = personal.bestByClass, onOpenRace = onOpenRace) }
                 }
                 if (personal.bestByClass.isNotEmpty()) {
                     item { SectionLabel("BEST BY CLASS") }
@@ -160,25 +158,17 @@ private fun Modifier.openRaceOf(a: TrackAttemptDto, onOpenRace: (String, Int?) -
 private fun TrackCard(t: TrackFullDto) {
     val logo = trackAsset(t, "logo.svg")
     val map = trackAsset(t, "map.svg")
+    val bg = trackAsset(t, "background.webp")
     val flag = trackFlagUrl(t.countryCode)
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (logo != null || flag != null) {
-            Box(Modifier.fillMaxWidth()) {
-                logo?.let { TrackSvgImage(it, Modifier.fillMaxWidth().height(56.dp)) }
-                flag?.let { FlagCircle(it, 24.dp, Modifier.align(Alignment.TopEnd)) }
-            }
-        }
-        map?.let {
-            AsyncImage(
-                model = it,
-                contentDescription = "${t.name} map",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(10.dp)),
-            )
-        }
+        TrackPreview(
+            backgroundUrl = bg, mapUrl = map, logoUrl = logo, flagUrl = flag,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)),
+            height = 180.dp, emblemHeight = 30.dp, flagSize = 26.dp,
+        )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(trackTitle(t), style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth().basicMarquee(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -194,7 +184,7 @@ private fun TrackCard(t: TrackFullDto) {
 @Composable
 private fun BestLapCard(best: TrackAttemptDto, byClass: Map<String, TrackAttemptDto>, onOpenRace: (String, Int?) -> Unit) {
     // The absolute best may belong to a faster class than the driver's usual one — flag that.
-    val fasterClass = best.carClass?.takeIf { cls -> byClass.size > 1 }
+    val fasterClass = best.carClass?.takeIf {  byClass.size > 1 }
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).openRaceOf(best, onOpenRace).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -259,8 +249,18 @@ private fun RecentCard(recent: List<TrackAttemptDto>, onOpenRace: (String, Int?)
 }
 
 @Composable
-private fun RacesHeader(races: Int) {
-    Text("$races races on this track", style = MaterialTheme.typography.bodyMedium, color = TextMed, fontWeight = FontWeight.SemiBold)
+private fun RacesHeader(races: Int, laps: Int, distanceKm: Double) {
+    val parts = buildList {
+        add("$races races")
+        if (laps > 0) add("$laps laps")
+        if (distanceKm > 0) add("${formatKm(distanceKm)} km")
+    }
+    Text(
+        parts.joinToString(" · ") + " on this track",
+        style = MaterialTheme.typography.bodyMedium,
+        color = TextMed,
+        fontWeight = FontWeight.SemiBold,
+    )
 }
 
 @Composable

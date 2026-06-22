@@ -1,6 +1,5 @@
 package com.orioooneee.lmuasister.ui.tracks
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -23,10 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -35,8 +32,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import coil3.compose.AsyncImagePainter
-import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.remote.TrackFullDto
@@ -89,6 +84,7 @@ fun TracksScreen(insets: PaddingValues, onOpenTrack: (String) -> Unit) {
 private fun TrackGridCard(t: TrackFullDto, onClick: () -> Unit) {
     val logo = trackAsset(t, "logo.svg")
     val map = trackAsset(t, "map.svg")
+    val bg = trackAsset(t, "background.webp")
     val flag = trackFlagUrl(t.countryCode)
     Column(
         modifier = Modifier
@@ -98,15 +94,7 @@ private fun TrackGridCard(t: TrackFullDto, onClick: () -> Unit) {
             .border(1.dp, Outline, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
     ) {
-        Box(Modifier.fillMaxWidth().height(104.dp).background(Surface2), contentAlignment = Alignment.Center) {
-            // Main image = the track minimap; the emblem sits small in the corner.
-            when {
-                map != null -> TrackSvgImage(map, Modifier.fillMaxSize().padding(10.dp))
-                logo != null -> TrackSvgImage(logo, Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 12.dp))
-            }
-            logo?.let { TrackSvgImage(it, Modifier.align(Alignment.TopStart).padding(8.dp).height(18.dp)) }
-            flag?.let { FlagCircle(it, 22.dp, Modifier.align(Alignment.TopEnd).padding(8.dp)) }
-        }
+        TrackPreview(backgroundUrl = bg, mapUrl = map, logoUrl = logo, flagUrl = flag, height = 104.dp)
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 trackTitle(t),
@@ -185,11 +173,15 @@ internal fun trackFlagUrl(cc: String?): String? {
 
 @Composable
 internal fun TrackSvgImage(url: String, modifier: Modifier) {
-    val painter = rememberAsyncImagePainter(model = url)
-    val state by painter.state.collectAsState()
-    if (state is AsyncImagePainter.State.Success) {
-        Image(painter = painter, contentDescription = null, contentScale = ContentScale.Fit, modifier = modifier)
-    }
+    // AsyncImage (not rememberAsyncImagePainter + state) → no per-item recomposition churn while
+    // scrolling, and the shared singleton ImageLoader memory-caches the rasterised SVG across all
+    // track-preview screens. Nothing is drawn until it loads (no placeholder).
+    AsyncImage(
+        model = url,
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = modifier,
+    )
 }
 
 @Composable

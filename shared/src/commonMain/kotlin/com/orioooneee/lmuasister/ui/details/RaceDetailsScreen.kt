@@ -1,6 +1,5 @@
 package com.orioooneee.lmuasister.ui.details
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -50,8 +49,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImagePainter
-import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.model.CarGroup
 import com.orioooneee.lmuasister.data.model.ClassLeaderboard
@@ -64,6 +61,7 @@ import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
 import com.orioooneee.lmuasister.ui.IconBolt
+import com.orioooneee.lmuasister.ui.tracks.TrackPreview
 import com.orioooneee.lmuasister.ui.components.ClassChip
 import com.orioooneee.lmuasister.ui.components.carClassColor
 import com.orioooneee.lmuasister.ui.components.CoverImage
@@ -261,24 +259,14 @@ private fun TrackCard(
     hotlapsSkeletonCount: Int = 6,
 ) {
     val flag = track.countryCode?.let { flagUrlFromCode(it) } ?: track.country?.let { flagUrl(it) }
+    val bg = track.mapUrl?.takeIf { it.isNotBlank() }?.let { it.substringBeforeLast("/") + "/background.webp" }
     Card {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Emblem (circuit logo) stands in for the track name; the country flag sits in
-            // the top-right corner of it — no title row needed.
-            if (track.logoUrl != null || flag != null) {
-                Box(Modifier.fillMaxWidth()) {
-                    track.logoUrl?.let { TrackEmblem(it) }
-                    flag?.let { Box(Modifier.align(Alignment.TopEnd)) { FlagCircle(it) } }
-                }
-            }
-            if (!track.mapUrl.isNullOrBlank()) {
-                CoverImage(
-                    url = track.mapUrl,
-                    contentDescription = "${track.name} map",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxWidth().height(160.dp).clip(MaterialTheme.shapes.medium),
-                )
-            }
+            TrackPreview(
+                backgroundUrl = bg, mapUrl = track.mapUrl, logoUrl = track.logoUrl, flagUrl = flag,
+                modifier = Modifier.clip(MaterialTheme.shapes.medium),
+                height = 170.dp, emblemHeight = 30.dp, flagSize = 24.dp,
+            )
             val officialName = track.name.takeIf { it.isNotBlank() }
             val primaryName = track.simpleName?.takeIf { it.isNotBlank() } ?: officialName
             DetailRows(
@@ -296,21 +284,6 @@ private fun TrackCard(
                 hotlaps.isNotEmpty() -> HotlapsFlow(hotlaps)
             }
         }
-    }
-}
-
-/** Circuit text logo (vector emblem) — shown only once Coil has it (missing asset = invisible). */
-@Composable
-private fun TrackEmblem(url: String) {
-    val painter = rememberAsyncImagePainter(model = url)
-    val state by painter.state.collectAsState()
-    if (state is AsyncImagePainter.State.Success) {
-        Image(
-            painter = painter,
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxWidth().height(80.dp),
-        )
     }
 }
 
@@ -1004,15 +977,6 @@ private fun Card(title: String? = null, leading: (@Composable () -> Unit)? = nul
             Spacer(Modifier.height(12.dp))
         }
         content()
-    }
-}
-
-@Composable
-private fun FlagCircle(url: String) {
-    Box(
-        Modifier.size(34.dp).clip(CircleShape).background(Surface2).border(1.dp, Outline, CircleShape),
-    ) {
-        CoverImage(url = url, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
     }
 }
 

@@ -32,6 +32,24 @@ data class SteamProfile(
     val stats: ProfileStatsDto? = null,
     // DR/SR progression: one point per race, oldest→newest, for the profile chart.
     @SerialName("rating_history") val ratingHistory: RatingHistoryDto? = null,
+    // Total distance driven across all races, in km (float; shown rounded as a header badge).
+    @SerialName("total_distance_km") val totalDistanceKm: Double = 0.0,
+    // Per-track distance breakdown (km desc) — shown when the distance badge is tapped.
+    @SerialName("track_breakdown") val trackBreakdown: List<TrackBreakdownDto> = emptyList(),
+)
+
+/** One track's slice of the career distance breakdown (GET /profile → `track_breakdown`). */
+@Serializable
+data class TrackBreakdownDto(
+    @SerialName("track_id") val trackId: String? = null,   // per-layout asset id → opens track detail
+    val track: String = "—",
+    @SerialName("length_km") val lengthKm: Double? = null,
+    @SerialName("num_turns") val numTurns: Int? = null,
+    @SerialName("logo_url") val logoUrl: String? = null,
+    @SerialName("country_code") val countryCode: String? = null,
+    val races: Int = 0,
+    val laps: Int = 0,
+    @SerialName("distance_km") val distanceKm: Double = 0.0,
 )
 
 /** GET /api/v2/profile → `stats`. Only the headline `total` block is used by the UI;

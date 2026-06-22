@@ -1,6 +1,5 @@
 package com.orioooneee.lmuasister.ui.profile
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,7 +34,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -53,8 +54,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import coil3.compose.AsyncImagePainter
-import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
 import com.orioooneee.lmuasister.data.remote.LapDto
@@ -64,6 +63,7 @@ import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.ReasonDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
+import com.orioooneee.lmuasister.ui.tracks.TrackPreview
 import com.orioooneee.lmuasister.ui.components.BlockSkeleton
 import com.orioooneee.lmuasister.ui.components.LeaderboardRowSkeleton
 import com.orioooneee.lmuasister.ui.components.MetaChip
@@ -82,6 +82,7 @@ import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.formatIsoDateTime
 import com.orioooneee.lmuasister.ui.util.formatLap
+import kotlin.math.roundToLong
 
 private val PosGreen = Color(0xFF53D769)
 private val NegRed = Color(0xFFE5484D)
@@ -300,6 +301,8 @@ private fun SplitError(onRetry: () -> Unit) {
 private fun TrackCard(t: TrackDto) {
     val flag = flagFor(t.countryCode)
     val logo = absUrl(t.logoUrl ?: t.mapUrl?.let { it.substringBeforeLast("/") + "/logo.svg" })
+    val map = absUrl(t.mapUrl)
+    val bg = absUrl(t.mapUrl?.let { it.substringBeforeLast("/") + "/background.webp" })
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -309,20 +312,11 @@ private fun TrackCard(t: TrackDto) {
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (logo != null || flag != null) {
-            Box(Modifier.fillMaxWidth()) {
-                logo?.let { SvgImage(it, Modifier.fillMaxWidth().height(56.dp)) }
-                flag?.let { FlagCircle(it, 24.dp, Modifier.align(Alignment.TopEnd)) }
-            }
-        }
-        absUrl(t.mapUrl)?.let { map ->
-            AsyncImage(
-                model = map,
-                contentDescription = "${t.name} map",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(10.dp)),
-            )
-        }
+        TrackPreview(
+            backgroundUrl = bg, mapUrl = map, logoUrl = logo, flagUrl = flag,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)),
+            height = 170.dp, emblemHeight = 28.dp, flagSize = 24.dp,
+        )
         val name = t.simpleName?.takeIf { it.isNotBlank() } ?: t.name.takeIf { it.isNotBlank() }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             name?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold) }
@@ -478,13 +472,16 @@ private fun SheetLink(label: String, onClick: () -> Unit) {
 }
 
 /** Bottom sheet listing every lap (time + sectors + pit flag) plus the headline lap stats. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun LapsSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
     val laps = raceLaps(d)
     val bestMs = laps.mapNotNull { it.lapTimeMs?.takeIf { t -> t > 0L } }.minOrNull()
     // Fastest time per sector across all laps — used to green-highlight the best sector each lap.
     val bestSectors = bestSectorsByIndex(laps)
+    // Track length (km) → average speed per lap and overall.
+    val lengthKm = d.trackInfo?.lengthKm?.toDoubleOrNull()?.takeIf { it > 0.0 }
+    val pace = paceFrom(laps, 1)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -494,16 +491,17 @@ private fun LapsSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(max = sheetMaxHeight())   // cap at ~70% of the screen, scroll past that
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text("Lap times", style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Stat("Laps", laps.size.toString())
                 bestMs?.let { Stat("Best", formatLap(it)) }
-                paceFrom(laps, 1)?.let { Stat("Avg", formatLap(it.avgMs)) }
+                pace?.let { Stat("Avg", formatLap(it.avgMs)) }
                 d.finishStatus?.takeIf { it.isNotBlank() }?.let { Stat("Result", it) }
             }
             Column(
@@ -513,7 +511,7 @@ private fun LapsSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
                     .border(1.dp, Outline, RoundedCornerShape(10.dp)),
             ) {
                 laps.forEachIndexed { i, lap ->
-                    LapRow(lap, alt = i % 2 == 1, isBest = bestMs != null && lap.lapTimeMs == bestMs, bestSectors = bestSectors)
+                    LapRow(lap, alt = i % 2 == 1, isBest = bestMs != null && lap.lapTimeMs == bestMs, bestSectors = bestSectors, lengthKm = lengthKm)
                 }
             }
         }
@@ -521,7 +519,7 @@ private fun LapsSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List<Long?>) {
+private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List<Long?>, lengthKm: Double?) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -534,6 +532,15 @@ private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List
             // Class position this lap (overall as fallback), shown prominently.
             (lap.classPosition ?: lap.position)?.takeIf { it > 0 }?.let {
                 Text("P$it", style = MaterialTheme.typography.labelMedium, color = TextHigh, fontWeight = FontWeight.SemiBold)
+            }
+            // Average speed on this lap (track length / lap time, 2 decimals) — next to the position.
+            val speed = lap.lapTimeMs?.takeIf { it > 0L }?.let { ms -> lengthKm?.let { speedKmh(it, ms) } }
+            speed?.let {
+                Text(
+                    "avg $it km/h",
+                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                    color = TextLow,
+                )
             }
             if (lap.pit) PitBadge()
             Spacer(Modifier.weight(1f))
@@ -582,6 +589,13 @@ private fun PitBadge() {
     }
 }
 
+/** Average speed for a lap: track length (km) / lap time (ms) → km/h, to 2 decimals ("198.34"). */
+private fun speedKmh(lengthKm: Double, lapMs: Long): String {
+    if (lapMs <= 0L) return "—"
+    val r = (lengthKm * 3_600_000.0 / lapMs * 100.0).roundToLong()
+    return "${r / 100}.${(r % 100).toString().padStart(2, '0')}"
+}
+
 /** A sector time in milliseconds as "S.mmm" seconds. */
 private fun sectorFmt(ms: Long): String {
     val s = ms / 1000
@@ -591,6 +605,14 @@ private fun sectorFmt(ms: Long): String {
 
 /** Bottom sheet that explains the player's own SR/DR change for this race, component by
  *  component (signed weight + reason), grouped into an SR section and a DR section. */
+/** Cap for the detail bottom sheets: ~85% of the screen height; content scrolls past it. */
+@Composable
+private fun sheetMaxHeight(): Dp {
+    val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
+    return with(density) { (windowInfo.containerSize.height * 0.85f).toDp() }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RatingBreakdownSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
@@ -603,6 +625,8 @@ private fun RatingBreakdownSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(max = sheetMaxHeight())   // cap at ~70% of the screen, scroll past that
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -991,15 +1015,6 @@ private fun rankColor(rank: String): Color = when (rank.trim().firstOrNull()?.lo
     else -> TextMed
 }
 
-
-@Composable
-private fun SvgImage(url: String, modifier: Modifier) {
-    val painter = rememberAsyncImagePainter(model = url)
-    val state by painter.state.collectAsState()
-    if (state is AsyncImagePainter.State.Success) {
-        Image(painter = painter, contentDescription = null, contentScale = ContentScale.Fit, modifier = modifier)
-    }
-}
 
 @Composable
 private fun FlagCircle(url: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {

@@ -51,6 +51,7 @@ import com.orioooneee.lmuasister.ui.profile.ProfileScreen
 import com.orioooneee.lmuasister.ui.profile.RaceProfileDetailScreen
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
 import com.orioooneee.lmuasister.ui.profile.SuspensionsScreen
+import com.orioooneee.lmuasister.ui.profile.TrackBreakdownScreen
 import com.orioooneee.lmuasister.ui.tracks.TrackDetailScreen
 import com.orioooneee.lmuasister.ui.tracks.TracksScreen
 import com.orioooneee.lmuasister.ui.theme.Carbon
@@ -91,6 +92,9 @@ data class CategoryRacesRoute(val category: String, val title: String)
 
 @Serializable
 data class SuspensionsRoute(val active: Boolean)
+
+@Serializable
+object TrackBreakdownRoute
 
 @Serializable
 data class ProfileRaceDetailRoute(val eventId: String, val split: Int = -1)
@@ -200,6 +204,7 @@ fun MainShell(
                         Telemetry.log(AnalyticsEvent.PrivacyOpened)
                         nav.navigate(PrivacyRoute)
                     },
+                    onOpenTracks = { nav.navigate(TrackBreakdownRoute) },
                 )
             }
             composable<TracksRoute> {
@@ -230,6 +235,14 @@ fun MainShell(
             }
             composable<PrivacyRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) {
                 PrivacyPolicyScreen(insets = insets, onBack = { nav.popBackStack() })
+            }
+            composable<TrackBreakdownRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) {
+                TrackBreakdownScreen(
+                    viewModel = profileViewModel,
+                    insets = insets,
+                    onBack = { nav.popBackStack() },
+                    onOpenTrack = { trackId -> nav.navigate(TrackDetailRoute(trackId)) },
+                )
             }
             composable<AllRacesRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) {
                 AllRacesScreen(

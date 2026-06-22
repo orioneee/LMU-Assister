@@ -53,6 +53,7 @@ import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.Race
 import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.Schedule
+import com.orioooneee.lmuasister.ui.IconCoffee
 import com.orioooneee.lmuasister.ui.IconGithub
 import com.orioooneee.lmuasister.ui.WeekTab
 import com.orioooneee.lmuasister.ui.components.EmptyState
@@ -65,6 +66,7 @@ import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.Surface1
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
+import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -81,6 +83,7 @@ import lmuassister.shared.generated.resources.tab_special
 import org.jetbrains.compose.resources.stringResource
 
 private const val REPO_URL = "https://github.com/orioneee/LMU-Assister"
+private const val JAR_URL = "https://send.monobank.ua/jar/A13DDkcaK5"
 
 @Composable
 fun HomeScreen(
@@ -103,11 +106,12 @@ fun HomeScreen(
     val heroHeight = with(density) { windowInfo.containerSize.height.toDp() / 3 }.coerceIn(180.dp, 300.dp)
     val uriHandler = LocalUriHandler.current
     val openRepo = { uriHandler.openUri(REPO_URL) }
+    val openJar = { uriHandler.openUri(JAR_URL) }
 
     if (tabs.isEmpty()) {
         Column(Modifier.fillMaxSize().background(Carbon)) {
             Spacer(Modifier.height(topInset + 12.dp))
-            ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo)
+            ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo, openJar)
             Spacer(Modifier.height(12.dp))
             NoRaces(Modifier.weight(1f), onRefresh)
         }
@@ -147,7 +151,7 @@ fun HomeScreen(
                 .background(Carbon),
         ) {
             Spacer(Modifier.height(topInset + 12.dp))
-            ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo)
+            ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo, openJar)
             Spacer(Modifier.height(12.dp))
             if (tabs.size > 1) {
                 Row(
@@ -172,6 +176,7 @@ private fun ScheduleTopBar(
     selectedWeek: String,
     onSelectWeek: (String) -> Unit,
     onOpenRepo: () -> Unit,
+    onOpenJar: () -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth().padding(end = 12.dp),
@@ -180,6 +185,27 @@ private fun ScheduleTopBar(
         Box(Modifier.weight(1f)) {
             if (weeks.size > 1) WeekPillsRow(weeks, selectedWeek, onSelectWeek)
         }
+        // Support (Monobank jar) + GitHub, inline in the header row so they never overlap the tabs below.
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(Amber.copy(alpha = 0.15f))
+                .border(1.dp, Amber.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                .clickable(onClick = onOpenJar)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(IconCoffee, contentDescription = null, tint = Amber, modifier = Modifier.size(16.dp))
+            Text(
+                "Buy me a coffee",
+                style = MaterialTheme.typography.labelMedium,
+                color = Amber,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        }
+        Spacer(Modifier.width(6.dp))
         Box(
             Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onOpenRepo),
             contentAlignment = Alignment.Center,

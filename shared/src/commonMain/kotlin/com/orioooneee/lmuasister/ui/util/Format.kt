@@ -1,6 +1,7 @@
 package com.orioooneee.lmuasister.ui.util
 
 import androidx.compose.ui.graphics.Color
+import kotlin.math.roundToLong
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.LocalTime
@@ -55,6 +56,18 @@ fun formatIsoTimeAndDate(iso: String?): Pair<String, String>? =
     iso?.takeIf { it.isNotBlank() }
         ?.let { runCatching { Instant.parse(it).local() }.getOrNull() }
         ?.let { dt -> "${two(dt.hour)}:${two(dt.minute)}" to "${two(dt.day)}.${two(dt.month.ordinal + 1)}.${dt.year}" }
+
+/** Distance in km, rounded to a whole number with space-grouped thousands. Works for any
+ *  magnitude: 11000.4 -> "11 000", 980.6 -> "981", 1234567.0 -> "1 234 567". */
+fun formatKm(km: Double): String {
+    val digits = km.roundToLong().toString()
+    val sb = StringBuilder()
+    for ((i, c) in digits.withIndex()) {
+        if (i > 0 && (digits.length - i) % 3 == 0) sb.append(' ')
+        sb.append(c)
+    }
+    return sb.toString()
+}
 
 /** Lap time in ms -> "1:42.623". */
 fun formatLap(ms: Long): String {

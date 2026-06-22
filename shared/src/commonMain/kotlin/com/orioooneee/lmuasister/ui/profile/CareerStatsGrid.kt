@@ -139,7 +139,7 @@ private fun StatTile(
             .background(Surface2)
             // Accent border in the cell's own color marks a tile as tappable.
             .then(if (clickable) Modifier.border(1.dp, cell.color.copy(alpha = 0.55f), shape) else Modifier)
-            .then(if (clickable) Modifier.clickable { onOpenCategory(cell.category!!) } else Modifier)
+            .then(if (clickable) Modifier.clickable { onOpenCategory(cell.category) } else Modifier)
             .padding(vertical = 14.dp),
         contentAlignment = Alignment.Center,
     ) {

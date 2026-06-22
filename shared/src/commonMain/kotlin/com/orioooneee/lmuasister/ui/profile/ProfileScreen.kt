@@ -82,6 +82,7 @@ fun ProfileScreen(
     onOpenSuspensions: (active: Boolean) -> Unit = {},
     onOpenCategory: (StatCategory) -> Unit = {},
     onOpenPrivacy: () -> Unit = {},
+    onOpenTracks: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val topInset = insets.calculateTopPadding()
@@ -121,7 +122,7 @@ fun ProfileScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Spacer(Modifier.height(topInset + 24.dp))
-                ProfileContent(signedIn.backend, onSeeAllRaces, onOpenRace, onOpenSuspensions, onOpenCategory)
+                ProfileContent(signedIn.backend, onSeeAllRaces, onOpenRace, onOpenSuspensions, onOpenCategory, onOpenTracks)
                 Spacer(Modifier.height(24.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -341,6 +342,7 @@ private fun ProfileContent(
     onOpenRace: (eventId: String, split: Int?) -> Unit,
     onOpenSuspensions: (active: Boolean) -> Unit,
     onOpenCategory: (StatCategory) -> Unit,
+    onOpenTracks: () -> Unit,
 ) {
     when (backend) {
         is BackendState.Ok -> ProfileView(
@@ -350,6 +352,7 @@ private fun ProfileContent(
             onOpenRace = onOpenRace,
             onOpenSuspensions = onOpenSuspensions,
             onOpenCategory = onOpenCategory,
+            onOpenTracks = onOpenTracks,
         )
         BackendState.Loading -> ProfileSkeleton()
         is BackendState.AuthFailed -> ProfileMessage("Couldn't load profile", backend.message)
