@@ -81,7 +81,8 @@ data class RaceDto(
     val raceLength: Int = 0,
     val settings: SettingsDto = SettingsDto(),
     val track: TrackDto? = null,
-    val imageUrl: String? = null,
+    // Event promo card — absolute S3 (studio) URL. NB: distinct from track.cover (R2 track preview).
+    val cover: String? = null,
     val weather: WeatherDto? = null,
     val leaderboardId: String? = null,
     val completed: Boolean = false,
@@ -134,12 +135,11 @@ data class TrackDto(
     // v2 sends length as a string ("13.626"); parsed to Double in the mapper.
     @SerialName("length_km") val lengthKm: String? = null,
     @SerialName("num_turns") val numTurns: Int? = null,
-    @SerialName("map_url") val mapUrl: String? = null,
-    // v2 asset URLs — sent by the backend once race.track is enriched; until then
-    // they're derived client-side from map_url (same /track/<id>/ path).
-    @SerialName("logo_url") val logoUrl: String? = null,
-    @SerialName("card_url") val cardUrl: String? = null,
-    @SerialName("background_url") val backgroundUrl: String? = null,
+    // Absolute CDN (R2) asset URLs — all four sent flat by the backend, loaded directly.
+    @SerialName("scheme") val scheme: String? = null,
+    @SerialName("logo") val logo: String? = null,
+    @SerialName("cover") val cover: String? = null,
+    @SerialName("background") val background: String? = null,
     @SerialName("country_code") val countryCode: String? = null,
 )
 

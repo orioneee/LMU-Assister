@@ -41,8 +41,8 @@ val ProfileJson: Json = Json {
  * time-slot maths) server-side and exposes:
  *   - GET /schedule        → every week + championships, fully merged
  *   - GET /race/<id>       → the race plus its fastest-lap leaderboard
- *   - GET /img/<token>     → proxied image bytes (referenced from image/map urls)
  *
+ * Images are absolute CDN URLs (R2 / S3) in the payloads — loaded directly, no proxy.
  * Base URL comes from [BuildConfig.BACKEND_URL] (set in local.properties).
  */
 class BackendApi(private val client: HttpClient) {
@@ -92,15 +92,7 @@ class BackendApi(private val client: HttpClient) {
         return AppJson.decodeFromString(body)
     }
 
-    fun imageUrl(path: String?): String? = when {
-        path.isNullOrBlank() -> null
-        path.startsWith("http") -> path
-        else -> ORIGIN + path
-    }
-
     private companion object {
         val API_BASE = BuildConfig.BACKEND_URL.trimEnd('/')   // http://host/api/v2
-        // Host root, version-agnostic: everything before "/api/" (falls back to API_BASE).
-        val ORIGIN = API_BASE.substringBefore("/api/", API_BASE)  // http://host
     }
 }

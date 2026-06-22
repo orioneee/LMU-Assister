@@ -114,7 +114,7 @@ class RaceRepository(
     suspend fun load(weekKeyOverride: String? = null, refresh: Boolean = false): Result<Schedule> = runCatching {
         val resp = full(refresh)
         val key = weekKeyOverride ?: resp.weeks.firstOrNull()?.key ?: error("No race weeks available")
-        Schedule(resp.schedules[key].orEmpty().map { it.toModel(api::imageUrl) })
+        Schedule(resp.schedules[key].orEmpty().map { it.toModel() })
     }
 
     private val lbMem = mutableMapOf<String, RaceLeaderboards>()
@@ -259,7 +259,7 @@ private class LeaderboardPagingSource(
 private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
 
 
-private fun RaceDto.toModel(resolveImage: (String?) -> String?): Race = Race(
+private fun RaceDto.toModel(): Race = Race(
     id = id,
     type = RaceType.from(type),
     series = series,
@@ -271,8 +271,8 @@ private fun RaceDto.toModel(resolveImage: (String?) -> String?): Race = Race(
     times = times.mapNotNull { runCatching { Instant.parse(it) }.getOrNull() },
     raceLength = raceLength,
     settings = settings.toModel(),
-    track = track?.toModel(resolveImage),
-    imageUrl = resolveImage(imageUrl),
+    track = track?.toModel(),
+    imageUrl = cover,
     weather = weather?.toModel(),
     leaderboardId = leaderboardId,
     completed = completed,
@@ -297,23 +297,20 @@ private fun SettingsDto.toModel() = RaceSettings(
     limitedTires = limitedTires,
 )
 
-private fun TrackDto.toModel(resolveImage: (String?) -> String?): TrackInfo {
-    fun sibling(file: String): String? =
-        mapUrl?.takeIf { it.endsWith("/map.svg") }?.removeSuffix("map.svg")?.plus(file)
-    return TrackInfo(
-        name = name,
-        shortName = shortName,
-        simpleName = simpleName,
-        town = town,
-        country = country,
-        lengthKm = lengthKm?.toDoubleOrNull(),
-        numTurns = numTurns,
-        mapUrl = resolveImage(mapUrl),
-        logoUrl = resolveImage(logoUrl ?: sibling("logo.svg")),
-        cardUrl = resolveImage(cardUrl ?: sibling("card.webp")),
-        countryCode = countryCode,
-    )
-}
+private fun TrackDto.toModel(): TrackInfo = TrackInfo(
+    name = name,
+    shortName = shortName,
+    simpleName = simpleName,
+    town = town,
+    country = country,
+    lengthKm = lengthKm?.toDoubleOrNull(),
+    numTurns = numTurns,
+    mapUrl = scheme,
+    logoUrl = logo,
+    cardUrl = cover,
+    backgroundUrl = background,
+    countryCode = countryCode,
+)
 
 private fun WeatherDto.toModel(): RaceWeather? = RaceWeather(
     practice = practice?.toModel(),

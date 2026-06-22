@@ -23,8 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,14 +31,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.orioooneee.lmuasister.config.BuildConfig
-import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.remote.TrackBreakdownDto
-import com.orioooneee.lmuasister.data.remote.TrackFullDto
-import com.orioooneee.lmuasister.ui.TrackLogoIndex
 import com.orioooneee.lmuasister.ui.tracks.TrackPreview
 import com.orioooneee.lmuasister.ui.tracks.trackFlagUrl
-import org.koin.compose.koinInject
 import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.ShimmerBar
 import com.orioooneee.lmuasister.ui.components.shimmerBrush
@@ -69,15 +62,6 @@ fun TrackBreakdownScreen(
     val profile = (state as? SteamLoginUiState.SignedIn)?.backend
         ?.let { it as? BackendState.Ok }?.profile
     val tracks = profile?.trackBreakdown
-
-    // The breakdown often carries no logo_url, so match each track to the full reference roster
-    // (same source the Tracks screen uses) and derive the reliable /track/<id>/logo.svg emblem.
-    val repo = koinInject<RaceRepository>()
-    val roster by produceState(repo.cachedTracks()) {
-        repo.cachedTracks()?.let { value = it }
-        repo.tracks().getOrNull()?.let { value = it }
-    }
-    val logoByName = remember(roster) { rosterLogoMap(roster) }
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
         Row(
@@ -112,7 +96,7 @@ fun TrackBreakdownScreen(
                 Text("No track distance yet.", style = MaterialTheme.typography.bodyMedium, color = TextLow)
             }
             else -> TrackGrid(insets) {
-                items(tracks, key = { it.trackId ?: it.track }) { TrackBreakdownCard(it, logoByName, onOpenTrack) }
+                items(tracks, key = { it.trackId ?: it.track }) { TrackBreakdownCard(it, onOpenTrack) }
             }
         }
     }
@@ -133,14 +117,9 @@ private fun TrackGrid(insets: PaddingValues, content: androidx.compose.foundatio
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TrackBreakdownCard(t: TrackBreakdownDto, logoByName: Map<String, String>, onOpenTrack: (String) -> Unit) {
-    // Emblem: backend logo_url if present, else the roster's id-derived logo, else the schedule cache.
-    val emblemUrl = absUrl(t.logoUrl) ?: logoByName[normalizeName(t.track)] ?: TrackLogoIndex.lookup(t.track)
-    val mapUrl = emblemUrl?.takeIf { "logo.svg" in it }?.replace("logo.svg", "map.svg")
-    val bgUrl = emblemUrl?.takeIf { "logo.svg" in it }?.replace("logo.svg", "background.webp")
-    // Navigate by the backend track_id; if a stale payload omits it, pull the id out of the asset URL.
+private fun TrackBreakdownCard(t: TrackBreakdownDto, onOpenTrack: (String) -> Unit) {
+    // All four assets arrive as absolute CDN (R2) URLs straight in the breakdown row.
     val trackId = t.trackId?.takeIf { it.isNotBlank() }
-        ?: emblemUrl?.substringAfter("/track/", "")?.substringBefore("/")?.takeIf { it.isNotBlank() }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -150,7 +129,7 @@ private fun TrackBreakdownCard(t: TrackBreakdownDto, logoByName: Map<String, Str
             .clickable(enabled = trackId != null) { trackId?.let(onOpenTrack) },
     ) {
         TrackPreview(
-            backgroundUrl = bgUrl, mapUrl = mapUrl, logoUrl = emblemUrl,
+            backgroundUrl = t.background, mapUrl = t.scheme, logoUrl = t.logo,
             flagUrl = trackFlagUrl(t.countryCode),
             height = 96.dp, emblemHeight = 24.dp,
         )
@@ -197,26 +176,3 @@ private fun TrackBreakdownSkeleton() {
     }
 }
 
-/** {normalised track name → absolute logo url} built from the reference roster, deriving the
- *  emblem from each track's id exactly like the Tracks screen (the reliable source). */
-private fun rosterLogoMap(roster: List<TrackFullDto>?): Map<String, String> {
-    val m = HashMap<String, String>()
-    roster?.forEach { t ->
-        val id = t.id.takeIf { it.isNotBlank() } ?: return@forEach
-        val url = t.assets?.logo?.let { absUrl(it) } ?: (BuildConfig.BACKEND_URL.trimEnd('/') + "/track/$id/logo.svg")
-        listOfNotNull(t.fullName, t.name, t.eventName).forEach { n ->
-            normalizeName(n)?.let { m.putIfAbsent(it, url) }
-        }
-    }
-    return m
-}
-
-/** Lowercase + strip everything but a–z/0–9, so the breakdown name matches a roster name. */
-private fun normalizeName(s: String?): String? =
-    s?.lowercase()?.replace(Regex("[^a-z0-9]"), "")?.ifBlank { null }
-
-private fun absUrl(path: String?): String? = when {
-    path.isNullOrBlank() -> null
-    path.startsWith("http") -> path
-    else -> BuildConfig.BACKEND_URL.substringBefore("/api/", BuildConfig.BACKEND_URL).trimEnd('/') + path
-}

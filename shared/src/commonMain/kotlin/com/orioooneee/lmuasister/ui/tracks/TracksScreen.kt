@@ -32,7 +32,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.remote.TrackFullDto
 import com.orioooneee.lmuasister.ui.components.ShimmerBar
@@ -141,27 +140,14 @@ internal fun trackTitle(t: TrackFullDto): String =
         .replace(Regex(" - (WEC|ELMS|IMSA|GT)$"), "")
         .trim()
 
-/** Relative backend asset path → absolute URL against the API origin. */
-internal fun trackAbsUrl(path: String?): String? = when {
-    path.isNullOrBlank() -> null
-    path.startsWith("http") -> path
-    else -> BuildConfig.BACKEND_URL.substringBefore("/api/", BuildConfig.BACKEND_URL).trimEnd('/') + path
-}
-
-/** Track asset URL. The /tracks `assets` fields are usually null, but the files ARE served at
- *  the standard `/track/<id>/<file>` path — so derive from the id when the field is missing
- *  (same trick the race screens use). file = logo.svg / map.svg / card.webp / background.webp. */
-internal fun trackAsset(t: TrackFullDto, file: String): String? {
-    val explicit = when (file) {
-        "logo.svg" -> t.assets?.logo
-        "map.svg" -> t.assets?.map
-        "card.webp" -> t.assets?.card
-        "background.webp" -> t.assets?.background
-        else -> null
-    }
-    explicit?.let { return trackAbsUrl(it) }
-    val id = t.id.takeIf { it.isNotBlank() } ?: return null
-    return BuildConfig.BACKEND_URL.trimEnd('/') + "/track/$id/$file"
+/** Track asset URL — absolute CDN (R2) link straight from the payload, or null.
+ *  `file` stays the caller's selector: logo.svg / map.svg / card.webp / background.webp. */
+internal fun trackAsset(t: TrackFullDto, file: String): String? = when (file) {
+    "logo.svg" -> t.assets?.logo
+    "map.svg" -> t.assets?.scheme
+    "card.webp" -> t.assets?.cover
+    "background.webp" -> t.assets?.background
+    else -> null
 }
 
 /** ISO country code → circle-flag SVG url (null if not a 2-letter code). */

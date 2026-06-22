@@ -65,18 +65,23 @@ fun TrackDetailScreen(
     val repo = koinInject<RaceRepository>()
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val signedIn = uiState is SteamLoginUiState.SignedIn
-    val result by produceState<Result<TrackDetailResponse>?>(null, trackId) {
+    // Re-keyed on signedIn so the personal record loads in once auth lands (e.g. after a cold-start restore).
+    val result by produceState<Result<TrackDetailResponse>?>(null, trackId, signedIn) {
+        // 1) Paint instantly: cached personal detail, else the public track block from the roster.
         viewModel.cachedTrackDetail(trackId)?.let { value = Result.success(it) }
-        val fresh = runCatching { viewModel.trackDetail(trackId) }
-        value = when {
-            fresh.isSuccess -> fresh
-            value != null -> value // keep the cached payload on a transient failure
-            else -> {
-                // Not signed in / auth failed → still show the public track block from the roster.
-                val pub = repo.cachedTracks()?.firstOrNull { it.id == trackId || it.base == trackId || it.code == trackId }
-                    ?: runCatching { repo.tracks().getOrNull() }.getOrNull()?.firstOrNull { it.id == trackId }
-                if (pub != null) Result.success(TrackDetailResponse(track = pub, personal = null)) else fresh
+        if (value == null) {
+            publicTrack(repo, trackId)?.let { value = Result.success(TrackDetailResponse(track = it, personal = null)) }
+        }
+        // 2) Only hit the personal endpoint when signed in — avoids withReauth's 60s token wait when signed out.
+        if (signedIn) {
+            val fresh = runCatching { viewModel.trackDetail(trackId) }
+            when {
+                fresh.isSuccess -> value = fresh
+                value == null -> value = fresh // nothing to show → surface the error
             }
+        } else if (value == null) {
+            // Signed out and no public block available → show an error instead of a forever loader.
+            value = Result.failure(IllegalStateException("Couldn't load this track"))
         }
     }
 
@@ -111,6 +116,13 @@ fun TrackDetailScreen(
             )
         }
     }
+}
+
+/** The public reference block for a track (cached roster first, then a network refresh). No auth. */
+private suspend fun publicTrack(repo: RaceRepository, trackId: String): TrackFullDto? {
+    fun List<TrackFullDto>?.find() = this?.firstOrNull { it.id == trackId || it.base == trackId || it.code == trackId }
+    return repo.cachedTracks().find()
+        ?: runCatching { repo.tracks().getOrNull() }.getOrNull().find()
 }
 
 @Composable

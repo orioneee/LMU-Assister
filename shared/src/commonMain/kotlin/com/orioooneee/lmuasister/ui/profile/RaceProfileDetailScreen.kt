@@ -54,7 +54,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
 import com.orioooneee.lmuasister.data.remote.LapDto
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
@@ -300,9 +299,9 @@ private fun SplitError(onRetry: () -> Unit) {
 @Composable
 private fun TrackCard(t: TrackDto) {
     val flag = flagFor(t.countryCode)
-    val logo = absUrl(t.logoUrl ?: t.mapUrl?.let { it.substringBeforeLast("/") + "/logo.svg" })
-    val map = absUrl(t.mapUrl)
-    val bg = absUrl(t.mapUrl?.let { it.substringBeforeLast("/") + "/background.webp" })
+    val logo = t.logo
+    val map = t.scheme
+    val bg = t.background
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1039,12 +1038,6 @@ private fun sessionLabel(key: String): String = when (key) {
     "qualifying" -> "Qualifying"
     "practice" -> "Practice"
     else -> key.replaceFirstChar(Char::uppercaseChar)
-}
-
-private fun absUrl(path: String?): String? = when {
-    path.isNullOrBlank() -> null
-    path.startsWith("http") -> path
-    else -> BuildConfig.BACKEND_URL.substringBefore("/api/", BuildConfig.BACKEND_URL).trimEnd('/') + path
 }
 
 private fun flagFor(value: String?): String? {

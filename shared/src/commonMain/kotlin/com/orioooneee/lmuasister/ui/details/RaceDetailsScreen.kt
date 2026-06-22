@@ -259,11 +259,10 @@ private fun TrackCard(
     hotlapsSkeletonCount: Int = 6,
 ) {
     val flag = track.countryCode?.let { flagUrlFromCode(it) } ?: track.country?.let { flagUrl(it) }
-    val bg = track.mapUrl?.takeIf { it.isNotBlank() }?.let { it.substringBeforeLast("/") + "/background.webp" }
     Card {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             TrackPreview(
-                backgroundUrl = bg, mapUrl = track.mapUrl, logoUrl = track.logoUrl, flagUrl = flag,
+                backgroundUrl = track.backgroundUrl, mapUrl = track.mapUrl, logoUrl = track.logoUrl, flagUrl = flag,
                 modifier = Modifier.clip(MaterialTheme.shapes.medium),
                 height = 170.dp, emblemHeight = 30.dp, flagSize = 24.dp,
             )

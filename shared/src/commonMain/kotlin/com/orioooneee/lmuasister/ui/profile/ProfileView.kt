@@ -38,7 +38,6 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
-import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.remote.RaceSessionsDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
@@ -520,9 +519,9 @@ private fun SessionPosBadge(label: String, position: Int) {
 
 @Composable
 private fun TrackLogo(url: String?, trackName: String? = null) {
-    // Profile cards often come back with no track_logo → fall back to the schedule's
-    // cached emblem for the same track (matched by normalised name).
-    val abs = absUrl(url) ?: TrackLogoIndex.lookup(trackName) ?: return
+    // track_logo is an absolute CDN URL now; still fall back to the schedule's cached
+    // emblem for the same track (matched by normalised name) when it's null.
+    val abs = url?.takeIf { it.isNotBlank() } ?: TrackLogoIndex.lookup(trackName) ?: return
     val painter = rememberAsyncImagePainter(model = abs)
     val state by painter.state.collectAsState()
     if (state is AsyncImagePainter.State.Success) {
@@ -547,11 +546,6 @@ private fun GridToFinish(grid: Int?, finish: Int) {
     Text("$grid→$finish", style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.SemiBold)
 }
 
-private fun absUrl(path: String?): String? = when {
-    path.isNullOrBlank() -> null
-    path.startsWith("http") -> path
-    else -> BuildConfig.BACKEND_URL.substringBefore("/api/", BuildConfig.BACKEND_URL).trimEnd('/') + path
-}
 
 private fun splitLabel(split: Int, total: Int?): String =
     if (total != null && total > 0) "Split $split/$total" else "Split $split"

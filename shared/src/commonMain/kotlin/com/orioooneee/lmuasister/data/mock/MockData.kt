@@ -180,7 +180,7 @@ internal object MockData {
             raceLength = spec.lenMin,
             settings = sampleSettings(spec),
             track = trackDto(t),
-            imageUrl = null, // no cover server in mock — UI falls back to its placeholder
+            cover = null, // no cover server in mock — UI falls back to its placeholder
             weather = sampleWeather(spec.id),
             leaderboardId = "lb-${spec.id}-overall",
             completed = false,
@@ -563,9 +563,9 @@ internal object MockData {
             type = "Permanent",
             official = true,
             assets = TrackAssetsDto(
-                map = "/api/v2/track/$id/map.svg",
+                scheme = "/api/v2/track/$id/scheme.svg",
                 logo = "/api/v2/track/$id/logo.svg",
-                card = "/api/v2/track/$id/card.webp",
+                cover = "/api/v2/track/$id/cover.webp",
                 background = "/api/v2/track/$id/background.webp",
             ),
         )

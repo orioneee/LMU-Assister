@@ -38,10 +38,13 @@ data class TrackInfo(
     val country: String?,
     val lengthKm: Double?,
     val numTurns: Int?,
+    /** Track scheme/minimap (svg). Carries the backend `scheme` asset. */
     val mapUrl: String?,
     val logoUrl: String? = null,
-    /** Colored event card art (webp) — used as the track emblem banner. */
+    /** Colored event card art (webp) — used as the track emblem banner. Backend `cover`. */
     val cardUrl: String? = null,
+    /** Track background art (webp). Backend `background`. */
+    val backgroundUrl: String? = null,
     /** ISO-3166 alpha-2 country code (for the flag), when the backend sends it. */
     val countryCode: String? = null,
 )

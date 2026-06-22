@@ -45,7 +45,11 @@ data class TrackBreakdownDto(
     val track: String = "—",
     @SerialName("length_km") val lengthKm: Double? = null,
     @SerialName("num_turns") val numTurns: Int? = null,
-    @SerialName("logo_url") val logoUrl: String? = null,
+    // Absolute CDN (R2) asset URLs — sent flat in each breakdown row, loaded directly.
+    val scheme: String? = null,
+    val logo: String? = null,
+    val cover: String? = null,
+    val background: String? = null,
     @SerialName("country_code") val countryCode: String? = null,
     val races: Int = 0,
     val laps: Int = 0,

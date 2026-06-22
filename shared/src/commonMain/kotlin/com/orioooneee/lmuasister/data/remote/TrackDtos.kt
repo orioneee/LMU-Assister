@@ -32,12 +32,12 @@ data class TrackFullDto(
     val assets: TrackAssetsDto? = null,
 )
 
-/** Relative asset URLs (any may be null); resolve against the API origin. */
+/** Absolute CDN (R2) asset URLs — any may be null; loaded directly, no resolution. */
 @Serializable
 data class TrackAssetsDto(
-    val map: String? = null,
+    val scheme: String? = null,
     val logo: String? = null,
-    val card: String? = null,
+    val cover: String? = null,
     val background: String? = null,
 )
 
