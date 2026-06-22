@@ -147,6 +147,7 @@ data class LapDto(
 data class SessionSummaryDto(
     val position: Int? = null,
     @SerialName("class_position") val classPosition: Int? = null,
+    @SerialName("class_size") val classSize: Int? = null, // cars in player's class this session
     @SerialName("grid_position") val gridPosition: Int? = null,
     @SerialName("best_lap_ms") val bestLapMs: Long? = null,
     @SerialName("best_lap_sectors_ms") val bestLapSectorsMs: List<Long?> = emptyList(),
@@ -182,6 +183,10 @@ data class RecentRaceDto(
     // Kept defaulted: a no-result race sends position: null, which coerces to 0 (see [ProfileJson]).
     val position: Int = 0,                                   // overall finishing position
     @SerialName("class_position") val classPosition: Int? = null, // position within own class
+    @SerialName("class_race_position") val classRacePosition: Int? = null,   // in-class finish (= class_position)
+    @SerialName("class_race_size") val classRaceSize: Int? = null,           // cars in player's class in the race
+    @SerialName("class_quali_position") val classQualiPosition: Int? = null, // in-class start (from quali), null if no quali
+    @SerialName("class_quali_size") val classQualiSize: Int? = null,         // cars in player's class in quali
     @SerialName("grid_position") val gridPosition: Int? = null,
     @SerialName("car_class") val carClass: String? = null,
     // Car model name, e.g. "McLaren 720S GT3" (backend may send either key).
@@ -231,6 +236,10 @@ data class RaceDetailDto(
     @SerialName("splits_available") val splitsAvailable: List<Int> = emptyList(),  // render as tabs
     @SerialName("field_size") val fieldSize: Int,
     val position: Int? = null,
+    @SerialName("class_race_position") val classRacePosition: Int? = null,   // in-class finish
+    @SerialName("class_race_size") val classRaceSize: Int? = null,           // cars in player's class in the race
+    @SerialName("class_quali_position") val classQualiPosition: Int? = null, // in-class start (from quali), null if no quali
+    @SerialName("class_quali_size") val classQualiSize: Int? = null,         // cars in player's class in quali
     @SerialName("grid_position") val gridPosition: Int? = null,
     @SerialName("best_lap_ms") val bestLapMs: Long? = null,
     @SerialName("best_lap_sectors_ms") val bestLapSectorsMs: List<Long?> = emptyList(),

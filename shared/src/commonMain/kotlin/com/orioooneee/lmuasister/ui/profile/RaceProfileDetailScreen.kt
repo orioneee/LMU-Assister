@@ -397,9 +397,14 @@ private fun SummaryCard(d: RaceDetailDto) {
             d.split?.let { MetaChip(if (d.totalSplits != null) "Split $it/${d.totalSplits}" else "Split $it") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            d.gridPosition?.takeIf { it > 0 }?.let { Stat("Start", "P$it") }
-            d.position?.takeIf { it > 0 }?.let { Stat("Finish", "P$it" + if (d.fieldSize > 0) " / ${d.fieldSize}" else "") }
-            gainLost(d.gridPosition, d.position)?.let { (txt, color) -> StatColored("+/-", txt, color) }
+            // In-class start/finish/delta. Absolute positions aren't shown — users care about the class result.
+            val start = d.classQualiPosition ?: d.gridPosition
+            val finish = d.classRacePosition ?: d.position
+            // Denominator is the in-class car count; falls back to the overall field only if class size is absent.
+            val finishSize = (if (d.classRacePosition != null) d.classRaceSize else d.fieldSize)?.takeIf { it > 0 }
+            start?.takeIf { it > 0 }?.let { Stat("Start", "P$it") }
+            finish?.takeIf { it > 0 }?.let { Stat("Finish", "P$it" + (finishSize?.let { s -> " / $s" } ?: "")) }
+            gainLost(start, finish)?.let { (txt, color) -> StatColored("+/-", txt, color) }
             DeltaStat("DR", d.drChange)
             DeltaStat("SR", d.srChange)
         }

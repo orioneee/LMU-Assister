@@ -407,8 +407,8 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
         // History shows the in-class finishing position. The denominator is the CLASS field size;
         // field_size is the overall grid (all classes), so only show "of N" when the backend sends
         // the class count — otherwise no denominator at all.
-        val classPos = race.classPosition?.takeIf { it > 0 } ?: race.position
-        val subtitle = race.classFieldSize?.takeIf { it > 0 }?.let { "of $it" }
+        val classPos = race.classRacePosition ?: race.classPosition?.takeIf { it > 0 } ?: race.position
+        val subtitle = (race.classRaceSize ?: race.classFieldSize)?.takeIf { it > 0 }?.let { "of $it" }
         // Left column: date/time over the position badge, grid→finish delta underneath.
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             // Time on top, date below: "18:50" / "21.06.2026".
@@ -420,7 +420,7 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
                 }
             }
             PositionBadge(classPos, subtitle, race.finishStatus)
-            if (finished) GridToFinish(race.gridPosition, race.position)
+            if (finished) GridToFinish(race.classQualiPosition, race.classRacePosition ?: race.classPosition)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(
@@ -487,23 +487,25 @@ private fun CarLine(carClass: String?, carName: String?) {
 @Composable
 private fun SessionsBreakdown(sessions: RaceSessionsDto?, includeRace: Boolean) {
     if (sessions == null) return
-    // Positions only (times dropped) on a single row: "QUALI 8   RACE 5".
-    val quali = sessions.qualifying?.position
-    val race = if (includeRace) sessions.race?.position else null
-    if (quali == null && race == null) return
+    // In-class positions (times dropped) on a single row: "QUALI 11/12   RACE 10/12".
+    val quali = sessions.qualifying
+    val race = if (includeRace) sessions.race else null
+    val qPos = quali?.let { it.classPosition ?: it.position }
+    val rPos = race?.let { it.classPosition ?: it.position }
+    if (qPos == null && rPos == null) return
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        quali?.let { SessionPosBadge("QUALI", it) }
-        race?.let { SessionPosBadge("RACE", it) }
+        qPos?.let { SessionPosBadge("QUALI", it, quali.classSize) }
+        rPos?.let { SessionPosBadge("RACE", it, race.classSize) }
     }
 }
 
-/** Two-tone "QUALI · 8" / "RACE · 5" pill for one session's finishing position. */
+/** Two-tone "QUALI · 11/12" / "RACE · 10/12" pill for one session's in-class position. */
 @Composable
-private fun SessionPosBadge(label: String, position: Int) {
+private fun SessionPosBadge(label: String, position: Int, size: Int? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Outline, RoundedCornerShape(6.dp)),
@@ -512,7 +514,8 @@ private fun SessionPosBadge(label: String, position: Int) {
             Text(label, style = MaterialTheme.typography.labelSmall, color = TextLow, fontWeight = FontWeight.Bold)
         }
         Box(Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) {
-            Text(position.toString(), style = MaterialTheme.typography.labelMedium, color = TextHigh, fontWeight = FontWeight.Bold)
+            val txt = position.toString() + (size?.takeIf { it > 0 }?.let { "/$it" } ?: "")
+            Text(txt, style = MaterialTheme.typography.labelMedium, color = TextHigh, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -535,8 +538,8 @@ private fun TrackLogo(url: String?, trackName: String? = null) {
 }
 
 @Composable
-private fun GridToFinish(grid: Int?, finish: Int) {
-    if (grid == null || finish <= 0) return
+private fun GridToFinish(grid: Int?, finish: Int?) {
+    if (grid == null || finish == null || finish <= 0) return
     val gained = grid - finish
     val color = when {
         gained > 0 -> PosGreen
