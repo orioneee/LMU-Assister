@@ -122,6 +122,7 @@ import lmuassister.shared.generated.resources.set_tire_warmers
 import lmuassister.shared.generated.resources.set_tire_wear
 import lmuassister.shared.generated.resources.set_track_limits
 import lmuassister.shared.generated.resources.full_leaderboard
+import lmuassister.shared.generated.resources.set_start_interval
 import lmuassister.shared.generated.resources.track_city
 import lmuassister.shared.generated.resources.track_name
 import lmuassister.shared.generated.resources.track_official_name
@@ -951,6 +952,7 @@ private fun settingRows(s: RaceSettings): List<Pair<String, String>> = listOfNot
     s.safetyRank?.let { stringResource(Res.string.set_safety_rank) to it },
     s.driverRank?.let { stringResource(Res.string.set_driver_rank) to it },
     s.splitSize?.let { stringResource(Res.string.set_split_size) to it.toString() },
+    s.startIntervalMin?.let { stringResource(Res.string.set_start_interval) to "every ${it}m" },
     s.driverSwaps?.let { stringResource(Res.string.set_driver_swaps) to if (it) stringResource(Res.string.yes) else stringResource(Res.string.no) },
     s.trackLimits?.let { stringResource(Res.string.set_track_limits) to it },
     s.tireWarmers?.let { stringResource(Res.string.set_tire_warmers) to it },

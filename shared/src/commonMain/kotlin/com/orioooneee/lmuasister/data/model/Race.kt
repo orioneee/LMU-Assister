@@ -91,6 +91,7 @@ data class RaceSettings(
     val safetyRank: String?,
     val driverRank: String?,
     val splitSize: Int?,
+    val startIntervalMin: Int?,
     val qualifyingLength: Int?,
     val practiceLength: Int?,
     val driverSwaps: Boolean?,

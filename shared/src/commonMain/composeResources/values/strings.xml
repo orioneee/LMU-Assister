@@ -121,6 +121,7 @@
     <string name="set_safety_rank">Safety rank</string>
     <string name="set_driver_rank">Driver rank</string>
     <string name="set_split_size">Split size</string>
+    <string name="set_start_interval">Start interval</string>
     <string name="set_driver_swaps">Driver swaps</string>
     <string name="set_track_limits">Track limits</string>
     <string name="set_tire_warmers">Tire warmers</string>

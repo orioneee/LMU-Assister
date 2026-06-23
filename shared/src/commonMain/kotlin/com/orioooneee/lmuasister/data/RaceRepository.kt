@@ -289,6 +289,7 @@ private fun SettingsDto.toModel() = RaceSettings(
     safetyRank = safetyRank,
     driverRank = driverRank,
     splitSize = splitSize,
+    startIntervalMin = startIntervalMin,
     qualifyingLength = qualifyingLength,
     practiceLength = practiceLength,
     driverSwaps = driverSwaps,

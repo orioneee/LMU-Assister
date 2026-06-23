@@ -111,7 +111,11 @@ fun HomeScreen(
     if (tabs.isEmpty()) {
         Column(Modifier.fillMaxSize().background(Carbon)) {
             Spacer(Modifier.height(topInset + 12.dp))
-            ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo, openJar)
+            // No tier row here to host the buttons, so keep week pills + support inline.
+            Row(Modifier.fillMaxWidth().padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { if (weeks.size > 1) WeekPillsRow(weeks, selectedWeek, onSelectWeek) }
+                SupportCluster(openRepo, openJar)
+            }
             Spacer(Modifier.height(12.dp))
             NoRaces(Modifier.weight(1f), onRefresh)
         }
@@ -151,41 +155,42 @@ fun HomeScreen(
                 .background(Carbon),
         ) {
             Spacer(Modifier.height(topInset + 12.dp))
-            ScheduleTopBar(weeks, selectedWeek, onSelectWeek, openRepo, openJar)
-            Spacer(Modifier.height(12.dp))
-            if (tabs.size > 1) {
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    tabs.forEachIndexed { i, tab ->
-                        TierTab(tab.label(), pager.currentPage == i) {
-                            scope.launch { pager.animateScrollToPage(i) }
+            // Week pills get their own full-width row — never crowded by the support buttons.
+            if (weeks.size > 1) {
+                WeekPillsRow(weeks, selectedWeek, onSelectWeek)
+                Spacer(Modifier.height(12.dp))
+            }
+            // Tier tabs (left, scrollable) share a row with the support cluster (right). Always rendered
+            // so Buy-me-a-coffee / GitHub stay visible even with a single tier.
+            Row(
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f)) {
+                    if (tabs.size > 1) {
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            tabs.forEachIndexed { i, tab ->
+                                TierTab(tab.label(), pager.currentPage == i) {
+                                    scope.launch { pager.animateScrollToPage(i) }
+                                }
+                            }
                         }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                SupportCluster(openRepo, openJar)
             }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
+/** Buy-me-a-coffee (Monobank jar) + GitHub, kept as a compact right-aligned cluster. */
 @Composable
-private fun ScheduleTopBar(
-    weeks: List<WeekTab>,
-    selectedWeek: String,
-    onSelectWeek: (String) -> Unit,
-    onOpenRepo: () -> Unit,
-    onOpenJar: () -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth().padding(end = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.weight(1f)) {
-            if (weeks.size > 1) WeekPillsRow(weeks, selectedWeek, onSelectWeek)
-        }
-        // Support (Monobank jar) + GitHub, inline in the header row so they never overlap the tabs below.
+private fun SupportCluster(onOpenRepo: () -> Unit, onOpenJar: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(10.dp))

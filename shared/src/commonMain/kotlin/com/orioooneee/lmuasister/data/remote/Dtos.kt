@@ -114,6 +114,7 @@ data class SettingsDto(
     val safetyRank: String? = null,
     val driverRank: String? = null,
     val splitSize: Int? = null,
+    val startIntervalMin: Int? = null, // rolling-daily start cadence (every N min); DAILY only, else null
     val qualifyingLength: Int? = null,
     val practiceLength: Int? = null,
     val driverSwaps: Boolean? = null,
