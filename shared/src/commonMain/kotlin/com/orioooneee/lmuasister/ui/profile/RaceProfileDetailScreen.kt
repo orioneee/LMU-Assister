@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -47,13 +48,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.orioooneee.lmuasister.data.remote.AvailableCarDto
 import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
 import com.orioooneee.lmuasister.data.remote.LapDto
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
@@ -194,6 +200,9 @@ private fun DetailContent(
     ) {
         d.trackInfo?.let { item { TrackCard(it) } }
         item { SummaryCard(d) }
+        if (d.availableCars.isNotEmpty()) {
+            item { AvailableCarsSection(d.availableCars) }
+        }
         if (tabs.size > 1) {
             item { SplitTabs(tabs, selected, mySplit) { selected = it } }
         }
@@ -210,7 +219,13 @@ private fun DetailContent(
                 for (key in listOf("qualifying", "race")) {
                     val session = sessions[key] ?: continue
                     if (session.classification.isEmpty()) continue
-                    item(key = "$selected-$key") { SessionCard(sessionLabel(key), session.classification) }
+                    item(key = "$selected-$key") {
+                        SessionCard(
+                            sessionLabel(key),
+                            session.classification,
+                            showRatingDeltas = key == "race",
+                        )
+                    }
                 }
             }
         }
@@ -367,14 +382,17 @@ private fun CategoryChip(label: String, color: Color) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SummaryCard(d: RaceDetailDto) {
     var showBreakdown by remember { mutableStateOf(false) }
-    var showLaps by remember { mutableStateOf(false) }
+    var lapSheet by remember { mutableStateOf<String?>(null) }
     val hasBreakdown = d.srReasons.isNotEmpty() || d.drReasons.isNotEmpty()
     val laps = raceLaps(d)
+    val qualifyingLaps = sessionLaps(d, "qualifying")
     // Any laps at all — laps without a time still get a row (shown as "—").
-    val hasLaps = laps.isNotEmpty()
+    val hasRaceLaps = laps.isNotEmpty()
+    val hasQualifyingLaps = qualifyingLaps.isNotEmpty()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -388,8 +406,25 @@ private fun SummaryCard(d: RaceDetailDto) {
         if (d.categories.isNotEmpty()) CategoryChips(d.categories)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             d.carClass?.let { ClassPill(it) }
-            (d.carName ?: d.car)?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, color = TextHigh, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (d.manufacturerLogoUrl != null) {
+                AsyncImage(
+                    model = d.manufacturerLogoUrl,
+                    contentDescription = d.manufacturer,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(40.dp),
+                )
+            }
+            if (d.carImageUrl != null) {
+                AsyncImage(
+                    model = d.carImageUrl,
+                    contentDescription = d.carName ?: d.car,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.width(96.dp).height(72.dp).clip(RoundedCornerShape(5.dp)),
+                )
+            }
+            (d.carName ?: d.car)?.takeIf { it.isNotBlank() }?.let { name ->
+                val cleanName = stripCarClass(name)
+                Text(cleanName, style = MaterialTheme.typography.bodyMedium, color = TextHigh, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -449,17 +484,18 @@ private fun SummaryCard(d: RaceDetailDto) {
             }
             if (showPaceInfo) PaceInfoDialog { showPaceInfo = false }
         }
-        if (hasLaps || hasBreakdown) {
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                // All per-lap times + extra stats for this race.
-                if (hasLaps) SheetLink("Lap times") { showLaps = true }
+        if (hasQualifyingLaps || hasRaceLaps || hasBreakdown) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // All per-lap times + extra stats for each session when the backend provides them.
+                if (hasQualifyingLaps) SheetLink("Qualifying lap times") { lapSheet = "qualifying" }
+                if (hasRaceLaps) SheetLink("Race lap times") { lapSheet = "race" }
                 // Why the SR/DR moved — only when the backend sent a breakdown.
                 if (hasBreakdown) SheetLink("Rating breakdown") { showBreakdown = true }
             }
         }
     }
 
-    if (showLaps) LapsSheet(d) { showLaps = false }
+    lapSheet?.let { sessionKey -> LapsSheet(d, sessionKey) { lapSheet = null } }
     if (showBreakdown) RatingBreakdownSheet(d) { showBreakdown = false }
 }
 
@@ -479,14 +515,25 @@ private fun SheetLink(label: String, onClick: () -> Unit) {
 /** Bottom sheet listing every lap (time + sectors + pit flag) plus the headline lap stats. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun LapsSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
-    val laps = raceLaps(d)
+private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Unit) {
+    val sessionRow = sessionMeRow(d, sessionKey)
+    val laps = sessionLaps(d, sessionKey)
     val bestMs = laps.mapNotNull { it.lapTimeMs?.takeIf { t -> t > 0L } }.minOrNull()
+        ?: sessionRow?.bestLapMs?.takeIf { it > 0L }
     // Fastest time per sector across all laps — used to green-highlight the best sector each lap.
-    val bestSectors = bestSectorsByIndex(laps)
+    val lapBestSectors = bestSectorsByIndex(laps)
+    val bestSectors = lapBestSectors.takeIf { it.any { s -> (s ?: 0L) > 0L } }
+        ?: sessionRow?.bestSectorsMs?.takeIf { it.any { s -> (s ?: 0L) > 0L } }
+        ?: sessionRow?.bestLapSectorsMs?.takeIf { it.any { s -> (s ?: 0L) > 0L } }
+        ?: emptyList()
+    val theoreticalBestMs = theoreticalBestLapMs(bestSectors)
     // Track length (km) → average speed per lap and overall.
     val lengthKm = d.trackInfo?.lengthKm?.toDoubleOrNull()?.takeIf { it > 0.0 }
     val pace = paceFrom(laps, 1)
+    val finishStatus = when (sessionKey) {
+        "race" -> sessionRow?.finishStatus ?: d.finishStatus
+        else -> sessionRow?.finishStatus
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -502,13 +549,14 @@ private fun LapsSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
                 .padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text("Lap times", style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
+            Text("${sessionLabel(sessionKey)} lap times", style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Stat("Laps", laps.size.toString())
                 bestMs?.let { Stat("Best", formatLap(it)) }
                 pace?.let { Stat("Avg", formatLap(it.avgMs)) }
-                d.finishStatus?.takeIf { it.isNotBlank() }?.let { Stat("Result", it) }
+                finishStatus?.takeIf { it.isNotBlank() }?.let { Stat("Result", it) }
             }
+            theoreticalBestMs?.let { TheoreticalBestLap(it, bestSectors) }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -520,6 +568,37 @@ private fun LapsSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TheoreticalBestLap(totalMs: Long, bestSectors: List<Long?>) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                "Theoretical best lap",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextLow,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                formatLap(totalMs),
+                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                color = PosGreen,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Text(
+            bestSectors.mapIndexedNotNull { i, s -> s?.takeIf { it > 0L }?.let { "S${i + 1} ${sectorFmt(it)}" } }
+                .joinToString("  "),
+            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+            color = TextLow,
+            maxLines = 1,
+        )
     }
 }
 
@@ -579,6 +658,12 @@ private fun bestSectorsByIndex(laps: List<LapDto>): List<Long?> {
     return (0 until width).map { i ->
         laps.mapNotNull { it.sectorsMs.getOrNull(i)?.takeIf { v -> v > 0L } }.minOrNull()
     }
+}
+
+private fun theoreticalBestLapMs(bestSectors: List<Long?>): Long? {
+    if (bestSectors.isEmpty()) return null
+    val sectors = bestSectors.map { it?.takeIf { v -> v > 0L } ?: return null }
+    return sectors.sum()
 }
 
 @Composable
@@ -716,11 +801,20 @@ private fun signedOneDecimal(v: Double): String {
     return "$sign${r / 10}.${r % 10}"
 }
 
-/** Lap list for the pace card / lap sheet. Prefer the race-session "me" row — it carries
- *  class_position per lap, which the top-level lap_progress copy currently omits. */
-private fun raceLaps(d: RaceDetailDto): List<LapDto> =
-    d.sessions["race"]?.classification?.firstOrNull { it.isMe }?.lapProgress?.takeIf { it.isNotEmpty() }
-        ?: d.lapProgress
+private fun sessionMeRow(d: RaceDetailDto, sessionKey: String): ClassificationRowDto? =
+    d.sessions[sessionKey]?.classification?.firstOrNull { it.isMe }
+
+/** Lap list for a session. Prefer the session "me" row because it carries class_position per lap.
+ *  Race keeps the legacy top-level lap_progress fallback for older payloads. */
+private fun sessionLaps(d: RaceDetailDto, sessionKey: String): List<LapDto> {
+    val sessionLaps = sessionMeRow(d, sessionKey)?.lapProgress?.takeIf { it.isNotEmpty() }
+    return when (sessionKey) {
+        "race" -> sessionLaps ?: d.lapProgress
+        else -> sessionLaps.orEmpty()
+    }
+}
+
+private fun raceLaps(d: RaceDetailDto): List<LapDto> = sessionLaps(d, "race")
 
 /** Player's average pace over valid laps + the gap to the best valid lap. */
 private class PaceStats(
@@ -840,7 +934,7 @@ private fun DeltaStat(label: String, delta: Double?) {
 
 
 @Composable
-private fun SessionCard(label: String, rows: List<ClassificationRowDto>) {
+private fun SessionCard(label: String, rows: List<ClassificationRowDto>, showRatingDeltas: Boolean) {
     var expanded by remember { mutableStateOf(false) }
     val meIndex = rows.indexOfFirst { it.isMe }
     val shown = when {
@@ -861,7 +955,7 @@ private fun SessionCard(label: String, rows: List<ClassificationRowDto>) {
                 .background(Surface1)
                 .border(1.dp, Outline, RoundedCornerShape(12.dp)),
         ) {
-            shown.forEachIndexed { i, row -> ClassificationLine(row, alt = i % 2 == 1) }
+            shown.forEachIndexed { i, row -> ClassificationLine(row, alt = i % 2 == 1, showRatingDeltas = showRatingDeltas) }
             if (canToggle) {
                 Row(
                     modifier = Modifier
@@ -884,8 +978,9 @@ private fun SessionCard(label: String, rows: List<ClassificationRowDto>) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean) {
+private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean, showRatingDeltas: Boolean) {
     // Zebra striping like the race leaderboards; the player's own row always wins with an amber tint.
     val bg = when {
         r.isMe -> Amber.copy(alpha = 0.12f)
@@ -897,9 +992,9 @@ private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean) {
         modifier = Modifier
             .fillMaxWidth()
             .background(bg)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Text(
             r.position?.toString() ?: "—",
@@ -907,13 +1002,31 @@ private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean) {
             color = posColor,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
-            modifier = Modifier.width(22.dp),
+            modifier = Modifier.width(18.dp),
         )
-        flagFor(r.nationality)?.let { FlagCircle(it, 16.dp) }
+        Column(
+            modifier = Modifier.width(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            flagFor(r.nationality)?.let { FlagCircle(it, 16.dp) }
+        }
         // Name + badges share the flexible middle column; the name marquees if it can't fit.
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            val driverName = r.name ?: "—"
+            val carName = r.car
+                ?.takeIf { it.isNotBlank() }
+                ?.let { car -> stripCarClass(car).ifBlank { car } }
+            val title = buildAnnotatedString {
+                append(driverName)
+                carName?.let {
+                    withStyle(SpanStyle(color = TextLow, fontWeight = FontWeight.Normal)) {
+                        append(", $it")
+                    }
+                }
+            }
             Text(
-                r.name ?: "—",
+                title,
                 style = MaterialTheme.typography.bodySmall,
                 color = if (r.isMe) TextHigh else TextMed,
                 fontWeight = if (r.isMe) FontWeight.SemiBold else FontWeight.Normal,
@@ -921,12 +1034,16 @@ private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean) {
                 softWrap = false,
                 modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE),
             )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 r.carClass?.takeIf { it.isNotBlank() }?.let { ClassMiniBadge(it) }
                 // Position within the driver's own class (the leading number is the overall position).
                 r.classPosition?.takeIf { it > 0 }?.let { ClassPosBadge(it, r.carClass) }
                 r.driverRating?.let { RatingMiniBadge("DR", it) }
                 r.safetyRating?.let { RatingMiniBadge("SR", it) }
+                if (showRatingDeltas) RatingDeltaColumn(r.drChange, r.srChange)
             }
             // Best-lap sector splits, when the backend provides them.
             val sectors = r.bestLapSectorsMs.filterNotNull().filter { it > 0L }
@@ -1009,6 +1126,50 @@ private fun RatingMiniBadge(label: String, rating: RatingDto) {
     }
 }
 
+@Composable
+private fun RatingDeltaColumn(drChange: Double?, srChange: Double?) {
+    if (drChange == null && srChange == null) return
+    Column(
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
+        RatingDeltaLine("DR:", drChange)
+        RatingDeltaLine("SR:", srChange)
+    }
+}
+
+@Composable
+private fun RatingDeltaLine(label: String, delta: Double?) {
+    if (delta == null) return
+    val color = when {
+        delta > 0 -> PosGreen
+        delta < 0 -> NegRed
+        else -> TextMed
+    }
+    val arrow = when {
+        delta > 0 -> "▲"
+        delta < 0 -> "▼"
+        else -> "•"
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        val style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, lineHeight = 9.sp)
+        Text(label, style = style, color = TextLow, maxLines = 1)
+        Text(
+            "$arrow ${formatRatingDelta(delta)}",
+            style = style,
+            color = color,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+    }
+}
+
+private fun formatRatingDelta(delta: Double): String {
+    val abs = if (delta < 0) -delta else delta
+    val rounded = (abs * 10).toLong()
+    return "${rounded / 10}.${rounded % 10}"
+}
+
 // Official LMU rank-tier colors (from the in-game DR/SR badge SVGs).
 private val Gold = Color(0xFFE1A01F)
 private val Silver = Color(0xFF8F9499)
@@ -1039,6 +1200,114 @@ private fun ClassPill(carClass: String) {
     val c = classColorFor(carClass)
     Box(Modifier.clip(RoundedCornerShape(6.dp)).background(c).padding(horizontal = 8.dp, vertical = 3.dp)) {
         Text(carClass.uppercase(), style = MaterialTheme.typography.labelMedium, color = onBadgeText(c), fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun AvailableCarsSection(availableCars: Map<String, List<AvailableCarDto>>) {
+    if (availableCars.isEmpty()) return
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Surface1)
+            .border(1.dp, Outline, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            "Available Cars",
+            style = MaterialTheme.typography.titleMedium,
+            color = TextHigh,
+            fontWeight = FontWeight.Bold,
+        )
+
+        availableCars.forEach { (className, cars) ->
+            if (cars.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        className,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextMed,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        cars.forEach { car ->
+                            AvailableCarCard(car)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AvailableCarCard(car: AvailableCarDto) {
+    Row(
+        modifier = Modifier
+            .width(220.dp)
+            .height(96.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Surface2)
+            .border(1.dp, Outline, RoundedCornerShape(10.dp))
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (car.carImageUrl != null) {
+            AsyncImage(
+                model = car.carImageUrl,
+                contentDescription = car.friendly,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .width(86.dp)
+                    .height(64.dp)
+                    .clip(RoundedCornerShape(6.dp)),
+            )
+        }
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (car.manufacturerLogoUrl != null) {
+                    AsyncImage(
+                        model = car.manufacturerLogoUrl,
+                        contentDescription = car.manufacturer,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                Text(
+                    car.manufacturer,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMed,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(5.dp))
+            Text(
+                car.friendly,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextHigh,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

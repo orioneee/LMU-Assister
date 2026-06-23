@@ -86,6 +86,7 @@ data class RaceDto(
     val weather: WeatherDto? = null,
     val leaderboardId: String? = null,
     val completed: Boolean = false,
+    @SerialName("available_cars") val availableCars: Map<String, List<AvailableCarDto>> = emptyMap(),
 )
 
 @Serializable
@@ -100,6 +101,14 @@ data class CarsByClassDto(
     // JSON key is the Kotlin keyword "class"; @SerialName overrides the snake-case strategy.
     @SerialName("class") val carClass: String = "",
     val cars: List<String> = emptyList(),
+)
+
+@Serializable
+data class AvailableCarDto(
+    val friendly: String = "",
+    val manufacturer: String = "",
+    @SerialName("car_image_url") val carImageUrl: String? = null,
+    @SerialName("manufacturer_logo_url") val manufacturerLogoUrl: String? = null,
 )
 
 @Serializable
@@ -209,6 +218,9 @@ data class LeaderboardEntryDto(
     // rebuilt → the percentile can't be trusted, so we hide it and show only the rank.
     val fasterThanPct: Double? = null,
     val rankUnstable: Boolean = false,
+    @SerialName("car_image_url") val carImageUrl: String? = null,
+    val manufacturer: String? = null,
+    @SerialName("manufacturer_logo_url") val manufacturerLogoUrl: String? = null,
 )
 
 /** GET /leaderboard/<id>?limit=&cursor= — one paginated page of the full board. */

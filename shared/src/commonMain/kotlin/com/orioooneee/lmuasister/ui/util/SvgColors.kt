@@ -9,7 +9,7 @@ package com.orioooneee.lmuasister.ui.util
 fun inlineSvgCss(svg: String): String {
     val rules = HashMap<String, String>()
     val ruleRe = Regex("\\.([A-Za-z0-9_-]+)\\s*\\{([^}]*)\\}")
-    Regex("<style[^>]*>(.*?)</style>", RegexOption.DOT_MATCHES_ALL).findAll(svg).forEach { block ->
+    Regex("<style[^>]*>([\\s\\S]*?)</style>").findAll(svg).forEach { block ->
         ruleRe.findAll(block.groupValues[1]).forEach { rule ->
             val attrs = rule.groupValues[2].split(";").mapNotNull { decl ->
                 val kv = decl.split(":", limit = 2)

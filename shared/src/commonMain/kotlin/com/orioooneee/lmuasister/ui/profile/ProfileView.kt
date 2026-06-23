@@ -415,7 +415,11 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
                 maxLines = 1,
                 modifier = Modifier.fillMaxWidth().basicMarquee(),
             )
-            CarLine(race.carClass, race.carName ?: race.car)
+            CarLine(
+                race.carClass,
+                race.carName ?: race.car,
+                race.carImageUrl,
+            )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 TrackLogo(race.trackLogo, race.track)
                 race.track?.let {
@@ -443,11 +447,15 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
 private val CAR_CLASS_TOKENS = Regex("""\b(LMGT3|LMGTE|LMGT|LMP1|LMP2|LMP3|LMDh|LMH|GTE|GT3|GTP|Hypercar)\b""", RegexOption.IGNORE_CASE)
 
 /** "Ford Mustang LMGT3" → "Ford Mustang", "McLaren 720S LMGT3 Evo" → "McLaren 720S Evo". */
-private fun stripCarClass(name: String): String =
+fun stripCarClass(name: String): String =
     name.replace(CAR_CLASS_TOKENS, "").replace(Regex("\\s{2,}"), " ").trim()
 
 @Composable
-private fun CarLine(carClass: String?, carName: String?) {
+private fun CarLine(
+    carClass: String?,
+    carName: String?,
+    carImageUrl: String? = null,
+) {
     val name = carName?.takeIf { it.isNotBlank() }?.let { stripCarClass(it) }?.takeIf { it.isNotBlank() }
     if (carClass == null && name == null) return
     Row(
@@ -456,6 +464,14 @@ private fun CarLine(carClass: String?, carName: String?) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         carClass?.let { ClassPill(it) }
+        if (carImageUrl != null) {
+            AsyncImage(
+                model = carImageUrl,
+                contentDescription = name,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.width(48.dp).height(36.dp).clip(RoundedCornerShape(4.dp)),
+            )
+        }
         name?.let {
             Text(
                 it,

@@ -197,6 +197,10 @@ data class RecentRaceDto(
     @SerialName("sr_change") val srChange: Double? = null,
     @SerialName("dr_change") val drChange: Double? = null,
     val sessions: RaceSessionsDto? = null,
+    @SerialName("car_id") val carId: String? = null,
+    @SerialName("car_image_url") val carImageUrl: String? = null,
+    val manufacturer: String? = null,
+    @SerialName("manufacturer_logo_url") val manufacturerLogoUrl: String? = null,
 )
 
 /**
@@ -224,6 +228,9 @@ data class RaceDetailDto(
     val car: String? = null,
     @SerialName("car_name") val carName: String? = null,
     @SerialName("car_class") val carClass: String? = null,
+    @SerialName("car_image_url") val carImageUrl: String? = null,
+    val manufacturer: String? = null,
+    @SerialName("manufacturer_logo_url") val manufacturerLogoUrl: String? = null,
     val track: String? = null,
     @SerialName("track_logo") val trackLogo: String? = null,
     @SerialName("track_info") val trackInfo: TrackDto? = null, // full track block (emblem, minimap, length…)
@@ -258,6 +265,8 @@ data class RaceDetailDto(
     val categories: List<String> = emptyList(),
     // keyed "practice" / "qualifying" / "race" — YOUR split, fully here
     val sessions: Map<String, RaceSessionDetailDto> = emptyMap(),
+    // Available cars grouped by class (from the schedule endpoint)
+    @SerialName("available_cars") val availableCars: Map<String, List<AvailableCarDto>> = emptyMap(),
 )
 
 /** GET /api/v2/profile/race/<eventId>/split/<n> — one foreign split's tables (no `me` row). */
@@ -284,6 +293,9 @@ data class ClassificationRowDto(
     val nationality: String? = null,
     @SerialName("is_me") val isMe: Boolean = false,
     val car: String? = null,
+    @SerialName("car_image_url") val carImageUrl: String? = null,
+    val manufacturer: String? = null,
+    @SerialName("manufacturer_logo_url") val manufacturerLogoUrl: String? = null,
     @SerialName("car_number") val carNumber: String? = null,
     @SerialName("car_class") val carClass: String? = null,
     @SerialName("best_lap_ms") val bestLapMs: Long? = null,

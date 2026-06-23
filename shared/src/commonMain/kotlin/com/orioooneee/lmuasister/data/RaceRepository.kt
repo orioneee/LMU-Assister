@@ -1,6 +1,7 @@
 package com.orioooneee.lmuasister.data
 
 import com.orioooneee.lmuasister.data.model.CarGroup
+import com.orioooneee.lmuasister.data.model.AvailableCar
 import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.ClassInfo
 import com.orioooneee.lmuasister.data.model.ClassLeaderboard
@@ -42,7 +43,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 
-private const val CACHE_KEY = "schedule_v1"
+// v2 adds exact available-car artwork. Do not revive v1 entries that decoded before
+// the field existed, otherwise race details stay image-less until a manual refresh.
+private const val CACHE_KEY = "schedule_v2"
 private const val STATUS_READY = "ready"
 private const val HOTLAP_POLLS = 6
 private const val HOTLAP_POLL_DELAY_MS = 1500L
@@ -276,6 +279,9 @@ private fun RaceDto.toModel(): Race = Race(
     weather = weather?.toModel(),
     leaderboardId = leaderboardId,
     completed = completed,
+    availableCars = availableCars.mapValues { (_, cars) ->
+        cars.map { AvailableCar(it.friendly, it.manufacturer, it.carImageUrl, it.manufacturerLogoUrl) }
+    },
 )
 
 private fun ClassInfoDto.toModel() = ClassInfo(id = id, name = name, colorHex = colorHex)
@@ -350,6 +356,9 @@ private fun LeaderboardEntryDto.toModel() = LapEntry(
     srRank = srRank,
     fasterThanPct = fasterThanPct,
     rankUnstable = rankUnstable,
+    carImageUrl = carImageUrl,
+    manufacturer = manufacturer,
+    manufacturerLogoUrl = manufacturerLogoUrl,
 )
 
 private fun HotlapDto.toModel() = Hotlap(

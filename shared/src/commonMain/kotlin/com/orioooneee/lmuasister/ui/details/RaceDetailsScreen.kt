@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -32,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,8 +51,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.model.CarGroup
+import com.orioooneee.lmuasister.data.model.AvailableCar
 import com.orioooneee.lmuasister.data.model.ClassLeaderboard
 import com.orioooneee.lmuasister.data.model.Hotlap
 import com.orioooneee.lmuasister.data.model.LapEntry
@@ -61,6 +65,7 @@ import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
 import com.orioooneee.lmuasister.ui.IconBolt
+import com.orioooneee.lmuasister.ui.profile.stripCarClass
 import com.orioooneee.lmuasister.ui.tracks.TrackPreview
 import com.orioooneee.lmuasister.ui.components.ClassChip
 import com.orioooneee.lmuasister.ui.components.carClassColor
@@ -94,6 +99,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 import kotlin.time.Clock
+import coil3.compose.AsyncImage
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.cars_section
 import lmuassister.shared.generated.resources.duration_race
@@ -167,6 +173,11 @@ fun RaceDetailsScreen(
         val fresh = repo.hotlaps(race.id).getOrNull()
         if (fresh != null) value = fresh else if (value == null) value = emptyList()
     }
+    // Exact livery name → physical car model. The schedule still keeps every allowed
+    // livery, but the UI collapses identical models and uses the first livery's artwork.
+    val liveryToModel by produceState(emptyMap<String, String>(), race.id) {
+        value = runCatching { repo.liveryToModel() }.getOrDefault(emptyMap())
+    }
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 320.dp),
@@ -217,7 +228,11 @@ fun RaceDetailsScreen(
             }
         }
 
-        if (race.carsByClass.isNotEmpty()) {
+        if (race.availableCars.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                AvailableCarsSection(race.availableCars, liveryToModel)
+            }
+        } else if (race.carsByClass.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) { CarsTicker(race.carsByClass) }
         }
 
@@ -463,6 +478,109 @@ private fun CarTickerChip(car: String, carClass: String) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(accent))
         Spacer(Modifier.width(7.dp))
         Text(car, style = MaterialTheme.typography.labelMedium, color = TextHigh, maxLines = 1)
+    }
+}
+
+@Composable
+private fun AvailableCarsSection(
+    availableCars: Map<String, List<AvailableCar>>,
+    liveryToModel: Map<String, String>,
+) {
+    val normalizedModels = remember(liveryToModel) {
+        liveryToModel.mapKeys { (name, _) -> name.trim().lowercase() }
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            stringResource(Res.string.cars_section).uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = TextLow,
+            fontWeight = FontWeight.SemiBold,
+        )
+        availableCars.forEach { (className, cars) ->
+            val collapsed = remember(cars, normalizedModels) {
+                cars.map { car ->
+                    val rawModel = normalizedModels[car.friendly.trim().lowercase()] ?: car.friendly
+                    val model = stripCarClass(rawModel).ifBlank { rawModel }
+                    model to car
+                }.distinctBy { (model, car) ->
+                    "${car.manufacturer.trim().lowercase()}|${model.trim().lowercase()}"
+                }
+            }
+            if (collapsed.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(className, style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.SemiBold)
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        collapsed.forEach { (model, car) ->
+                            AvailableCarCard(car, model, carCardWidth(car.manufacturer))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun carCardWidth(manufacturer: String): Dp = when {
+    manufacturer.length > 10 -> 264.dp
+    manufacturer.length > 8 -> 244.dp
+    else -> 220.dp
+}
+
+@Composable
+private fun AvailableCarCard(car: AvailableCar, modelName: String, width: Dp) {
+    Column(
+        modifier = Modifier
+            .width(width)
+            .height(94.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface2)
+            .border(1.dp, Outline, RoundedCornerShape(12.dp))
+            .padding(horizontal = 9.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(57.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            car.manufacturerLogoUrl?.let {
+                AsyncImage(
+                    model = it,
+                    contentDescription = car.manufacturer,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Text(
+                car.manufacturer,
+                style = MaterialTheme.typography.labelMedium,
+                color = TextMed,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            car.carImageUrl?.let {
+                AsyncImage(
+                    model = it,
+                    contentDescription = modelName,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.width(96.dp).height(57.dp).clip(RoundedCornerShape(5.dp)),
+                )
+            }
+        }
+        Text(
+            modelName,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextHigh,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

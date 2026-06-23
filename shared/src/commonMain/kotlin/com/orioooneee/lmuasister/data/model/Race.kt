@@ -29,6 +29,13 @@ data class CarGroup(
     val cars: List<String>,
 )
 
+data class AvailableCar(
+    val friendly: String,
+    val manufacturer: String,
+    val carImageUrl: String?,
+    val manufacturerLogoUrl: String?,
+)
+
 data class TrackInfo(
     val name: String,
     val shortName: String,
@@ -124,6 +131,8 @@ data class Race(
     val leaderboardId: String? = null,
     /** This period's race is over (week complete / season complete) — not active right now. */
     val completed: Boolean = false,
+    /** Exact liveries allowed for this race, grouped by class, with CDN artwork. */
+    val availableCars: Map<String, List<AvailableCar>> = emptyMap(),
 ) {
     val title: String get() = series.ifBlank { circuit }
 
@@ -161,6 +170,9 @@ data class LapEntry(
     // Only set on the signed-in player's own "Your position" row.
     val fasterThanPct: Double? = null,
     val rankUnstable: Boolean = false,
+    val carImageUrl: String? = null,
+    val manufacturer: String? = null,
+    val manufacturerLogoUrl: String? = null,
 )
 
 /** A YouTube hot-lap video for a track (parsed server-side, no API key). */
