@@ -36,6 +36,8 @@ data class SteamProfile(
     @SerialName("total_distance_km") val totalDistanceKm: Double = 0.0,
     // Per-track distance breakdown (km desc) — shown when the distance badge is tapped.
     @SerialName("track_breakdown") val trackBreakdown: List<TrackBreakdownDto> = emptyList(),
+    // Top 3 favourite car models by race count, grouped server-side by manufacturer + model + class.
+    @SerialName("favorite_cars") val favoriteCars: List<FavoriteCarDto> = emptyList(),
 )
 
 /** One track's slice of the career distance breakdown (GET /profile → `track_breakdown`). */
@@ -54,6 +56,33 @@ data class TrackBreakdownDto(
     val races: Int = 0,
     val laps: Int = 0,
     @SerialName("distance_km") val distanceKm: Double = 0.0,
+)
+
+/** One of the user's top cars by race count from GET /profile → `favorite_cars`. */
+@Serializable
+data class FavoriteCarDto(
+    @SerialName("car_id") val carId: String? = null,
+    val car: String? = null,
+    @SerialName("car_name") val carName: String? = null,
+    val model: String? = null,
+    val manufacturer: String? = null,
+    @SerialName("manufacturer_logo_url") val manufacturerLogoUrl: String? = null,
+    @SerialName("car_image_url") val carImageUrl: String? = null,
+    @SerialName("car_class") val carClass: String? = null,
+    @SerialName("class_info") val classInfo: FavoriteCarClassInfoDto? = null,
+    @SerialName("class_color_hex") val classColorHex: String? = null,
+    val races: Int = 0,
+    @SerialName("distance_km") val distanceKm: Double = 0.0,
+    val wins: Int = 0,
+    val poles: Int = 0,
+    val podiums: Int = 0,
+)
+
+@Serializable
+data class FavoriteCarClassInfoDto(
+    val id: String? = null,
+    val name: String? = null,
+    @SerialName("color_hex") val colorHex: String? = null,
 )
 
 /** GET /api/v2/profile → `stats`. Only the headline `total` block is used by the UI;

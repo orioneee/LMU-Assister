@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,6 +53,7 @@ import com.orioooneee.lmuasister.ui.components.classColorFor
 import com.orioooneee.lmuasister.ui.components.onBadgeText
 import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import androidx.compose.material3.Icon
+import com.orioooneee.lmuasister.data.remote.FavoriteCarDto
 import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.ClassHyper
 import com.orioooneee.lmuasister.ui.theme.Outline
@@ -71,6 +73,7 @@ import lmuassister.shared.generated.resources.susp_license_clean
 import lmuassister.shared.generated.resources.susp_no_active
 import lmuassister.shared.generated.resources.susp_past_count
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 private val PosGreen = SkillBeginner
 private val NegRed = ClassHyper
@@ -116,6 +119,9 @@ fun ProfileView(
             RatingProgressionCard(it)
         }
         profile.stats?.total?.let { CareerStatsGrid(it, onOpenCategory = onOpenCategory) }
+        if (profile.favoriteCars.isNotEmpty()) {
+            FavoriteCarsSection(profile.favoriteCars.take(3))
+        }
 
         if (profile.recentRaces.isNotEmpty()) {
             SectionHeader("Recent races")
@@ -135,6 +141,166 @@ fun ProfileView(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FavoriteCarsSection(cars: List<FavoriteCarDto>) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionHeader("Favorite cars")
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            cars.forEachIndexed { index, car ->
+                FavoriteCarCard(index + 1, car)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FavoriteCarCard(rank: Int, car: FavoriteCarDto) {
+    val carClass = car.carClass?.takeIf { it.isNotBlank() }
+    val cleanName = listOfNotNull(car.carName, car.car, car.model)
+        .firstOrNull { it.isNotBlank() }
+        ?.let { stripCarClass(it) }
+        ?.takeIf { it.isNotBlank() }
+    val manufacturer = car.manufacturer?.takeIf { it.isNotBlank() }
+    val accent = carClass?.let { classColorFor(it) } ?: Outline
+    val distanceKm = car.distanceKm.roundToInt().takeIf { it > 0 }
+    val shape = RoundedCornerShape(14.dp)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 118.dp)
+            .clip(shape)
+            .background(Surface1)
+            .border(1.dp, Outline, shape)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ManufacturerMark(manufacturer, car.manufacturerLogoUrl)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    FavoriteRankBadge(rank, accent)
+                    carClass?.let { ClassPill(it) }
+                    distanceKm?.let { ClickablePill("${formatKm(it.toDouble())} km", DistAccent, onClick = null) }
+                }
+                cleanName?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextHigh,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier.fillMaxWidth().basicMarquee(),
+                    )
+                }
+            }
+            car.carImageUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                AsyncImage(
+                    model = url,
+                    contentDescription = cleanName,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.width(112.dp).height(72.dp).clip(RoundedCornerShape(6.dp)),
+                )
+            }
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            FavoriteStatBadge("Races", car.races, TextMed)
+            FavoriteStatBadge("Wins", car.wins, StatCategory.Wins.color)
+            FavoriteStatBadge("Podiums", car.podiums, StatCategory.Podiums.color)
+            FavoriteStatBadge("Poles", car.poles, StatCategory.Poles.color)
+        }
+    }
+}
+
+@Composable
+private fun ManufacturerMark(manufacturer: String?, logoUrl: String?) {
+    val shape = RoundedCornerShape(10.dp)
+    Box(
+        modifier = Modifier
+            .size(46.dp)
+            .clip(shape)
+            .background(Surface2)
+            .border(1.dp, Outline, shape)
+            .padding(7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!logoUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = logoUrl,
+                contentDescription = manufacturer,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth().height(30.dp),
+            )
+        } else {
+            Text(
+                manufacturer?.firstOrNull()?.uppercaseChar()?.toString() ?: "—",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextMed,
+                fontWeight = FontWeight.Black,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FavoriteRankBadge(rank: Int, color: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.14f))
+            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+    ) {
+        Text(
+            "#$rank",
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun FavoriteStatBadge(label: String, value: Int, color: Color) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.12f))
+            .border(1.dp, color.copy(alpha = 0.42f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(
+            label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+        Text(
+            value.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            color = TextHigh,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
     }
 }
 

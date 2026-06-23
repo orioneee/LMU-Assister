@@ -8,6 +8,8 @@ import com.orioooneee.lmuasister.data.remote.CarsResponse
 import com.orioooneee.lmuasister.data.remote.ClassInfoDto
 import com.orioooneee.lmuasister.data.remote.ClassLeaderboardDto
 import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
+import com.orioooneee.lmuasister.data.remote.FavoriteCarClassInfoDto
+import com.orioooneee.lmuasister.data.remote.FavoriteCarDto
 import com.orioooneee.lmuasister.data.remote.HotlapDto
 import com.orioooneee.lmuasister.data.remote.HotlapsResponse
 import com.orioooneee.lmuasister.data.remote.LapDto
@@ -25,7 +27,10 @@ import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SessionSummaryDto
 import com.orioooneee.lmuasister.data.remote.SessionWeatherDto
 import com.orioooneee.lmuasister.data.remote.SettingsDto
+import com.orioooneee.lmuasister.data.remote.ProfileStatsDto
+import com.orioooneee.lmuasister.data.remote.ProfileJson
 import com.orioooneee.lmuasister.data.remote.SteamProfile
+import com.orioooneee.lmuasister.data.remote.StatTotalsDto
 import com.orioooneee.lmuasister.data.remote.SuspensionDto
 import com.orioooneee.lmuasister.data.remote.TrackAttemptDto
 import com.orioooneee.lmuasister.data.remote.TrackAssetsDto
@@ -320,7 +325,7 @@ internal object MockData {
 
     // ───────────────────────── profile ─────────────────────────
 
-    fun profile(): String = AppJson.encodeToString(
+    fun profile(): String = ProfileJson.encodeToString(
         SteamProfile(
             uid = PLAYER_UID,
             name = PLAYER_NAME,
@@ -334,6 +339,23 @@ internal object MockData {
             totalSuspensions = 4,
             suspensions = suspensions(),
             recentRaces = recentRaces().take(3),
+            stats = ProfileStatsDto(
+                total = StatTotalsDto(
+                    races = 128,
+                    wins = 14,
+                    podiums = 41,
+                    top5 = 67,
+                    dnfs = 9,
+                    polePositions = 9,
+                    lapsCompleted = 1_842,
+                    lapsLead = 155,
+                    fastestLaps = 11,
+                    grandSlams = 2,
+                    polesConverted = 5,
+                    winsNoPole = 9,
+                ),
+            ),
+            favoriteCars = favoriteCars(),
         ),
     )
 
@@ -355,6 +377,60 @@ internal object MockData {
                 from = now - 160 * day, to = now - 159 * day, active = false),
         )
     }
+
+    private fun favoriteCars(): List<FavoriteCarDto> = listOf(
+        FavoriteCarDto(
+            carId = "44_24_PROT92DCFAD4",
+            car = "Ford Mustang LMGT3",
+            carName = "Ford Mustang LMGT3",
+            model = "Mustang LMGT3",
+            manufacturer = "Ford",
+            manufacturerLogoUrl = null,
+            carImageUrl = "https://placehold.co/260x150/1B1E25/F2F4F8.png?text=Ford+Mustang",
+            carClass = "GT3",
+            classInfo = FavoriteCarClassInfoDto(id = "GT3", name = "GT3", colorHex = "#f59e0b"),
+            classColorHex = "#f59e0b",
+            races = 18,
+            distanceKm = 1_284.6,
+            wins = 3,
+            poles = 2,
+            podiums = 8,
+        ),
+        FavoriteCarDto(
+            carId = "59_24_PROT72SEVO",
+            car = "McLaren 720S LMGT3 Evo",
+            carName = "McLaren 720S LMGT3 Evo",
+            model = "720S LMGT3 Evo",
+            manufacturer = "McLaren",
+            manufacturerLogoUrl = null,
+            carImageUrl = "https://placehold.co/260x150/1B1E25/F2F4F8.png?text=McLaren+720S",
+            carClass = "LMGT3",
+            classInfo = FavoriteCarClassInfoDto(id = "LMGT3", name = "LMGT3", colorHex = "#16A34A"),
+            classColorHex = "#16A34A",
+            races = 15,
+            distanceKm = 936.2,
+            wins = 2,
+            poles = 1,
+            podiums = 6,
+        ),
+        FavoriteCarDto(
+            carId = "6_23_HYP499P",
+            car = "Ferrari 499P",
+            carName = "Ferrari 499P",
+            model = "499P",
+            manufacturer = "Ferrari",
+            manufacturerLogoUrl = null,
+            carImageUrl = "https://placehold.co/260x150/1B1E25/F2F4F8.png?text=Ferrari+499P",
+            carClass = "Hypercar",
+            classInfo = FavoriteCarClassInfoDto(id = "Hypercar", name = "Hypercar", colorHex = "#e2231a"),
+            classColorHex = "#e2231a",
+            races = 11,
+            distanceKm = 701.8,
+            wins = 1,
+            poles = 0,
+            podiums = 4,
+        ),
+    )
 
     private data class RaceCard(
         val title: String, val track: Int, val cls: String, val car: String,
