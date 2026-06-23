@@ -70,6 +70,7 @@ import com.orioooneee.lmuasister.ui.components.ShimmerBar
 import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import com.orioooneee.lmuasister.ui.components.classColorFor
 import com.orioooneee.lmuasister.ui.components.onBadgeText
+import com.orioooneee.lmuasister.ui.components.RankLight
 import com.orioooneee.lmuasister.ui.details.CircleButton
 import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.Carbon
@@ -993,23 +994,26 @@ private fun RatingMiniBadge(label: String, rating: RatingDto) {
     val color = rankColor(rating.rank)
     val letter = rating.rank.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty()
     val value = letter + rating.tier.toString()
+    // Same official geometry as RankBadge, scaled down for a list row.
+    val shape = RoundedCornerShape(3.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.clip(RoundedCornerShape(5.dp)).border(1.dp, Outline, RoundedCornerShape(5.dp)),
+        modifier = Modifier.clip(shape).border(1.dp, color, shape),
     ) {
-        Box(Modifier.background(Surface2).padding(horizontal = 4.dp, vertical = 2.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextLow)
+        Box(Modifier.background(RankLight).padding(horizontal = 4.dp, vertical = 2.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = color)
         }
         Box(Modifier.background(color).padding(horizontal = 4.dp, vertical = 2.dp)) {
-            Text(value, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = onBadgeText(color), maxLines = 1)
+            Text(value, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = RankLight, maxLines = 1)
         }
     }
 }
 
-private val Gold = Color(0xFFE6B422)
-private val Silver = Color(0xFFC9D1DA)
-private val Bronze = Color(0xFFCD7F32)
-private val Platinum = Color(0xFF6FE3F0)
+// Official LMU rank-tier colors (from the in-game DR/SR badge SVGs).
+private val Gold = Color(0xFFE1A01F)
+private val Silver = Color(0xFF8F9499)
+private val Bronze = Color(0xFF977548)
+private val Platinum = Color(0xFF89B2DD)
 
 private fun rankColor(rank: String): Color = when (rank.trim().firstOrNull()?.lowercaseChar()) {
     'b' -> Bronze

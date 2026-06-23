@@ -74,12 +74,16 @@ fun ClassInfo.shortCode(): String {
     }
 }
 
-// FIA driver-category tier from the first letter (handles "Bronze" AND "B2"/"B3" etc.)
-private fun srColor(sr: String): Color = when (sr.trim().firstOrNull()?.lowercaseChar()) {
-    'b' -> Color(0xFFCD7F32) // bronze
-    's' -> Color(0xFFC9D1DA) // silver
-    'g' -> Color(0xFFE6B422) // gold
-    'p' -> Color(0xFF6FE3F0) // platinum
+// Light panel color used by the official LMU rank badges (the "DR"/"SR" half).
+val RankLight = Color(0xFFF3F4F8)
+
+// Official LMU rank-tier colors, taken from the in-game DR/SR badge SVGs.
+// First letter only, so it handles "Bronze" AND "B2"/"B3" etc.
+fun rankTierColor(rank: String): Color = when (rank.trim().firstOrNull()?.lowercaseChar()) {
+    'b' -> Color(0xFF977548) // bronze
+    's' -> Color(0xFF8F9499) // silver
+    'g' -> Color(0xFFE1A01F) // gold
+    'p' -> Color(0xFF89B2DD) // platinum
     else -> Color(0xFF8A93A6)
 }
 
@@ -119,16 +123,27 @@ fun ClassChip(classInfo: ClassInfo) {
 @Composable
 fun SrBadge(sr: String) {
     if (sr.isBlank() || sr.equals("none", ignoreCase = true)) return
-    val tier = srColor(sr)
+    RankBadge("SR", sr.uppercase(), rankTierColor(sr))
+}
+
+/**
+ * Two-tone rank badge matching the official LMU artwork: a light panel carrying the [label]
+ * ("DR"/"SR") in the tier [color], and a colored panel carrying the [value] (e.g. "G2") in light.
+ */
+@Composable
+fun RankBadge(label: String, value: String, color: Color) {
+    // Geometry from the official SVG (112x52): outer rx=8 (~0.15·h) and a 3px (~0.06·h)
+    // tier-colored stroke around the whole badge.
+    val shape = RoundedCornerShape(3.5.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Outline, RoundedCornerShape(6.dp)),
+        modifier = Modifier.clip(shape).border(1.5.dp, color, shape),
     ) {
-        Box(Modifier.background(Surface3).padding(horizontal = 6.dp, vertical = 3.dp)) {
-            Text("SR", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextMed)
+        Box(Modifier.background(RankLight).padding(horizontal = 6.dp, vertical = 3.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = color)
         }
-        Box(Modifier.background(tier).padding(horizontal = 6.dp, vertical = 3.dp)) {
-            Text(sr.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = onBadgeText(tier), maxLines = 1)
+        Box(Modifier.background(color).padding(horizontal = 6.dp, vertical = 3.dp)) {
+            Text(value, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = RankLight, maxLines = 1)
         }
     }
 }

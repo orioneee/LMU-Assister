@@ -45,6 +45,7 @@ import com.orioooneee.lmuasister.data.remote.SteamProfile
 import com.orioooneee.lmuasister.ui.IconFlag
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
 import com.orioooneee.lmuasister.ui.components.MetaChip
+import com.orioooneee.lmuasister.ui.components.RankBadge
 import com.orioooneee.lmuasister.ui.components.SectionHeader
 import com.orioooneee.lmuasister.ui.components.ShimmerBar
 import com.orioooneee.lmuasister.ui.components.classColorFor
@@ -73,10 +74,11 @@ import org.jetbrains.compose.resources.stringResource
 
 private val PosGreen = SkillBeginner
 private val NegRed = ClassHyper
-private val Gold = Color(0xFFE6B422)
-private val Silver = Color(0xFFC9D1DA)
-private val Bronze = Color(0xFFCD7F32)
-private val Platinum = Color(0xFF6FE3F0)
+// Official LMU rank-tier colors (from the in-game DR/SR badge SVGs).
+private val Gold = Color(0xFFE1A01F)
+private val Silver = Color(0xFF8F9499)
+private val Bronze = Color(0xFF977548)
+private val Platinum = Color(0xFF89B2DD)
 
 private fun rankColor(rank: String): Color = when (rank.trim().firstOrNull()?.lowercaseChar()) {
     'b' -> Bronze
@@ -251,26 +253,8 @@ private fun CountryFlag(nationality: String?, accent: Color, size: Dp = 68.dp) {
 @Composable
 private fun RatingPill(label: String, rating: RatingDto?) {
     if (rating == null || rating.rank.isBlank()) return
-    val color = rankColor(rating.rank)
     val letter = rating.rank.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty()
-    val value = letter + rating.tier.toString()
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Outline, RoundedCornerShape(6.dp)),
-    ) {
-        Box(Modifier.background(Surface3).padding(horizontal = 6.dp, vertical = 3.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextMed)
-        }
-        Box(Modifier.background(color).padding(horizontal = 6.dp, vertical = 3.dp)) {
-            Text(
-                value.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = onBadgeText(color),
-                maxLines = 1,
-            )
-        }
-    }
+    RankBadge(label, (letter + rating.tier.toString()).uppercase(), rankColor(rating.rank))
 }
 
 private val FlagGray = Color(0xFF8A8F98)
