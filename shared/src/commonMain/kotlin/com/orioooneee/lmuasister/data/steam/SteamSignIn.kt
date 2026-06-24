@@ -4,6 +4,7 @@ package com.orioooneee.lmuasister.data.steam
 sealed interface SignInOutcome {
     data class Success(val appToken: String, val uid: String) : SignInOutcome
     data class GuardRequired(val kind: SteamGuardKind) : SignInOutcome
+    data class DeviceConfirmationPending(val challengeId: String, val expiresIn: Int) : SignInOutcome
     data class Failure(val reason: String) : SignInOutcome
 
     /** The device egress tunnel is required / not connected — the UI should retry. */
@@ -21,6 +22,9 @@ sealed interface SignInOutcome {
  */
 interface SteamSignIn {
     suspend fun signIn(username: String, password: String, guardCode: String?): SignInOutcome
+
+    suspend fun continueDeviceConfirmation(challengeId: String): SignInOutcome =
+        SignInOutcome.Failure("Steam Guard approval is not available on this platform.")
 
     /** Silent session restore (no password) → app token, or null if a full login is needed. */
     suspend fun restore(): String?

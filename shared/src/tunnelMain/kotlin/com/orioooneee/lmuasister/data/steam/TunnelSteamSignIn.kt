@@ -3,8 +3,10 @@ package com.orioooneee.lmuasister.data.steam
 import com.orioooneee.lmuasister.data.remote.BackendAuthFailed
 import com.orioooneee.lmuasister.data.remote.BackendTunnelRequired
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
+import com.orioooneee.lmuasister.data.remote.SteamChallengeExpired
 import com.orioooneee.lmuasister.data.remote.SteamCreds
 import com.orioooneee.lmuasister.data.remote.SteamGuardNeeded
+import com.orioooneee.lmuasister.data.remote.UnsupportedGuardFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,25 +45,60 @@ internal class TunnelSteamSignIn(
         return last
     }
 
-    private suspend fun attemptSignIn(username: String, password: String, guardCode: String?): SignInOutcome =
-        withTunnel { key -> loginWithRetry(username, password, guardCode, key) }
+    private suspend fun attemptSignIn(username: String, password: String, guardCode: String?): SignInOutcome {
+        val guardData = loadCreds()?.guard
+        return withTunnel { key -> loginWithRetry(username, password, guardCode, guardData, key) }
             ?: SignInOutcome.Failure("Couldn't reach the backend tunnel.")
+    }
 
     /**
      * Calls /auth/steam/login while the tunnel WS stays open. If the sidecar reports the
      * tunnel not connected (agent not yet visible — registration lag), retry on the SAME
      * open WS a few times before giving up. (Reopening the WS would only re-race.)
      */
-    private suspend fun loginWithRetry(username: String, password: String, guardCode: String?, key: String): SignInOutcome {
+    private suspend fun loginWithRetry(
+        username: String,
+        password: String,
+        guardCode: String?,
+        guardData: String?,
+        key: String,
+    ): SignInOutcome {
         repeat(LOGIN_RETRIES) { i ->
-            SteamLog.d("login: POST /auth/steam/login (try ${i + 1}/$LOGIN_RETRIES, tunnelKey=${SteamLog.short(key)})")
+            val hasGuardCode = !guardCode.isNullOrBlank()
+            val endpoint = if (hasGuardCode) "/auth/steam/login" else "/auth/steam/login/start"
+            SteamLog.d("login: POST $endpoint (try ${i + 1}/$LOGIN_RETRIES, tunnelKey=${SteamLog.short(key)})")
             try {
-                val resp = backend.authSteamLogin(username.trim(), password, guardCode?.takeIf { it.isNotBlank() }, key)
-                SteamLog.d("login: success uid=${resp.uid}, steamCreds=${resp.steam != null}")
-                resp.steam?.let { saveCreds(it) }
-                return SignInOutcome.Success(resp.token, resp.uid)
+                if (hasGuardCode) {
+                    val resp = backend.authSteamLogin(
+                        username.trim(),
+                        password,
+                        guardCode,
+                        guardData?.takeIf { it.isNotBlank() },
+                        key,
+                    )
+                    return success(resp.token, resp.uid, resp.steam)
+                }
+
+                val resp = backend.authSteamLoginStart(
+                    username.trim(),
+                    password,
+                    guardData?.takeIf { it.isNotBlank() },
+                    key,
+                )
+                if (resp.status == "pending_device_confirmation" && !resp.challengeId.isNullOrBlank()) {
+                    SteamLog.d("login: pending device confirmation challenge=${SteamLog.short(resp.challengeId)}")
+                    return SignInOutcome.DeviceConfirmationPending(resp.challengeId, resp.expiresIn)
+                }
+                val token = resp.token
+                val uid = resp.uid
+                if (token != null && uid != null) return success(token, uid, resp.steam)
+                SteamLog.e(
+                    "login: unexpected start response " +
+                        "status=${resp.status}, challenge=${resp.challengeId != null}, token=${resp.token != null}, uid=${resp.uid != null}",
+                )
+                return SignInOutcome.Failure("Unexpected Steam login response.")
             } catch (e: SteamGuardNeeded) {
-                SteamLog.d("login: Steam Guard required (kind=${e.kind})")
+                SteamLog.d("login: Steam Guard required (kind=${e.kind}, mode=${e.mode})")
                 return SignInOutcome.GuardRequired(if (e.kind.equals("email", true)) SteamGuardKind.EMAIL else SteamGuardKind.DEVICE)
             } catch (e: BackendTunnelRequired) {
                 SteamLog.e("login: tunnel not visible yet (try ${i + 1}), WS stays open, retrying…")
@@ -69,12 +106,64 @@ internal class TunnelSteamSignIn(
             } catch (e: BackendAuthFailed) {
                 SteamLog.e("login: auth_failed", e)
                 return SignInOutcome.Failure(e.message ?: "auth_failed")
+            } catch (e: UnsupportedGuardFlow) {
+                SteamLog.e("login: unsupported Guard flow", e)
+                return SignInOutcome.Failure(e.message ?: "Steam Guard approval is not supported on this device yet.")
             } catch (e: Throwable) {
                 SteamLog.e("login: unexpected error", e)
                 return SignInOutcome.Failure(e.message ?: e::class.simpleName ?: "sign-in failed")
             }
         }
         return SignInOutcome.TunnelRequired
+    }
+
+    override suspend fun continueDeviceConfirmation(challengeId: String): SignInOutcome {
+        SteamLog.d("login: continue device confirmation challenge=${SteamLog.short(challengeId)}")
+        var last: SignInOutcome = SignInOutcome.TunnelRequired
+        repeat(2) { attempt ->
+            SteamLog.d("login: continue attempt ${attempt + 1}/2")
+            last = attemptContinueDeviceConfirmation(challengeId)
+            SteamLog.d("login: continue attempt ${attempt + 1} → ${last::class.simpleName}")
+            if (last !is SignInOutcome.TunnelRequired) return last
+            delay(1200)
+        }
+        return last
+    }
+
+    private suspend fun attemptContinueDeviceConfirmation(challengeId: String): SignInOutcome =
+        withTunnel { key -> continueWithRetry(challengeId, key) }
+            ?: SignInOutcome.Failure("Couldn't reach the backend tunnel.")
+
+    private suspend fun continueWithRetry(challengeId: String, key: String): SignInOutcome {
+        repeat(LOGIN_RETRIES) { i ->
+            SteamLog.d("login: POST /auth/steam/login/continue (try ${i + 1}/$LOGIN_RETRIES, tunnelKey=${SteamLog.short(key)})")
+            try {
+                val resp = backend.authSteamLoginContinue(challengeId, key)
+                return success(resp.token, resp.uid, resp.steam)
+            } catch (e: BackendTunnelRequired) {
+                SteamLog.e("login: tunnel not visible yet (continue try ${i + 1}), WS stays open, retrying…")
+                delay(1500)
+            } catch (e: SteamChallengeExpired) {
+                SteamLog.e("login: challenge expired", e)
+                return SignInOutcome.Failure(e.message ?: "Steam Guard approval expired. Try again.")
+            } catch (e: SteamGuardNeeded) {
+                SteamLog.d("login: Steam Guard required during continue (kind=${e.kind}, mode=${e.mode})")
+                return SignInOutcome.GuardRequired(if (e.kind.equals("email", true)) SteamGuardKind.EMAIL else SteamGuardKind.DEVICE)
+            } catch (e: BackendAuthFailed) {
+                SteamLog.e("login: continue auth_failed", e)
+                return SignInOutcome.Failure(e.message ?: "auth_failed")
+            } catch (e: Throwable) {
+                SteamLog.e("login: continue unexpected error", e)
+                return SignInOutcome.Failure(e.message ?: e::class.simpleName ?: "sign-in failed")
+            }
+        }
+        return SignInOutcome.TunnelRequired
+    }
+
+    private fun success(token: String, uid: String, steam: SteamCreds?): SignInOutcome {
+        SteamLog.d("login: success uid=$uid, steamCreds=${steam != null}")
+        steam?.let { saveCreds(it) }
+        return SignInOutcome.Success(token, uid)
     }
 
     override suspend fun restore(): String? = loadCreds()?.let { reauthWith(it) }

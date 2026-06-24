@@ -17,6 +17,8 @@ import io.ktor.http.encodeURLPathPart
 import io.ktor.http.encodeURLQueryComponent
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.Json
 
 /** Response of /auth/steam: exchanges an on-device Steam Web API ticket for our app token. */
@@ -31,17 +33,53 @@ data class SteamCreds(val account: String? = null, val refresh: String? = null, 
 @Serializable
 data class AuthLoginResponse(val token: String, val uid: String, val steam: SteamCreds? = null)
 
+/** Start response may be immediate success or a pending Steam mobile confirmation challenge. */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class AuthLoginStartResponse(
+    val token: String? = null,
+    val uid: String? = null,
+    val steam: SteamCreds? = null,
+    val status: String? = null,
+    @JsonNames("challenge_id")
+    val challengeId: String? = null,
+    @JsonNames("expires_in")
+    val expiresIn: Int = 0,
+)
+
 /** Short-lived tunnel ticket from /tunnel/ticket — device opens wss://agentUrl?token=. */
 @Serializable
 data class TunnelTicket(val key: String, val token: String, val agentUrl: String = "", val expiresIn: Int = 0)
 
 @Serializable
-private data class ErrBody(val error: String? = null, val kind: String? = null, val detail: String? = null)
+private data class ErrBody(
+    val error: String? = null,
+    val kind: String? = null,
+    val mode: String? = null,
+    val detail: String? = null,
+)
 
 // Request bodies. The backend reads camelCase keys (username/password/guardCode/tunnelKey),
 // but AppJson is snake_case — so these are encoded with [RequestJson] (no naming strategy).
 @Serializable
-private data class LoginBody(val username: String, val password: String, val guardCode: String?, val tunnelKey: String)
+private data class LoginBody(
+    val username: String,
+    val password: String,
+    val guardCode: String?,
+    val guardData: String?,
+    val tunnelKey: String,
+)
+
+@Serializable
+private data class LoginStartBody(
+    val username: String,
+    val password: String,
+    val guardData: String?,
+    val tunnelKey: String,
+)
+
+@Serializable
+private data class LoginContinueBody(val challengeId: String, val tunnelKey: String)
 
 @Serializable
 private data class RefreshBody(val account: String, val refresh: String, val tunnelKey: String)
@@ -51,6 +89,13 @@ private data class DemoBody(val username: String, val password: String)
 
 /** Plain JSON for request bodies — keeps property names verbatim (camelCase). */
 private val RequestJson = Json { encodeDefaults = true }
+
+/** Auth endpoints use camelCase in the mobile contract; accept snake_case aliases too. */
+private val AuthJson = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    coerceInputValues = true
+}
 
 /** Backend rejected the ticket / no account (403) — do NOT retry, surface to the user. */
 class BackendAuthFailed(message: String) : Exception(message)
@@ -65,7 +110,13 @@ class BackendUnavailable : Exception("nakama_unavailable")
 class BackendTunnelRequired : Exception("tunnel_required")
 
 /** Steam Guard code needed (409 need_guard) — prompt and resend with the code. */
-class SteamGuardNeeded(val kind: String) : Exception("need_guard:$kind")
+class SteamGuardNeeded(val kind: String, val mode: String? = null) : Exception("need_guard:$kind")
+
+/** Steam only offered a Guard flow the current client cannot complete. */
+class UnsupportedGuardFlow(detail: String) : Exception(detail)
+
+/** Pending device confirmation no longer exists on the backend. */
+class SteamChallengeExpired : Exception("Steam Guard approval expired. Try again.")
 
 /**
  * Our stable REST surface (under {BACKEND_URL} = …/api/v2). The backend hides all the
@@ -170,6 +221,7 @@ class SteamBackendApi(private val client: HttpClient) {
         username: String,
         password: String,
         guardCode: String?,
+        guardData: String?,
         tunnelKey: String,
     ): AuthLoginResponse {
         val resp = client.post("$API_BASE/auth/steam/login") {
@@ -177,7 +229,35 @@ class SteamBackendApi(private val client: HttpClient) {
             // budget so we don't time out and tear the tunnel down mid-login.
             timeout { requestTimeoutMillis = STEAM_TIMEOUT }
             contentType(ContentType.Application.Json)
-            setBody(RequestJson.encodeToString(LoginBody(username, password, guardCode, tunnelKey)))
+            setBody(RequestJson.encodeToString(LoginBody(username, password, guardCode, guardData, tunnelKey)))
+        }
+        return decodeAuth(resp)
+    }
+
+    /** Credentials → immediate app token or pending Steam mobile approval challenge. */
+    suspend fun authSteamLoginStart(
+        username: String,
+        password: String,
+        guardData: String?,
+        tunnelKey: String,
+    ): AuthLoginStartResponse {
+        val resp = client.post("$API_BASE/auth/steam/login/start") {
+            timeout { requestTimeoutMillis = STEAM_TIMEOUT }
+            contentType(ContentType.Application.Json)
+            setBody(RequestJson.encodeToString(LoginStartBody(username, password, guardData, tunnelKey)))
+        }
+        SteamLog.d("backend: login/start response → ${resp.status.value}")
+        val text = resp.bodyAsText()
+        if (resp.status.value in 200..299) return AuthJson.decodeFromString(text)
+        throw decodeAuthError(resp.status.value, text)
+    }
+
+    /** Continue a pending Steam mobile approval challenge using a fresh device tunnel. */
+    suspend fun authSteamLoginContinue(challengeId: String, tunnelKey: String): AuthLoginResponse {
+        val resp = client.post("$API_BASE/auth/steam/login/continue") {
+            timeout { requestTimeoutMillis = STEAM_TIMEOUT }
+            contentType(ContentType.Application.Json)
+            setBody(RequestJson.encodeToString(LoginContinueBody(challengeId, tunnelKey)))
         }
         return decodeAuth(resp)
     }
@@ -194,16 +274,28 @@ class SteamBackendApi(private val client: HttpClient) {
 
     private suspend fun decodeAuth(resp: HttpResponse): AuthLoginResponse {
         SteamLog.d("backend: auth response → ${resp.status.value}")
-        if (resp.status.value in 200..299) return AppJson.decodeFromString(resp.bodyAsText())
-        val body = runCatching { AppJson.decodeFromString<ErrBody>(resp.bodyAsText()) }.getOrNull()
-        throw when {
-            resp.status.value == 409 && body?.error == "need_guard" -> SteamGuardNeeded(body.kind ?: "device")
-            resp.status.value == 428 -> BackendTunnelRequired()
-            resp.status.value == 409 -> BackendTunnelRequired() // tunnel_not_connected
-            resp.status.value == 403 -> BackendAuthFailed(body?.detail ?: body?.error ?: "auth_failed")
-            resp.status.value == 401 -> BackendReauthRequired()
-            resp.status.value == 502 || resp.status.value == 503 -> BackendUnavailable()
-            else -> Exception("HTTP ${resp.status.value}: ${resp.bodyAsText().take(200)}")
+        val text = resp.bodyAsText()
+        if (resp.status.value in 200..299) return AppJson.decodeFromString(text)
+        throw decodeAuthError(resp.status.value, text)
+    }
+
+    private fun decodeAuthError(status: Int, text: String): Exception {
+        val body = runCatching { AppJson.decodeFromString<ErrBody>(text) }.getOrNull()
+        return when {
+            body?.error == "need_guard" -> SteamGuardNeeded(body.kind ?: "device", body.mode)
+            body?.error == "tunnel_not_connected" -> BackendTunnelRequired()
+            body?.error == "challenge_not_found" -> SteamChallengeExpired()
+            body?.error == "unsupported_guard_flow" ->
+                UnsupportedGuardFlow(unsupportedGuardMessage(body.detail))
+            body?.error == "approval_timeout" -> BackendAuthFailed("Steam Guard approval expired. Try again.")
+            body?.error == "auth_failed" -> BackendAuthFailed(body.detail ?: "auth_failed")
+            status == 404 -> SteamChallengeExpired()
+            status == 428 -> BackendTunnelRequired()
+            status == 409 -> BackendTunnelRequired() // Backward-compatible tunnel_not_connected.
+            status == 403 -> BackendAuthFailed(body?.detail ?: body?.error ?: "auth_failed")
+            status == 401 -> BackendReauthRequired()
+            status == 502 || status == 503 -> BackendUnavailable()
+            else -> Exception("HTTP $status: ${text.take(200)}")
         }
     }
 
@@ -222,6 +314,13 @@ class SteamBackendApi(private val client: HttpClient) {
         502 -> BackendUnavailable()
         else -> Exception("HTTP ${status.value}: ${bodyAsText().take(200)}")
     }
+
+    private fun unsupportedGuardMessage(detail: String?): String =
+        when (detail) {
+            "device_confirmation_only" ->
+                "Steam requires mobile app approval for this account. This iOS version supports Steam Guard codes only."
+            else -> "Steam Guard mobile approval is not supported on this device yet."
+        }
 
     private companion object {
         val API_BASE = BuildConfig.BACKEND_URL.trimEnd('/') // http://host/api/v2

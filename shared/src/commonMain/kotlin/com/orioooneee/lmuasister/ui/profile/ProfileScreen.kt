@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +32,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,7 +50,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.orioooneee.lmuasister.supportsSteamGuardMobileApproval
 import com.orioooneee.lmuasister.data.steam.SteamGuardKind
 import com.orioooneee.lmuasister.ui.IconSteam
 import com.orioooneee.lmuasister.ui.components.RefreshableContent
@@ -65,6 +72,7 @@ import lmuassister.shared.generated.resources.profile_field_password
 import lmuassister.shared.generated.resources.profile_login_subtitle
 import lmuassister.shared.generated.resources.profile_login_title
 import lmuassister.shared.generated.resources.profile_sign_in
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -72,6 +80,7 @@ private val SteamTop = Color(0xFF2A475E)
 private val SteamBottom = Color(0xFF171A21)
 private val SteamLogoBg = Color(0xFF1B2838)
 private val DangerRed = Color(0xFFE5484D)
+private const val STEAM_GUARD_APPROVAL_SECONDS = 120
 
 @Composable
 fun ProfileScreen(
@@ -91,11 +100,37 @@ fun ProfileScreen(
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
+    var guardApprovalSecondsLeft by remember { mutableStateOf(STEAM_GUARD_APPROVAL_SECONDS) }
 
-    val loading = state is SteamLoginUiState.Loading
+    val pendingApproval = state as? SteamLoginUiState.DeviceConfirmationPending
+    val loading = state is SteamLoginUiState.Loading || pendingApproval != null
     val guardRequired = state is SteamLoginUiState.GuardRequired
     val restoring = state is SteamLoginUiState.Restoring
     val signedIn = state as? SteamLoginUiState.SignedIn
+    val waitingForGuardApproval = supportsSteamGuardMobileApproval && loading && code.isBlank()
+    val approvalTimerStart = pendingApproval?.expiresIn?.takeIf { it > 0 } ?: STEAM_GUARD_APPROVAL_SECONDS
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(waitingForGuardApproval, pendingApproval?.challengeId, approvalTimerStart) {
+        guardApprovalSecondsLeft = approvalTimerStart
+        if (!waitingForGuardApproval) return@LaunchedEffect
+        while (guardApprovalSecondsLeft > 0) {
+            delay(1_000L)
+            guardApprovalSecondsLeft -= 1
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, pendingApproval?.challengeId) {
+        val challengeId = pendingApproval?.challengeId
+        if (challengeId == null) return@DisposableEffect onDispose { }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.continueDeviceConfirmation()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     if (restoring) {
         Column(
@@ -228,12 +263,18 @@ fun ProfileScreen(
             enabled = guardRequired && !loading,
         )
 
-        StatusLine(state)
+        StatusLine(
+            state = state,
+            waitingForGuardApproval = waitingForGuardApproval,
+            guardApprovalSecondsLeft = guardApprovalSecondsLeft,
+            supportsGuardApproval = supportsSteamGuardMobileApproval,
+        )
 
         Spacer(Modifier.height(24.dp))
 
         SignInButton(
             loading = loading,
+            waitingForGuardApproval = waitingForGuardApproval,
             onClick = { viewModel.login(login, password, code) },
         )
 
@@ -370,11 +411,36 @@ private fun ProfileMessage(title: String, detail: String) {
 }
 
 @Composable
-private fun StatusLine(state: SteamLoginUiState) {
+private fun StatusLine(
+    state: SteamLoginUiState,
+    waitingForGuardApproval: Boolean,
+    guardApprovalSecondsLeft: Int,
+    supportsGuardApproval: Boolean,
+) {
     val (text, color) = when (state) {
+        SteamLoginUiState.Loading -> {
+            if (waitingForGuardApproval) {
+                val minutes = guardApprovalSecondsLeft / 60
+                val seconds = guardApprovalSecondsLeft % 60
+                "Approve the sign-in request in the Steam app, then return here. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
+                    MaterialTheme.colorScheme.primary
+            } else {
+                "Checking Steam Guard..." to MaterialTheme.colorScheme.primary
+            }
+        }
+        is SteamLoginUiState.DeviceConfirmationPending -> {
+            val minutes = guardApprovalSecondsLeft / 60
+            val seconds = guardApprovalSecondsLeft % 60
+            "Approve the sign-in request in the Steam app, then return here. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
+                MaterialTheme.colorScheme.primary
+        }
         is SteamLoginUiState.GuardRequired -> {
-            val via = if (state.kind == SteamGuardKind.EMAIL) "email" else "your Steam app"
-            "Enter the Steam Guard code from $via." to MaterialTheme.colorScheme.primary
+            when (state.kind) {
+                SteamGuardKind.EMAIL -> "Enter the Steam Guard code from your email."
+                SteamGuardKind.DEVICE ->
+                    if (supportsGuardApproval) "Enter the Steam Guard code from your Steam app."
+                    else "Open Steam Guard and enter the current code."
+            } to MaterialTheme.colorScheme.primary
         }
         is SteamLoginUiState.Error -> state.message to MaterialTheme.colorScheme.error
         else -> return
@@ -427,7 +493,11 @@ private fun Field(
 }
 
 @Composable
-private fun SignInButton(loading: Boolean, onClick: () -> Unit) {
+private fun SignInButton(
+    loading: Boolean,
+    waitingForGuardApproval: Boolean,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -441,6 +511,16 @@ private fun SignInButton(loading: Boolean, onClick: () -> Unit) {
     ) {
         if (loading) {
             CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+            if (waitingForGuardApproval) {
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "Waiting for approval",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+            }
         } else {
             Text(
                 stringResource(Res.string.profile_sign_in),

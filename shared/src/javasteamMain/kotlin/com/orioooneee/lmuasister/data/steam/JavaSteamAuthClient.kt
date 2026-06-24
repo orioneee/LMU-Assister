@@ -20,6 +20,7 @@ import java.security.Security
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * Steam authentication on-device via JavaSteam (the SteamKit2 port) — Android + JVM.
@@ -47,14 +48,15 @@ internal class JavaSteamAuthClient : SteamAuthClient {
                 this.password = password
                 this.persistentSession = true
                 this.guardData = guardData
-                this.authenticator = FormAuthenticator(guardCode)
+                this.authenticator = GuardAuthenticator(guardCode)
                 // platformType defaults to SteamClient → the refresh token can later be
                 // reused to log on and generate game session tickets.
             }
 
             val authSession = session.client.authentication
                 .beginAuthSessionViaCredentials(details).get()
-            val poll = authSession.pollingWaitForResult().get()
+            val poll = authSession.pollingWaitForResult()
+                .get(STEAM_GUARD_APPROVAL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
 
             val steamId = session.logOn(poll.accountName, poll.refreshToken)
             SteamLoginResult.Success(
@@ -146,8 +148,13 @@ internal class JavaSteamAuthClient : SteamAuthClient {
         }
     }
 
-    private fun humanError(t: Throwable): String =
-        (t.cause ?: t).message ?: t::class.simpleName ?: "Steam login failed"
+    private fun humanError(t: Throwable): String {
+        val root = t.cause ?: t
+        if (root is TimeoutException) {
+            return "Steam Guard approval timed out. Approve the request in the Steam app and try again."
+        }
+        return root.message ?: root::class.simpleName ?: "Steam login failed"
+    }
 
     private fun guardSignalOf(t: Throwable): GuardSignal? {
         var e: Throwable? = t
@@ -159,6 +166,8 @@ internal class JavaSteamAuthClient : SteamAuthClient {
     }
 
     private companion object {
+        private const val STEAM_GUARD_APPROVAL_TIMEOUT_MS = 120_000L
+
         @Volatile
         private var bcReady = false
 
@@ -183,15 +192,15 @@ internal class JavaSteamAuthClient : SteamAuthClient {
     }
 }
 
-/** Raised by [FormAuthenticator] to signal "Steam Guard code needed" up to the caller. */
+/** Raised by [GuardAuthenticator] to signal "Steam Guard code needed" up to the caller. */
 private class GuardSignal(val kind: SteamGuardKind) : RuntimeException()
 
 /**
  * Feeds a single user-supplied Guard code into JavaSteam's polling. If no (valid)
- * code is available it fails with [GuardSignal] so the UI can prompt for one. Device
- * confirmation is declined so the flow always falls back to a code the user types.
+ * code is available it accepts Steam mobile app confirmation when offered; if Steam
+ * only offers a typed code, it fails with [GuardSignal] so the UI can prompt for one.
  */
-private class FormAuthenticator(private val code: String?) : IAuthenticator {
+private class GuardAuthenticator(private val code: String?) : IAuthenticator {
     private var used = false
 
     override fun getDeviceCode(previousCodeWasIncorrect: Boolean): CompletableFuture<String> =
@@ -201,7 +210,7 @@ private class FormAuthenticator(private val code: String?) : IAuthenticator {
         supply(SteamGuardKind.EMAIL, previousCodeWasIncorrect)
 
     override fun acceptDeviceConfirmation(): CompletableFuture<Boolean> =
-        CompletableFuture.completedFuture(false)
+        CompletableFuture.completedFuture(code.isNullOrBlank())
 
     private fun supply(kind: SteamGuardKind, incorrect: Boolean): CompletableFuture<String> {
         if (code.isNullOrBlank() || used || incorrect) {

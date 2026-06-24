@@ -43,6 +43,11 @@ sealed interface SteamLoginUiState {
     data object Loading : SteamLoginUiState
 
     data class GuardRequired(val kind: SteamGuardKind) : SteamLoginUiState
+    data class DeviceConfirmationPending(
+        val challengeId: String,
+        val expiresIn: Int,
+        val continuing: Boolean = false,
+    ) : SteamLoginUiState
 
     data class SignedIn(val backend: BackendState = BackendState.Loading) : SteamLoginUiState
 
@@ -163,28 +168,47 @@ class SteamLoginViewModel(
         _state.value = SteamLoginUiState.Loading
         Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = !guardCode.isNullOrBlank()))
         viewModelScope.launch {
-            when (val r = signIn.signIn(username, password, guardCode)) {
-                is SignInOutcome.Success -> {
-                    appToken = r.appToken
-                    Telemetry.log(AnalyticsEvent.LoginSuccess(restored = false))
-                    Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
-                    _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
-                    loadProfile()
-                }
-                is SignInOutcome.GuardRequired -> {
-                    Telemetry.log(AnalyticsEvent.Login2faRequired(r.kind.name.lowercase()))
-                    _state.value = SteamLoginUiState.GuardRequired(r.kind)
-                }
-                SignInOutcome.TunnelRequired -> {
-                    Telemetry.log(AnalyticsEvent.LoginTunnelRequired)
-                    Telemetry.recordError(TelemetryError("login_tunnel_required"), "stage" to "login")
-                    _state.value = SteamLoginUiState.Error("Couldn't open the device tunnel — try again.")
-                }
-                is SignInOutcome.Failure -> {
-                    Telemetry.log(AnalyticsEvent.LoginFailed(loginFailReason(r.reason)))
-                    Telemetry.recordError(TelemetryError("login_failed: ${loginFailReason(r.reason)}"), "stage" to "login")
-                    _state.value = SteamLoginUiState.Error(r.reason)
-                }
+            handleSignInOutcome(signIn.signIn(username, password, guardCode), stage = "login")
+        }
+    }
+
+    fun continueDeviceConfirmation() {
+        val pending = _state.value as? SteamLoginUiState.DeviceConfirmationPending ?: return
+        if (pending.continuing) return
+        _state.value = pending.copy(continuing = true)
+        viewModelScope.launch {
+            handleSignInOutcome(
+                signIn.continueDeviceConfirmation(pending.challengeId),
+                stage = "login_continue",
+            )
+        }
+    }
+
+    private suspend fun handleSignInOutcome(r: SignInOutcome, stage: String) {
+        when (r) {
+            is SignInOutcome.Success -> {
+                appToken = r.appToken
+                Telemetry.log(AnalyticsEvent.LoginSuccess(restored = false))
+                Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
+                _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
+                loadProfile()
+            }
+            is SignInOutcome.GuardRequired -> {
+                Telemetry.log(AnalyticsEvent.Login2faRequired(r.kind.name.lowercase()))
+                _state.value = SteamLoginUiState.GuardRequired(r.kind)
+            }
+            is SignInOutcome.DeviceConfirmationPending -> {
+                _state.value = SteamLoginUiState.DeviceConfirmationPending(r.challengeId, r.expiresIn)
+            }
+            SignInOutcome.TunnelRequired -> {
+                Telemetry.log(AnalyticsEvent.LoginTunnelRequired)
+                Telemetry.recordError(TelemetryError("login_tunnel_required"), "stage" to stage)
+                _state.value = SteamLoginUiState.Error("Couldn't open the device tunnel — try again.")
+            }
+            is SignInOutcome.Failure -> {
+                Telemetry.log(AnalyticsEvent.LoginFailed(loginFailReason(r.reason)))
+                Telemetry.recordError(TelemetryError("login_failed: ${loginFailReason(r.reason)}"), "stage" to stage)
+                _state.value = SteamLoginUiState.Error(r.reason)
             }
         }
     }
