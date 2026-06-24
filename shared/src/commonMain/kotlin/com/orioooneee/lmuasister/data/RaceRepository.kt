@@ -13,6 +13,7 @@ import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.Schedule
+import com.orioooneee.lmuasister.data.model.ScheduleWeek
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
 import com.orioooneee.lmuasister.data.model.WeatherSegment
@@ -107,12 +108,12 @@ class RaceRepository(
     private suspend fun full(refresh: Boolean): ScheduleResponse =
         if (refresh) network(refresh = true) else cached() ?: network(refresh = false)
 
-    fun cachedWeeks(): List<String>? = cached()?.weeks?.map { it.key }
+    fun cachedWeeks(): List<ScheduleWeek>? = cached()?.weeks?.map { ScheduleWeek(it.key, it.label) }
 
     suspend fun refreshSchedule(): Result<Unit> = runCatching { network(refresh = true) }.map { }
 
-    suspend fun availableWeeks(refresh: Boolean = false): List<String> =
-        runCatching { full(refresh).weeks.map { it.key } }.getOrDefault(emptyList())
+    suspend fun availableWeeks(refresh: Boolean = false): List<ScheduleWeek> =
+        runCatching { full(refresh).weeks.map { ScheduleWeek(it.key, it.label) } }.getOrDefault(emptyList())
 
     suspend fun load(weekKeyOverride: String? = null, refresh: Boolean = false): Result<Schedule> = runCatching {
         val resp = full(refresh)

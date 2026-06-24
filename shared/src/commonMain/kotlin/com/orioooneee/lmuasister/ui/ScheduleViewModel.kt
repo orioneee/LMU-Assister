@@ -8,7 +8,6 @@ import com.orioooneee.lmuasister.analytics.TelemetryError
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.Schedule
-import com.orioooneee.lmuasister.ui.util.weekKeyShort
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,7 +43,7 @@ class ScheduleViewModel(
     val cars: StateFlow<List<CarModel>> = _cars.asStateFlow()
 
     private val cache = mutableMapOf<String, Schedule>()
-    private var weeks: List<String> = emptyList()
+    private var weeks: List<WeekTab> = emptyList()
     private var selected: String? = null
 
     init {
@@ -53,9 +52,9 @@ class ScheduleViewModel(
             repository.cars().getOrNull()?.let { _cars.value = it }
         }
         viewModelScope.launch {
-            repository.cachedWeeks()?.let { cachedKeys ->
-                weeks = cachedKeys
-                selected = cachedKeys.firstOrNull()
+            repository.cachedWeeks()?.let { cachedWeeks ->
+                weeks = cachedWeeks.map { WeekTab(it.key, it.label.ifBlank { it.key }) }
+                selected = weeks.firstOrNull()?.key
                 fetchWeek(selected)
             }
         }
@@ -81,9 +80,9 @@ class ScheduleViewModel(
         _refreshing.value = true
         viewModelScope.launch {
             if (repository.refreshSchedule().isSuccess) {
-                weeks = repository.availableWeeks()
+                weeks = repository.availableWeeks().map { WeekTab(it.key, it.label.ifBlank { it.key }) }
                 val sel = selected
-                if (sel == null || sel !in weeks) selected = weeks.firstOrNull()
+                if (sel == null || weeks.none { it.key == sel }) selected = weeks.firstOrNull()?.key
                 cache.clear()
                 fetchWeek(selected)
                 prefetchOtherWeeks()
@@ -113,8 +112,8 @@ class ScheduleViewModel(
 
     private suspend fun prefetchOtherWeeks() {
         weeks.forEach { week ->
-            if (cache[week] == null) {
-                runCatching { repository.load(week) }.getOrNull()?.getOrNull()?.let { cache[week] = it }
+            if (cache[week.key] == null) {
+                runCatching { repository.load(week.key) }.getOrNull()?.getOrNull()?.let { cache[week.key] = it }
             }
         }
     }
@@ -125,19 +124,13 @@ class ScheduleViewModel(
                 listOf(r.track?.name to r.track?.logoUrl, r.circuit to r.track?.logoUrl)
             },
         )
-        val sel = key ?: weeks.firstOrNull() ?: ""
+        val sel = key ?: weeks.firstOrNull()?.key ?: ""
         _state.value = ScheduleUiState.Success(
             ScheduleData(
                 schedule = schedule,
-                weeks = weeks.mapIndexed { i, k -> WeekTab(k, weekLabel(i, k)) },
+                weeks = weeks,
                 selected = sel,
             ),
         )
-    }
-
-    private fun weekLabel(index: Int, key: String): String = when (index) {
-        0 -> "This week"
-        1 -> "Next week"
-        else -> weekKeyShort(key)
     }
 }

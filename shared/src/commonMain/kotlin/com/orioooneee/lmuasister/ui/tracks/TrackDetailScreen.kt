@@ -31,8 +31,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.remote.TrackAttemptDto
-import com.orioooneee.lmuasister.data.remote.TrackDetailResponse
 import com.orioooneee.lmuasister.data.remote.TrackFullDto
+import com.orioooneee.lmuasister.data.remote.TrackPersonalDto
 import com.orioooneee.lmuasister.ui.components.BlockSkeleton
 import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.ShimmerBar
@@ -64,22 +64,47 @@ fun TrackDetailScreen(
 ) {
     val repo = koinInject<RaceRepository>()
     val uiState by viewModel.state.collectAsStateWithLifecycle()
-    val signedIn = uiState is SteamLoginUiState.SignedIn
-    // Re-keyed on signedIn so the personal record loads in once auth lands (e.g. after a cold-start restore).
-    val result by produceState<Result<TrackDetailResponse>?>(null, trackId, signedIn) {
-        // 1) Paint instantly: cached personal detail, else the public track block from the roster.
-        viewModel.cachedTrackDetail(trackId)?.let { value = Result.success(it) }
+    val auth = uiState.authAvailability()
+    // Re-keyed on auth so the personal record loads in once auth lands (e.g. after a cold-start restore).
+    val result by produceState<Result<TrackDetailData>?>(null, trackId, auth) {
+        fun paint(track: TrackFullDto, personal: PersonalRecordsState) {
+            value = Result.success(TrackDetailData(track, personal))
+        }
+
+        // 1) Paint instantly: cached personal detail for an active/restoring session, else the public
+        // track block from the roster. While auth is restoring, keep personal records in loading state.
+        viewModel.cachedTrackDetail(trackId)?.let { cached ->
+            paint(
+                cached.track,
+                when (auth) {
+                    AuthAvailability.SignedOut -> PersonalRecordsState.SignedOut
+                    else -> PersonalRecordsState.Ready(cached.personal)
+                },
+            )
+        }
         if (value == null) {
-            publicTrack(repo, trackId)?.let { value = Result.success(TrackDetailResponse(track = it, personal = null)) }
+            publicTrack(repo, trackId)?.let {
+                paint(
+                    it,
+                    when (auth) {
+                        AuthAvailability.SignedOut -> PersonalRecordsState.SignedOut
+                        else -> PersonalRecordsState.Loading
+                    },
+                )
+            }
         }
         // 2) Only hit the personal endpoint when signed in — avoids withReauth's 60s token wait when signed out.
-        if (signedIn) {
+        if (auth == AuthAvailability.SignedIn) {
             val fresh = runCatching { viewModel.trackDetail(trackId) }
             when {
-                fresh.isSuccess -> value = fresh
-                value == null -> value = fresh // nothing to show → surface the error
+                fresh.isSuccess -> fresh.getOrNull()?.let { paint(it.track, PersonalRecordsState.Ready(it.personal)) }
+                value == null -> value = Result.failure(fresh.exceptionOrNull() ?: IllegalStateException("Couldn't load this track"))
+                value?.getOrNull()?.personal is PersonalRecordsState.Loading -> {
+                    val message = fresh.exceptionOrNull()?.message ?: "Couldn't load your records"
+                    value?.getOrNull()?.track?.let { paint(it, PersonalRecordsState.Error(message)) }
+                }
             }
-        } else if (value == null) {
+        } else if (auth == AuthAvailability.SignedOut && value == null) {
             // Signed out and no public block available → show an error instead of a forever loader.
             value = Result.failure(IllegalStateException("Couldn't load this track"))
         }
@@ -107,7 +132,7 @@ fun TrackDetailScreen(
         when (val res = result) {
             null -> TrackDetailSkeleton()
             else -> res.fold(
-                onSuccess = { TrackContent(it, insets.calculateBottomPadding(), signedIn, onOpenRace) },
+                onSuccess = { TrackContent(it, insets.calculateBottomPadding(), onOpenRace) },
                 onFailure = {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(it.message ?: "Couldn't load this track", style = MaterialTheme.typography.bodyMedium, color = TextMed)
@@ -116,6 +141,30 @@ fun TrackDetailScreen(
             )
         }
     }
+}
+
+private enum class AuthAvailability { Pending, SignedIn, SignedOut }
+
+private fun SteamLoginUiState.authAvailability(): AuthAvailability = when (this) {
+    SteamLoginUiState.Restoring,
+    SteamLoginUiState.Loading -> AuthAvailability.Pending
+    is SteamLoginUiState.SignedIn -> AuthAvailability.SignedIn
+    SteamLoginUiState.Idle,
+    is SteamLoginUiState.Error,
+    is SteamLoginUiState.GuardRequired,
+    is SteamLoginUiState.DeviceConfirmationPending -> AuthAvailability.SignedOut
+}
+
+private data class TrackDetailData(
+    val track: TrackFullDto,
+    val personal: PersonalRecordsState,
+)
+
+private sealed interface PersonalRecordsState {
+    data object Loading : PersonalRecordsState
+    data object SignedOut : PersonalRecordsState
+    data class Ready(val personal: TrackPersonalDto?) : PersonalRecordsState
+    data class Error(val message: String) : PersonalRecordsState
 }
 
 /** The public reference block for a track (cached roster first, then a network refresh). No auth. */
@@ -127,37 +176,41 @@ private suspend fun publicTrack(repo: RaceRepository, trackId: String): TrackFul
 
 @Composable
 private fun TrackContent(
-    d: TrackDetailResponse,
+    d: TrackDetailData,
     bottomInset: androidx.compose.ui.unit.Dp,
-    signedIn: Boolean,
     onOpenRace: (String, Int?) -> Unit,
 ) {
-    val personal = d.personal
-    val hasRecords = personal != null && personal.races > 0
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp + bottomInset),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { TrackCard(d.track) }
-        when {
-            hasRecords -> {
-                item { RacesHeader(personal.races, personal.laps, personal.distanceKm) }
-                personal.bestLap?.bestLapMs?.let { _ ->
-                    item { BestLapCard(personal.bestLap, byClass = personal.bestByClass, onOpenRace = onOpenRace) }
-                }
-                if (personal.bestByClass.isNotEmpty()) {
-                    item { SectionLabel("BEST BY CLASS") }
-                    item { ByClassCard(personal.bestByClass, onOpenRace) }
-                }
-                if (personal.recent.isNotEmpty()) {
-                    item { SectionLabel("RECENT") }
-                    item { RecentCard(personal.recent, onOpenRace) }
+        when (val personalState = d.personal) {
+            PersonalRecordsState.Loading -> item { PersonalRecordsSkeleton() }
+            PersonalRecordsState.SignedOut -> item { Hint("Sign in to see your records on this track.") }
+            is PersonalRecordsState.Error -> item {
+                Hint(personalState.message.takeIf { it.isNotBlank() } ?: "Couldn't load your records right now.")
+            }
+            is PersonalRecordsState.Ready -> {
+                val personal = personalState.personal
+                if (personal == null || personal.races <= 0) {
+                    item { Hint("No lap times recorded on this track yet.") }
+                } else {
+                    item { RacesHeader(personal.races, personal.laps, personal.distanceKm) }
+                    personal.bestLap?.bestLapMs?.let { _ ->
+                        item { BestLapCard(personal.bestLap, byClass = personal.bestByClass, onOpenRace = onOpenRace) }
+                    }
+                    if (personal.bestByClass.isNotEmpty()) {
+                        item { SectionLabel("BEST BY CLASS") }
+                        item { ByClassCard(personal.bestByClass, onOpenRace) }
+                    }
+                    if (personal.recent.isNotEmpty()) {
+                        item { SectionLabel("RECENT") }
+                        item { RecentCard(personal.recent, onOpenRace) }
+                    }
                 }
             }
-            // Signed in but nothing recorded → say so; only prompt sign-in when actually signed out.
-            signedIn -> item { Hint("No lap times recorded on this track yet.") }
-            else -> item { Hint("Sign in to see your records on this track.") }
         }
     }
 }
@@ -291,6 +344,19 @@ private fun TrackDetailSkeleton() {
         ShimmerBar(Modifier.fillMaxWidth(0.5f).height(16.dp), brush)
         BlockSkeleton(brush, 90.dp)   // best lap
         BlockSkeleton(brush, 120.dp)  // by class / recent
+    }
+}
+
+@Composable
+private fun PersonalRecordsSkeleton() {
+    val brush = shimmerBrush()
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ShimmerBar(Modifier.fillMaxWidth(0.45f).height(16.dp), brush)
+        BlockSkeleton(brush, 90.dp)
+        BlockSkeleton(brush, 120.dp)
     }
 }
 

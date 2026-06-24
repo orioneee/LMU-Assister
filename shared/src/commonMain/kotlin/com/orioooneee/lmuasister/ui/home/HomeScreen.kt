@@ -111,11 +111,11 @@ fun HomeScreen(
     if (tabs.isEmpty()) {
         Column(Modifier.fillMaxSize().background(Carbon)) {
             Spacer(Modifier.height(topInset + 12.dp))
-            // No tier row here to host the buttons, so keep week pills + support inline.
-            Row(Modifier.fillMaxWidth().padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { if (weeks.size > 1) WeekPillsRow(weeks, selectedWeek, onSelectWeek) }
-                SupportCluster(openRepo, openJar)
+            if (weeks.size > 1) {
+                WeekPillsRow(weeks, selectedWeek, onSelectWeek)
+                Spacer(Modifier.height(8.dp))
             }
+            SupportRow(openRepo, openJar)
             Spacer(Modifier.height(12.dp))
             NoRaces(Modifier.weight(1f), onRefresh)
         }
@@ -160,34 +160,30 @@ fun HomeScreen(
                 WeekPillsRow(weeks, selectedWeek, onSelectWeek)
                 Spacer(Modifier.height(12.dp))
             }
-            // Tier tabs (left, scrollable) share a row with the support cluster (right). Always rendered
-            // so Buy-me-a-coffee / GitHub stay visible even with a single tier.
-            Row(
-                Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.weight(1f)) {
-                    if (tabs.size > 1) {
-                        Row(
-                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            tabs.forEachIndexed { i, tab ->
-                                TierTab(tab.label(), pager.currentPage == i) {
-                                    scope.launch { pager.animateScrollToPage(i) }
-                                }
-                            }
-                        }
-                    }
+            if (tabs.size > 1) {
+                TierTabsRow(tabs, pager.currentPage) { i ->
+                    scope.launch { pager.animateScrollToPage(i) }
                 }
-                SupportCluster(openRepo, openJar)
+                Spacer(Modifier.height(8.dp))
             }
+            SupportRow(openRepo, openJar)
             Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 /** Buy-me-a-coffee (Monobank jar) + GitHub, kept as a compact right-aligned cluster. */
+@Composable
+private fun SupportRow(onOpenRepo: () -> Unit, onOpenJar: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SupportCluster(onOpenRepo, onOpenJar)
+    }
+}
+
 @Composable
 private fun SupportCluster(onOpenRepo: () -> Unit, onOpenJar: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -221,6 +217,18 @@ private fun SupportCluster(onOpenRepo: () -> Unit, onOpenJar: () -> Unit) {
 }
 
 @Composable
+private fun TierTabsRow(tabs: List<HomeTab>, currentPage: Int, onSelect: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        tabs.forEachIndexed { i, tab ->
+            TierTab(tab.label(), currentPage == i) { onSelect(i) }
+        }
+    }
+}
+
+@Composable
 private fun WeekPillsRow(weeks: List<WeekTab>, selectedWeek: String, onSelectWeek: (String) -> Unit) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -244,11 +252,11 @@ private fun HomeTab.label(): String = when (this) {
 
 private fun buildTabs(schedule: Schedule, now: Instant): List<HomeTab> = buildList {
     val hasMain = schedule.races.any {
-        (it.type == RaceType.DAILY || it.type == RaceType.WEEKLY) && it.nextStart(now) != null
+        it.type == RaceType.DAILY || it.type == RaceType.WEEKLY
     }
     if (hasMain) add(MainTab)
-    if (schedule.special.any { it.nextStart(now) != null }) add(SpecialTab)
-    if (schedule.championship.any { it.nextStart(now) != null }) add(ChampTab)
+    if (schedule.special.isNotEmpty()) add(SpecialTab)
+    if (schedule.championship.isNotEmpty()) add(ChampTab)
 }
 
 private fun srRank(sr: String?): Int = when (sr?.trim()?.firstOrNull()?.lowercaseChar()) {
@@ -280,7 +288,6 @@ private fun TabContent(
         SpecialTab -> listOf(Section(null, schedule.special))
         ChampTab -> listOf(Section(null, schedule.championship))
     }
-        .map { sec -> sec.copy(races = sec.races.filter { it.nextStart(now) != null }) }
         .filter { it.races.isNotEmpty() }
 
     fun nextKey(r: Race) = r.nextStart(now)?.toEpochMilliseconds() ?: Long.MAX_VALUE
@@ -309,7 +316,11 @@ private fun TabContent(
                 // and weekly), so "NEXT" is the soonest race PER (type + difficulty) group.
                 val nextRaceIds: Set<String> = if (isCurrentWeek) {
                     all.groupBy { it.type to it.difficulty.lowercase() }
-                        .values.mapNotNull { g -> g.minByOrNull { nextKey(it) }?.id }
+                        .values.mapNotNull { g ->
+                            g.filter { it.nextStart(now) != null }
+                                .minByOrNull { nextKey(it) }
+                                ?.id
+                        }
                         .toSet()
                 } else {
                     emptySet()

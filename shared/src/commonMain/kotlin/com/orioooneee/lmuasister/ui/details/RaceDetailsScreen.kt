@@ -748,11 +748,15 @@ private fun LeaderboardCard(
             val liveryToModel by produceState(emptyMap<String, String>()) {
                 value = runCatching { repo.liveryToModel() }.getOrDefault(emptyMap())
             }
-            val me by produceState<MeRow>(MeRow.Loading, board.leaderboardId) {
+            val me by produceState<MeRow>(MeRow.Loading, board.leaderboardId, board.carClass) {
                 val id = board.leaderboardId
-                value = if (id == null) MeRow.None
-                else runCatching { repo.leaderboardMe(id) }.getOrNull()
-                    ?.let { MeRow.Found(it) } ?: MeRow.None
+                value = MeRow.Loading
+                value = if (id == null) {
+                    MeRow.None
+                } else {
+                    runCatching { repo.leaderboardMe(id) }.getOrNull()
+                        ?.let { MeRow.Found(it) } ?: MeRow.None
+                }
             }
             when (val row = me) {
                 is MeRow.Found -> {

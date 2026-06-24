@@ -2,6 +2,11 @@ package com.orioooneee.lmuasister.data.model
 
 import kotlin.time.Instant
 
+data class ScheduleWeek(
+    val key: String,
+    val label: String,
+)
+
 enum class RaceType(val label: String) {
     DAILY("Daily"),
     WEEKLY("Weekly"),
