@@ -36,7 +36,7 @@ data class SteamProfile(
     @SerialName("total_distance_km") val totalDistanceKm: Double = 0.0,
     // Per-track distance breakdown (km desc) — shown when the distance badge is tapped.
     @SerialName("track_breakdown") val trackBreakdown: List<TrackBreakdownDto> = emptyList(),
-    // Top 3 favourite car models by race count, grouped server-side by manufacturer + model + class.
+    // Top favourite car models by race count, grouped server-side by manufacturer + model + class.
     @SerialName("favorite_cars") val favoriteCars: List<FavoriteCarDto> = emptyList(),
 )
 

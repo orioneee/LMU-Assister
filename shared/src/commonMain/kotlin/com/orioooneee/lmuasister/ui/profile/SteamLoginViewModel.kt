@@ -89,6 +89,7 @@ private const val AUTH_WAIT_MS = 60_000L
 
 class SteamLoginViewModel(
     private val signIn: SteamSignIn,
+    private val authRunner: SteamAuthRunner,
     private val backend: SteamBackendApi,
     private val tokenHolder: AppTokenHolder,
 ) : ViewModel() {
@@ -115,13 +116,19 @@ class SteamLoginViewModel(
             field = value
             tokenHolder.set(value)
         }
+    private var handledAuthResultId = 0L
 
     init {
         val cached = loadCachedProfile()
         if (cached != null) {
             _state.value = SteamLoginUiState.SignedIn(BackendState.Ok(cached, fromCache = true))
         }
+        observeAuthRunner()
         viewModelScope.launch {
+            if (authRunner.state.value !is SteamAuthRunnerState.Idle) {
+                SteamLog.d("vm: auth runner already active, skipping restore")
+                return@launch
+            }
             if (LocalCache.read(DEMO_FLAG_KEY) == "1") {
                 SteamLog.d("vm: restoring demo session…")
                 val r = runCatching { backend.authDemo(DEMO_USERNAME, DEMO_PASSWORD) }.getOrNull()
@@ -156,7 +163,7 @@ class SteamLoginViewModel(
     }
 
     fun login(username: String, password: String, guardCode: String?) {
-        if (_state.value is SteamLoginUiState.Loading) return
+        if (_state.value is SteamLoginUiState.Loading || authRunner.state.value is SteamAuthRunnerState.Running) return
         if (username.isBlank() || password.isBlank()) {
             _state.value = SteamLoginUiState.Error("Enter your login and password.")
             return
@@ -167,20 +174,37 @@ class SteamLoginViewModel(
         }
         _state.value = SteamLoginUiState.Loading
         Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = !guardCode.isNullOrBlank()))
-        viewModelScope.launch {
-            handleSignInOutcome(signIn.signIn(username, password, guardCode), stage = "login")
-        }
+        authRunner.startSignIn(username, password, guardCode)
     }
 
     fun continueDeviceConfirmation() {
         val pending = _state.value as? SteamLoginUiState.DeviceConfirmationPending ?: return
         if (pending.continuing) return
         _state.value = pending.copy(continuing = true)
+        authRunner.continueDeviceConfirmation(pending.challengeId)
+    }
+
+    private fun observeAuthRunner() {
         viewModelScope.launch {
-            handleSignInOutcome(
-                signIn.continueDeviceConfirmation(pending.challengeId),
-                stage = "login_continue",
-            )
+            authRunner.state.collect { auth ->
+                when (auth) {
+                    SteamAuthRunnerState.Idle -> Unit
+                    is SteamAuthRunnerState.Running -> {
+                        if (auth.stage == "login_continue") {
+                            val pending = _state.value as? SteamLoginUiState.DeviceConfirmationPending
+                            _state.value = pending?.copy(continuing = true) ?: SteamLoginUiState.Loading
+                        } else if (_state.value !is SteamLoginUiState.SignedIn) {
+                            _state.value = SteamLoginUiState.Loading
+                        }
+                    }
+                    is SteamAuthRunnerState.Finished -> {
+                        if (handledAuthResultId == auth.id) return@collect
+                        handledAuthResultId = auth.id
+                        handleSignInOutcome(auth.outcome, auth.stage)
+                        authRunner.resetFinished(auth.id)
+                    }
+                }
+            }
         }
     }
 
@@ -276,6 +300,7 @@ class SteamLoginViewModel(
             }
             Telemetry.setUserId(null)
             Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "false")
+            authRunner.cancelRunning()
             signIn.signOut()
             appToken = null
             runCatching { LocalCache.write(PROFILE_CACHE_KEY, "") }

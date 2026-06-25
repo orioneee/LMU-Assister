@@ -7,6 +7,7 @@ import com.orioooneee.lmuasister.data.remote.AppTokenHolder
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
+import com.orioooneee.lmuasister.ui.profile.SteamAuthRunner
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
@@ -29,6 +30,7 @@ val appModule = module {
     single { SteamBackendApi(get()) }
     single { AppTokenHolder() }
     single { RaceRepository(get(), get()) }
+    single { SteamAuthRunner(get()) }
     viewModelOf(::ScheduleViewModel)
     // SteamSignIn / SteamSessionStore are bound per-platform via steamModule().
     viewModelOf(::SteamLoginViewModel)

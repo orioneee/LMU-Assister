@@ -100,6 +100,7 @@ private fun prettyBadge(badge: String): String =
     badge.split('-', '_').joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) }
 
 private const val RECENT_PREVIEW = 3
+private const val FAVORITE_CARS_PREVIEW = 5
 
 @Composable
 fun ProfileView(
@@ -120,7 +121,7 @@ fun ProfileView(
         }
         profile.stats?.total?.let { CareerStatsGrid(it, onOpenCategory = onOpenCategory) }
         if (profile.favoriteCars.isNotEmpty()) {
-            FavoriteCarsSection(profile.favoriteCars.take(3))
+            FavoriteCarsSection(profile.favoriteCars.take(FAVORITE_CARS_PREVIEW))
         }
 
         if (profile.recentRaces.isNotEmpty()) {
