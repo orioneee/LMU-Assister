@@ -429,6 +429,7 @@ private fun SummaryCard(d: RaceDetailDto) {
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             formatIsoDateTime(d.date)?.let { MetaChip(it) }
+            d.gameVersion?.let { versionFullLabel(it) }?.let { MetaChip("v$it") }
             d.eventType?.let { MetaChip(it.replaceFirstChar(Char::uppercaseChar)) }
             d.split?.let { MetaChip(if (d.totalSplits != null) "Split $it/${d.totalSplits}" else "Split $it") }
         }

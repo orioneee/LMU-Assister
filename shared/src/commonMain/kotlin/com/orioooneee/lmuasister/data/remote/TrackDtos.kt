@@ -55,6 +55,9 @@ data class TrackPersonalDto(
     // Career laps + distance on this track (snake_case `laps` / `distance_km` via AppJson).
     val laps: Int = 0,
     val distanceKm: Double = 0.0,
+    val currentPatch: GameVersionDto? = null,
+    val bestLapEver: TrackAttemptDto? = null,
+    val bestLapCurrentPatch: TrackAttemptDto? = null,
     // Absolute best lap across all classes (may be a faster prototype class).
     val bestLap: TrackAttemptDto? = null,
     // Best lap per class the driver has run — key is the class name ("GT3", "LMP2"…).
@@ -78,4 +81,5 @@ data class TrackAttemptDto(
     val split: Int? = null,
     val position: Int? = null,
     val finishStatus: String? = null,
+    val gameVersion: GameVersionDto? = null,
 )

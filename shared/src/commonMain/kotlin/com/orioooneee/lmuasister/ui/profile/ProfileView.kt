@@ -54,6 +54,7 @@ import com.orioooneee.lmuasister.ui.components.onBadgeText
 import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import androidx.compose.material3.Icon
 import com.orioooneee.lmuasister.data.remote.FavoriteCarDto
+import com.orioooneee.lmuasister.data.remote.GameVersionDto
 import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.ClassHyper
 import com.orioooneee.lmuasister.ui.theme.Outline
@@ -142,6 +143,19 @@ fun ProfileView(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun GameVersionBadge(version: GameVersionDto?) {
+    val full = versionFullLabel(version) ?: return
+    Box(
+        Modifier.clip(RoundedCornerShape(6.dp))
+            .background(Amber.copy(alpha = 0.12f))
+            .border(1.dp, Amber.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text("V$full", style = MaterialTheme.typography.labelMedium, color = Amber, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -384,6 +398,7 @@ private fun ProfileHeader(
             if (profile.totalDistanceKm > 0) {
                 ClickablePill("${formatKm(profile.totalDistanceKm)} km", DistAccent, onClick = onOpenTracks)
             }
+            GameVersionBadge(profile.currentGameVersion)
         }
         // Status badges (e.g. "Sr Probation") sit on the SAME row as the suspensions, after them.
         val badges = profile.badges.ifEmpty { listOfNotNull(profile.badge) }
@@ -568,6 +583,9 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
                     Text(time, style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 13.sp), color = TextMed, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     // Smaller so "21.06.2026" doesn't run much wider than the time above it.
                     Text(date, style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, lineHeight = 10.sp), color = TextLow, maxLines = 1)
+                    race.gameVersion?.let { versionFullLabel(it) }?.let {
+                        Text("V$it", style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, lineHeight = 10.sp), color = TextLow, maxLines = 1)
+                    }
                 }
             }
             PositionBadge(classPos, subtitle, race.finishStatus)
@@ -608,6 +626,14 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
             race.split?.let { MetaChip(splitLabel(it, race.totalSplits)) }
         }
     }
+}
+
+internal fun versionFullLabel(version: GameVersionDto?): String? =
+    version?.version?.takeIf { it.isNotBlank() }
+
+internal fun versionPatchWildcardLabel(version: GameVersionDto?): String? {
+    val patch = version?.patch?.takeIf { it.isNotBlank() } ?: return null
+    return "$patch.*"
 }
 
 // Class tokens to drop from a car name — the class is already shown as a separate pill.

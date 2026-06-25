@@ -42,6 +42,8 @@ import com.orioooneee.lmuasister.ui.components.onBadgeText
 import com.orioooneee.lmuasister.ui.details.CircleButton
 import com.orioooneee.lmuasister.ui.profile.SteamLoginUiState
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
+import com.orioooneee.lmuasister.ui.profile.versionFullLabel
+import com.orioooneee.lmuasister.ui.profile.versionPatchWildcardLabel
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.Surface1
@@ -198,8 +200,32 @@ private fun TrackContent(
                     item { Hint("No lap times recorded on this track yet.") }
                 } else {
                     item { RacesHeader(personal.races, personal.laps, personal.distanceKm) }
-                    personal.bestLap?.bestLapMs?.let { _ ->
-                        item { BestLapCard(personal.bestLap, byClass = personal.bestByClass, onOpenRace = onOpenRace) }
+                    val bestEver = personal.bestLapEver ?: personal.bestLap
+                    val bestCurrentPatch = personal.bestLapCurrentPatch
+                    val currentIsEver = bestCurrentPatch != null && bestEver != null && sameAttempt(bestCurrentPatch, bestEver)
+                    if (!currentIsEver) {
+                        bestCurrentPatch?.takeIf { it.bestLapMs != null }?.let { current ->
+                            item { SectionLabel("BEST CURRENT PATCH") }
+                            item {
+                                BestLapCard(
+                                    best = current,
+                                    byClass = personal.bestByClass,
+                                    versionLabel = (versionFullLabel(current.gameVersion) ?: versionFullLabel(personal.currentPatch))?.let { "v$it" },
+                                    onOpenRace = onOpenRace,
+                                )
+                            }
+                        }
+                    }
+                    bestEver?.takeIf { it.bestLapMs != null }?.let { ever ->
+                        item { SectionLabel("BEST EVER") }
+                        item {
+                            BestLapCard(
+                                best = ever,
+                                byClass = personal.bestByClass,
+                                versionLabel = versionPatchWildcardLabel(ever.gameVersion),
+                                onOpenRace = onOpenRace,
+                            )
+                        }
                     }
                     if (personal.bestByClass.isNotEmpty()) {
                         item { SectionLabel("BEST BY CLASS") }
@@ -218,6 +244,12 @@ private fun TrackContent(
 /** Opens the race-detail screen for an attempt's event, when it carries an eventId. */
 private fun Modifier.openRaceOf(a: TrackAttemptDto, onOpenRace: (String, Int?) -> Unit): Modifier =
     a.eventId?.takeIf { it.isNotBlank() }?.let { id -> this.clickable { onOpenRace(id, a.split) } } ?: this
+
+private fun sameAttempt(a: TrackAttemptDto, b: TrackAttemptDto): Boolean =
+    a.bestLapMs == b.bestLapMs &&
+        a.eventId == b.eventId &&
+        a.session == b.session &&
+        a.date == b.date
 
 @Composable
 private fun TrackCard(t: TrackFullDto) {
@@ -247,19 +279,24 @@ private fun TrackCard(t: TrackFullDto) {
 }
 
 @Composable
-private fun BestLapCard(best: TrackAttemptDto, byClass: Map<String, TrackAttemptDto>, onOpenRace: (String, Int?) -> Unit) {
+private fun BestLapCard(
+    best: TrackAttemptDto,
+    byClass: Map<String, TrackAttemptDto>,
+    versionLabel: String?,
+    onOpenRace: (String, Int?) -> Unit,
+) {
     // The absolute best may belong to a faster class than the driver's usual one — flag that.
     val fasterClass = best.carClass?.takeIf {  byClass.size > 1 }
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).openRaceOf(best, onOpenRace).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text("BEST LAP", style = MaterialTheme.typography.labelSmall, color = TextLow, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(lap(best.bestLapMs), style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Monospace), color = TextHigh, fontWeight = FontWeight.Bold)
             best.carClass?.let { ClassBadge(it) }
+            versionLabel?.let { MetaChip(it) }
         }
-        attemptMeta(best)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = TextMed) }
+        attemptMeta(best, includeVersion = false)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = TextMed) }
         if (fasterClass != null) {
             Text("Absolute best — set in $fasterClass.", style = MaterialTheme.typography.labelSmall, color = TextLow)
         }
@@ -378,11 +415,12 @@ private fun ClassBadge(carClass: String) {
     }
 }
 
-/** "session · tier · date" for an attempt (skips blanks). */
-private fun attemptMeta(a: TrackAttemptDto): String? {
+/** "session · tier · version · date" for an attempt (skips blanks). */
+private fun attemptMeta(a: TrackAttemptDto, includeVersion: Boolean = true): String? {
     val parts = buildList {
         a.session?.takeIf { it.isNotBlank() }?.let { add(it.replaceFirstChar(Char::uppercaseChar)) }
         a.tier?.takeIf { it.isNotBlank() }?.let { add(it.replaceFirstChar(Char::uppercaseChar)) }
+        if (includeVersion) versionFullLabel(a.gameVersion)?.let { add("v$it") }
         formatIsoDateTime(a.date)?.let { add(it) }
     }
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")

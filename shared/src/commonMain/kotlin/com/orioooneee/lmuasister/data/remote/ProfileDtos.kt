@@ -27,6 +27,7 @@ data class SteamProfile(
     @SerialName("total_suspensions") val totalSuspensions: Int = 0,
     // Full ban/warning history (newest first); each carries its reason + window + active flag.
     val suspensions: List<SuspensionDto> = emptyList(),
+    @SerialName("current_game_version") val currentGameVersion: GameVersionDto? = null,
     @SerialName("recent_races") val recentRaces: List<RecentRaceDto> = emptyList(),
     // Career stats (profile_get_stats) — totals + per-class/manufacturer breakdown.
     val stats: ProfileStatsDto? = null,
@@ -38,6 +39,17 @@ data class SteamProfile(
     @SerialName("track_breakdown") val trackBreakdown: List<TrackBreakdownDto> = emptyList(),
     // Top favourite car models by race count, grouped server-side by manufacturer + model + class.
     @SerialName("favorite_cars") val favoriteCars: List<FavoriteCarDto> = emptyList(),
+)
+
+@Serializable
+data class GameVersionDto(
+    val version: String? = null,
+    val patch: String? = null,
+    @SerialName("build_id") val buildId: String? = null,
+    @SerialName("published_at") val publishedAt: String? = null,
+    val title: String? = null,
+    val url: String? = null,
+    val source: String? = null,
 )
 
 /** One track's slice of the career distance breakdown (GET /profile → `track_breakdown`). */
@@ -230,6 +242,7 @@ data class RecentRaceDto(
     @SerialName("car_image_url") val carImageUrl: String? = null,
     val manufacturer: String? = null,
     @SerialName("manufacturer_logo_url") val manufacturerLogoUrl: String? = null,
+    @SerialName("game_version") val gameVersion: GameVersionDto? = null,
 )
 
 /**
@@ -296,6 +309,7 @@ data class RaceDetailDto(
     val sessions: Map<String, RaceSessionDetailDto> = emptyMap(),
     // Available cars grouped by class (from the schedule endpoint)
     @SerialName("available_cars") val availableCars: Map<String, List<AvailableCarDto>> = emptyMap(),
+    @SerialName("game_version") val gameVersion: GameVersionDto? = null,
 )
 
 /** GET /api/v2/profile/race/<eventId>/split/<n> — one foreign split's tables (no `me` row). */

@@ -10,6 +10,7 @@ import com.orioooneee.lmuasister.data.remote.ClassLeaderboardDto
 import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
 import com.orioooneee.lmuasister.data.remote.FavoriteCarClassInfoDto
 import com.orioooneee.lmuasister.data.remote.FavoriteCarDto
+import com.orioooneee.lmuasister.data.remote.GameVersionDto
 import com.orioooneee.lmuasister.data.remote.HotlapDto
 import com.orioooneee.lmuasister.data.remote.HotlapsResponse
 import com.orioooneee.lmuasister.data.remote.LapDto
@@ -60,6 +61,15 @@ import kotlinx.serialization.encodeToString
 internal object MockData {
 
     private const val SEED = 13_37L
+    private val currentGameVersion = GameVersionDto(
+        version = "1.3.3.4",
+        patch = "1.3",
+        buildId = "23771736",
+        publishedAt = "2026-06-17T12:42:11Z",
+        title = "V1.3.3.4 - Update 3, Patch 3, Hotfix 4 - 17th June",
+        url = "https://steamstore-a.akamaihd.net/news/externalpost/mock",
+        source = "steam_news",
+    )
 
     /** Stable RNG keyed by the given parts — same key ⇒ same sequence, every run. */
     private fun rng(vararg keys: Any): Random =
@@ -338,6 +348,7 @@ internal object MockData {
             activeSuspensions = 1,
             totalSuspensions = 4,
             suspensions = suspensions(),
+            currentGameVersion = currentGameVersion,
             recentRaces = recentRaces().take(3),
             stats = ProfileStatsDto(
                 total = StatTotalsDto(
@@ -478,6 +489,7 @@ internal object MockData {
             finishStatus = if (dnf) "DNF" else "Finished",
             srChange = sr,
             drChange = dr,
+            gameVersion = currentGameVersion,
         )
     }
 
@@ -546,6 +558,7 @@ internal object MockData {
             finishStatus = card.finishStatus,
             srChange = card.srChange,
             drChange = card.drChange,
+            gameVersion = card.gameVersion,
             // impact is a 1–4 weight (rendered as arrows), not a real point value.
             srReasons = listOf(
                 ReasonDto(impact = 2.0, positive = true, reason = "Clean racing — no incidents"),
@@ -669,12 +682,16 @@ internal object MockData {
                 split = 4,
                 position = pos,
                 finishStatus = status,
+                gameVersion = currentGameVersion,
             )
         val base = classPaceMs["LMGT3"] ?: 143_000L
         val gt3 = attempt("LMGT3", base + 845, 6, "qualifying", 6, "Finished")
         val lmp2 = attempt("LMP2", base - 14_000, 12, "race", 3, "Finished")
         val personal = TrackPersonalDto(
             races = 29,
+            currentPatch = currentGameVersion,
+            bestLapEver = lmp2,
+            bestLapCurrentPatch = gt3,
             bestLap = lmp2,                                   // absolute best (faster prototype)
             bestByClass = mapOf("LMGT3" to gt3, "LMP2" to lmp2),
             recent = listOf(
