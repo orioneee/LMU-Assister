@@ -82,6 +82,7 @@ private const val COLUMNS = 3
 fun CareerStatsGrid(
     totals: StatTotalsDto,
     modifier: Modifier = Modifier,
+    enableCategoryClicks: Boolean = true,
     onOpenCategory: (StatCategory) -> Unit = {},
 ) {
     val cells = listOf(
@@ -116,7 +117,7 @@ fun CareerStatsGrid(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 rowCells.forEach { cell ->
-                    StatTile(cell, Modifier.weight(1f), onOpenCategory)
+                    StatTile(cell, Modifier.weight(1f), enableCategoryClicks, onOpenCategory)
                 }
                 // Pad the final row so cells keep a consistent width.
                 repeat(COLUMNS - rowCells.size) { Spacer(Modifier.weight(1f)) }
@@ -129,9 +130,10 @@ fun CareerStatsGrid(
 private fun StatTile(
     cell: StatCell,
     modifier: Modifier = Modifier,
+    enableCategoryClicks: Boolean,
     onOpenCategory: (StatCategory) -> Unit,
 ) {
-    val clickable = cell.category != null
+    val clickable = enableCategoryClicks && cell.category != null
     val shape = RoundedCornerShape(12.dp)
     Box(
         modifier

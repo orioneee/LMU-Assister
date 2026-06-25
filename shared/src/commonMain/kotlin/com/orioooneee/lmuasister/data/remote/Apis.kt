@@ -74,6 +74,34 @@ class BackendApi(private val client: HttpClient) {
     /** Privacy policy as plain text — rendered in-app (no auth required). */
     suspend fun privacy(): String = client.get("$API_BASE/privacy").bodyAsText()
 
+    /** Public driver directory summary: rating distribution + top safety drivers. */
+    suspend fun usersSummary(): UsersSummaryResponse =
+        ProfileJson.decodeFromString(client.get("$API_BASE/users/summary").bodyAsText())
+
+    /** Public user search. Empty query intentionally returns an empty page. */
+    suspend fun usersSearch(query: String, page: Int = 1): UsersSearchResponse {
+        val url = "$API_BASE/users/search?q=${query.encodeURLQueryComponent()}&page=$page"
+        return ProfileJson.decodeFromString(client.get(url).bodyAsText())
+    }
+
+    /** Public user profile saved in our DB. Does not hit Nakama live. */
+    suspend fun publicUser(uid: String): SteamProfile {
+        val resp = client.get("$API_BASE/users/${uid.encodeURLPathPart()}")
+        val text = resp.bodyAsText()
+        if (resp.status.value == 404) throw Exception("user_not_found")
+        if (resp.status.value !in 200..299) throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
+        return ProfileJson.decodeFromString(text)
+    }
+
+    /** Public saved track history for a user. Same payload shape as /profile/track/<track_id>. */
+    suspend fun publicUserTrack(uid: String, trackId: String): TrackDetailResponse {
+        val resp = client.get("$API_BASE/users/${uid.encodeURLPathPart()}/track/${trackId.encodeURLPathPart()}")
+        val text = resp.bodyAsText()
+        if (resp.status.value == 404) throw Exception("track_not_found")
+        if (resp.status.value !in 200..299) throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
+        return AppJson.decodeFromString(text)
+    }
+
     /** One page of the full official leaderboard (cursor-paginated). When [token] is
      *  supplied, the response also carries the caller's own row + rank (`me`). */
     suspend fun leaderboardPage(

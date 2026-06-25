@@ -52,6 +52,10 @@ import com.orioooneee.lmuasister.ui.profile.RaceProfileDetailScreen
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
 import com.orioooneee.lmuasister.ui.profile.SuspensionsScreen
 import com.orioooneee.lmuasister.ui.profile.TrackBreakdownScreen
+import com.orioooneee.lmuasister.ui.publicusers.PublicUserDetailScreen
+import com.orioooneee.lmuasister.ui.publicusers.PublicUserTrackBreakdownScreen
+import com.orioooneee.lmuasister.ui.publicusers.PublicUsersScreen
+import com.orioooneee.lmuasister.ui.tracks.PublicTrackDetailScreen
 import com.orioooneee.lmuasister.ui.tracks.TrackDetailScreen
 import com.orioooneee.lmuasister.ui.tracks.TracksScreen
 import com.orioooneee.lmuasister.ui.theme.Carbon
@@ -61,6 +65,7 @@ import kotlinx.serialization.Serializable
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.error_title
 import lmuassister.shared.generated.resources.nav_profile
+import lmuassister.shared.generated.resources.nav_drivers
 import lmuassister.shared.generated.resources.nav_schedule
 import lmuassister.shared.generated.resources.nav_tracks
 import lmuassister.shared.generated.resources.retry
@@ -72,6 +77,9 @@ object HomeRoute
 
 @Serializable
 object ProfileRoute
+
+@Serializable
+object PublicUsersRoute
 
 @Serializable
 object TracksRoute
@@ -100,12 +108,22 @@ object TrackBreakdownRoute
 data class ProfileRaceDetailRoute(val eventId: String, val split: Int = -1)
 
 @Serializable
+data class PublicUserDetailRoute(val uid: String)
+
+@Serializable
+data class PublicUserTrackBreakdownRoute(val uid: String)
+
+@Serializable
+data class PublicUserTrackDetailRoute(val uid: String, val trackId: String)
+
+@Serializable
 object PrivacyRoute
 
 private const val NAV_ANIM = 300
 
 private enum class TopTab(val icon: ImageVector) {
     Schedule(IconCalendarOutline),
+    Drivers(IconPersonOutline),
     Tracks(IconFlag),
     Profile(IconPersonOutline),
 }
@@ -120,10 +138,12 @@ fun MainShell(
     val currentDest = backStack?.destination
 
     val onTopLevel = currentDest?.hierarchy?.any {
-        it.hasRoute(HomeRoute::class) || it.hasRoute(TracksRoute::class) || it.hasRoute(ProfileRoute::class)
+        it.hasRoute(HomeRoute::class) || it.hasRoute(PublicUsersRoute::class) ||
+            it.hasRoute(TracksRoute::class) || it.hasRoute(ProfileRoute::class)
     } == true
     val selectedTab = when {
         currentDest?.hierarchy?.any { it.hasRoute(ProfileRoute::class) } == true -> TopTab.Profile
+        currentDest?.hierarchy?.any { it.hasRoute(PublicUsersRoute::class) } == true -> TopTab.Drivers
         currentDest?.hierarchy?.any { it.hasRoute(TracksRoute::class) } == true -> TopTab.Tracks
         else -> TopTab.Schedule
     }
@@ -152,6 +172,7 @@ fun MainShell(
                     onSelect = { tab ->
                         val route: Any = when (tab) {
                             TopTab.Profile -> ProfileRoute
+                            TopTab.Drivers -> PublicUsersRoute
                             TopTab.Tracks -> TracksRoute
                             TopTab.Schedule -> HomeRoute
                         }
@@ -205,6 +226,41 @@ fun MainShell(
                         nav.navigate(PrivacyRoute)
                     },
                     onOpenTracks = { nav.navigate(TrackBreakdownRoute) },
+                )
+            }
+            composable<PublicUsersRoute> {
+                PublicUsersScreen(
+                    insets = insets,
+                    onOpenUser = { uid -> nav.navigate(PublicUserDetailRoute(uid)) },
+                )
+            }
+            composable<PublicUserDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+                PublicUserDetailScreen(
+                    uid = entry.toRoute<PublicUserDetailRoute>().uid,
+                    insets = insets,
+                    onBack = { nav.popBackStack() },
+                    onOpenTracks = {
+                        val uid = entry.toRoute<PublicUserDetailRoute>().uid
+                        nav.navigate(PublicUserTrackBreakdownRoute(uid))
+                    },
+                )
+            }
+            composable<PublicUserTrackBreakdownRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+                val route = entry.toRoute<PublicUserTrackBreakdownRoute>()
+                PublicUserTrackBreakdownScreen(
+                    uid = route.uid,
+                    insets = insets,
+                    onBack = { nav.popBackStack() },
+                    onOpenTrack = { trackId -> nav.navigate(PublicUserTrackDetailRoute(route.uid, trackId)) },
+                )
+            }
+            composable<PublicUserTrackDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+                val route = entry.toRoute<PublicUserTrackDetailRoute>()
+                PublicTrackDetailScreen(
+                    uid = route.uid,
+                    trackId = route.trackId,
+                    insets = insets,
+                    onBack = { nav.popBackStack() },
                 )
             }
             composable<TracksRoute> {
@@ -348,6 +404,10 @@ private fun ScheduleTab(viewModel: ScheduleViewModel, insets: PaddingValues, onO
 
 private fun screenNameOf(dest: NavDestination): String = when {
     dest.hasRoute(HomeRoute::class) -> "schedule"
+    dest.hasRoute(PublicUsersRoute::class) -> "drivers"
+    dest.hasRoute(PublicUserDetailRoute::class) -> "public_profile"
+    dest.hasRoute(PublicUserTrackBreakdownRoute::class) -> "public_track_breakdown"
+    dest.hasRoute(PublicUserTrackDetailRoute::class) -> "public_track_detail"
     dest.hasRoute(TracksRoute::class) -> "tracks"
     dest.hasRoute(TrackDetailRoute::class) -> "track_detail"
     dest.hasRoute(ProfileRoute::class) -> "profile"
@@ -366,6 +426,7 @@ private fun BottomBar(selected: TopTab, onSelect: (TopTab) -> Unit) {
         TopTab.entries.forEach { tab ->
             val label = when (tab) {
                 TopTab.Schedule -> stringResource(Res.string.nav_schedule)
+                TopTab.Drivers -> stringResource(Res.string.nav_drivers)
                 TopTab.Tracks -> stringResource(Res.string.nav_tracks)
                 TopTab.Profile -> stringResource(Res.string.nav_profile)
             }

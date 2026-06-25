@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.orioooneee.lmuasister.data.remote.SteamProfile
 import com.orioooneee.lmuasister.data.remote.TrackBreakdownDto
 import com.orioooneee.lmuasister.ui.tracks.TrackPreview
 import com.orioooneee.lmuasister.ui.tracks.trackFlagUrl
@@ -61,6 +62,23 @@ fun TrackBreakdownScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val profile = (state as? SteamLoginUiState.SignedIn)?.backend
         ?.let { it as? BackendState.Ok }?.profile
+
+    TrackBreakdownView(
+        profile = profile,
+        insets = insets,
+        onBack = onBack,
+        onOpenTrack = onOpenTrack,
+    )
+}
+
+/** Shared per-track distance grid. Used by both private and public profile flows. */
+@Composable
+fun TrackBreakdownView(
+    profile: SteamProfile?,
+    insets: PaddingValues,
+    onBack: () -> Unit,
+    onOpenTrack: (String) -> Unit = {},
+) {
     val tracks = profile?.trackBreakdown
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
@@ -175,4 +193,3 @@ private fun TrackBreakdownSkeleton() {
         }
     }
 }
-

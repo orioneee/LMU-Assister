@@ -30,16 +30,24 @@ import com.orioooneee.lmuasister.data.remote.SessionWeatherDto
 import com.orioooneee.lmuasister.data.remote.SettingsDto
 import com.orioooneee.lmuasister.data.remote.ProfileStatsDto
 import com.orioooneee.lmuasister.data.remote.ProfileJson
+import com.orioooneee.lmuasister.data.remote.PublicUserDto
+import com.orioooneee.lmuasister.data.remote.RatingDistributionBucketDto
 import com.orioooneee.lmuasister.data.remote.SteamProfile
 import com.orioooneee.lmuasister.data.remote.StatTotalsDto
 import com.orioooneee.lmuasister.data.remote.SuspensionDto
+import com.orioooneee.lmuasister.data.remote.RatingHistoryDto
+import com.orioooneee.lmuasister.data.remote.RatingPointDto
 import com.orioooneee.lmuasister.data.remote.TrackAttemptDto
 import com.orioooneee.lmuasister.data.remote.TrackAssetsDto
+import com.orioooneee.lmuasister.data.remote.TrackBreakdownDto
 import com.orioooneee.lmuasister.data.remote.TrackDetailResponse
 import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.data.remote.TrackFullDto
 import com.orioooneee.lmuasister.data.remote.TrackPersonalDto
 import com.orioooneee.lmuasister.data.remote.TracksResponse
+import com.orioooneee.lmuasister.data.remote.UsersDistributionDto
+import com.orioooneee.lmuasister.data.remote.UsersSearchResponse
+import com.orioooneee.lmuasister.data.remote.UsersSummaryResponse
 import com.orioooneee.lmuasister.data.remote.WeatherDto
 import com.orioooneee.lmuasister.data.remote.WeatherSegmentDto
 import kotlin.random.Random
@@ -367,8 +375,184 @@ internal object MockData {
                 ),
             ),
             favoriteCars = favoriteCars(),
+            syncedAt = syncedIso(),
+            lastUpdatedAt = syncedIso(),
+            totalLaps = 1_842,
         ),
     )
+
+    private val ratingRanks = listOf("Bronze", "Silver", "Gold", "Platinum")
+
+    private fun syncedIso(): String =
+        Instant.fromEpochMilliseconds(Clock.System.now().toEpochMilliseconds() - 42 * 60_000L).toString()
+
+    private fun mockRating(kind: String, index: Int): RatingDto {
+        val rank = ratingRanks[(index + if (kind == "sr") 1 else 0).mod(ratingRanks.size)]
+        val tier = index.mod(3) + 1
+        val progress = ((index * 17 + if (kind == "sr") 21 else 9) % 100).toDouble()
+        val elo = 820.0 + index * 37.0 + ratingRanks.indexOf(rank) * 260.0 + tier * 40.0
+        val label = "${rank.first()}$tier"
+        return RatingDto(rank = rank, tier = tier, progress = progress, elo = elo, rating = elo, label = label)
+    }
+
+    private fun publicUserAt(index: Int, driver: Drv): PublicUserDto {
+        val races = 26 + index * 7
+        val wins = (index * 3).mod((races / 4).coerceAtLeast(1))
+        val podiums = (wins + index * 2 + 3).coerceAtMost(races)
+        return PublicUserDto(
+            uid = if (driver.name == PLAYER_NAME) PLAYER_UID else "mock-driver-${index.toString().padStart(3, '0')}",
+            name = driver.name,
+            nationality = driver.cc.uppercase(),
+            badge = listOf("sr-clean", "endurance-regular", "hotlapper", "race-winner")[index.mod(4)],
+            driverRating = mockRating("dr", index),
+            safetyRating = mockRating("sr", index + 2),
+            races = races,
+            wins = wins,
+            podiums = podiums,
+            polePositions = (wins / 2 + index.mod(5)).coerceAtMost(races),
+            fastestLaps = (index * 2).mod(11),
+            syncedAt = syncedIso(),
+            lastUpdatedAt = syncedIso(),
+        )
+    }
+
+    private val publicUsers: List<PublicUserDto> by lazy {
+        val extra = listOf(Drv(PLAYER_NAME, PLAYER_CC, "PER")) + drivers + drivers.mapIndexed { i, d ->
+            d.copy(name = "${d.name} ${i + 2}")
+        }
+        extra.mapIndexed(::publicUserAt)
+    }
+
+    private fun distribution(users: List<PublicUserDto>, selector: (PublicUserDto) -> RatingDto?): Map<String, RatingDistributionBucketDto> {
+        val total = users.size.coerceAtLeast(1)
+        return ratingRanks.associateWith { rank ->
+            val count = users.count { selector(it)?.rank.equals(rank, ignoreCase = true) }
+            RatingDistributionBucketDto(count = count, percentage = count * 100.0 / total)
+        }
+    }
+
+    private fun safetyScore(user: PublicUserDto): Double {
+        val rating = user.safetyRating ?: return 0.0
+        val rankScore = ratingRanks.indexOfFirst { it.equals(rating.rank, ignoreCase = true) }.coerceAtLeast(0) * 1_000.0
+        return rankScore + rating.tier * 100.0 + (rating.progress ?: 0.0)
+    }
+
+    fun usersSummary(): String = ProfileJson.encodeToString(
+        UsersSummaryResponse(
+            count = publicUsers.size,
+            distribution = UsersDistributionDto(
+                driverRating = distribution(publicUsers) { it.driverRating },
+                safetyRating = distribution(publicUsers) { it.safetyRating },
+            ),
+            topSafety = publicUsers.sortedByDescending(::safetyScore).take(10),
+        ),
+    )
+
+    fun usersSearch(query: String, page: Int): String {
+        val clean = query.trim()
+        val pageSize = 20
+        val all = if (clean.isBlank()) emptyList() else publicUsers.filter { it.name?.contains(clean, ignoreCase = true) == true }
+        val safePage = page.coerceAtLeast(1)
+        val from = (safePage - 1) * pageSize
+        val slice = all.drop(from).take(pageSize)
+        return ProfileJson.encodeToString(
+            UsersSearchResponse(
+                query = clean,
+                page = safePage,
+                pageSize = pageSize,
+                count = slice.size,
+                total = all.size,
+                hasMore = from + pageSize < all.size,
+                users = slice,
+            ),
+        )
+    }
+
+    fun publicUser(uid: String): String? {
+        val user = publicUsers.firstOrNull { it.uid == uid } ?: return null
+        val index = publicUsers.indexOf(user).coerceAtLeast(0)
+        return ProfileJson.encodeToString(
+            SteamProfile(
+                uid = user.uid,
+                name = user.name,
+                displayName = user.name,
+                nationality = user.nationality,
+                badge = user.badge,
+                badges = listOfNotNull(user.badge),
+                driverRating = user.driverRating,
+                safetyRating = user.safetyRating,
+                activeSuspensions = index.mod(7).let { if (it == 0) 1 else 0 },
+                totalSuspensions = index.mod(5),
+                recentRaces = recentRaces().drop(index.mod(4)).take(3),
+                stats = ProfileStatsDto(
+                    total = StatTotalsDto(
+                        races = user.races,
+                        wins = user.wins,
+                        podiums = user.podiums,
+                        top5 = (user.podiums + 8).coerceAtMost(user.races),
+                        dnfs = index.mod(6),
+                        polePositions = user.polePositions,
+                        lapsCompleted = user.races * 14 + index * 3,
+                        lapsLead = user.wins * 11 + index,
+                        fastestLaps = user.fastestLaps,
+                        grandSlams = index.mod(3),
+                        polesConverted = (user.wins / 2).coerceAtMost(user.polePositions),
+                        winsNoPole = (user.wins - user.polePositions / 2).coerceAtLeast(0),
+                    ),
+                ),
+                ratingHistory = ratingHistory(index),
+                totalDistanceKm = user.races * 82.7,
+                trackBreakdown = mockTrackBreakdown(index),
+                favoriteCars = favoriteCars().drop(index.mod(2)).take(3),
+                syncedAt = user.syncedAt,
+                lastUpdatedAt = user.lastUpdatedAt,
+                totalLaps = user.races * 14 + index * 3,
+            ),
+        )
+    }
+
+    fun publicUserTrack(uid: String, trackId: String): String? {
+        publicUsers.firstOrNull { it.uid == uid } ?: return null
+        return trackDetail(trackId)
+    }
+
+    private fun mockTrackBreakdown(seed: Int): List<TrackBreakdownDto> =
+        tracks.mapIndexed { i, t ->
+            val races = 2 + (seed + i).mod(11)
+            val laps = races * (8 + i.mod(7))
+            val distance = laps * t.lengthKm.toDouble()
+            val id = t.idKey()
+            TrackBreakdownDto(
+                trackId = id,
+                track = t.simple,
+                lengthKm = t.lengthKm.toDoubleOrNull(),
+                numTurns = t.turns,
+                scheme = "/api/v2/track/$id/scheme.svg",
+                logo = "/api/v2/track/$id/logo.svg",
+                cover = "/api/v2/track/$id/cover.webp",
+                background = "/api/v2/track/$id/background.webp",
+                countryCode = t.cc.uppercase(),
+                races = races,
+                laps = laps,
+                distanceKm = distance,
+            )
+        }.sortedByDescending { it.distanceKm }
+
+    private fun ratingHistory(seed: Int): RatingHistoryDto {
+        val now = Clock.System.now().toEpochMilliseconds()
+        fun points(offset: Int) = (0 until 18).map { i ->
+            val score = 120.0 + offset * 45.0 + i * (18 + seed.mod(7)) + ((i * seed + offset) % 50)
+            RatingPointDto(
+                date = Instant.fromEpochMilliseconds(now - (18 - i) * 3L * 86_400_000L).toString(),
+                rank = ratingRanks[(score / 300.0).toInt().coerceIn(0, ratingRanks.lastIndex)],
+                tier = ((score / 100.0).toInt().mod(3)) + 1,
+                progress = score.mod(100.0),
+                score = score,
+                change = if (i == 0) 0.0 else 4.0 + seed.mod(9),
+            )
+        }
+        return RatingHistoryDto(dr = points(seed.mod(4)), sr = points(seed.mod(4) + 2))
+    }
 
     fun stats(): String = AppJson.encodeToString(
         mapOf("races" to "128", "wins" to "14", "podiums" to "41", "poles" to "9"),

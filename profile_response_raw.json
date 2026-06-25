@@ -1,0 +1,4952 @@
+{
+  "uid": "ffe52187-7e8c-4a4e-9afa-3e44b9f4aac5",
+  "name": "Danylo Perepeliuk",
+  "nationality": "UA",
+  "badge": "sr-clean",
+  "badges": [
+    "sr-clean"
+  ],
+  "email": "perepelukdanilo@gmail.com",
+  "driver_rating": {
+    "rank": "Bronze",
+    "tier": 3,
+    "progress": 56.94995
+  },
+  "safety_rating": {
+    "rank": "Silver",
+    "tier": 3,
+    "progress": 59.82541
+  },
+  "total_suspensions": 4,
+  "suspensions": [
+    {
+      "type": 7,
+      "reason": "You have been involved in too many on track incidents and contacts over the last 10 races, you have been automatically suspended for 1 day, due to high SR Incident Ratio 1st Offense. If your on track behaviour does not improve after the suspension the next ban will be longer, you will have 5 races to try and improve your SR Ratio and try to gain a clean or trusted racer badge.",
+      "from": 1781968177488,
+      "to": 1782054577488
+    },
+    {
+      "type": 7,
+      "reason": "You have been involved in too many on track incidents and contacts over the last 10 races, you have been automatically suspended for 7 days, due to high SR Incident Ratio 3rd Offense. If your on track behaviour does not improve after the suspension the next ban will be longer, you will have 5 races to try and improve your SR Ratio and try to gain a clean or trusted racer badge.",
+      "from": 1775218576708,
+      "to": 1775823376708
+    },
+    {
+      "type": 7,
+      "reason": "You have been involved in too many on track incidents and contacts over the last 10 races, you have been automatically suspended for 3 days, due to high SR Incident Ratio 2nd Offense. If your on track behaviour does not improve after the suspension the next ban will be longer, you will have 5 races to try and improve your SR Ratio and try to gain a clean or trusted racer badge.",
+      "from": 1771283730319,
+      "to": 1771542930319
+    },
+    {
+      "type": 7,
+      "reason": "You have been involved in too many on track incidents and contacts over the last 10 races, you have been automatically suspended for 1 day, due to high SR Incident Ratio 1st Offense. If your on track behaviour does not improve after the suspension the next ban will be longer, you will have 5 races to try and improve your SR Ratio and try to gain a clean or trusted racer badge.",
+      "from": 1771161262045,
+      "to": 1771247662045
+    }
+  ],
+  "recent_races": [
+    {
+      "date": "2026-06-24T18:00:00Z",
+      "title": "LMP3 Fixed",
+      "event_id": "ee6fc24a-f0c9-41e5-ad55-215156e3a2b5",
+      "series_id": "e3bbf368-fb2e-48d6-999f-4472480f3818",
+      "track": "Spa",
+      "track_logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_4bb77fd10958555c1ede236761d3345fa96de1a9.svg",
+      "tier": "beginner",
+      "event_type": "daily",
+      "official": true,
+      "split": 8,
+      "field_size": 19,
+      "position": 19,
+      "class_position": 19,
+      "class_race_position": 19,
+      "class_race_size": 19,
+      "class_quali_position": 15,
+      "class_quali_size": 19,
+      "grid_position": 15,
+      "car_class": "LMP3",
+      "car": "Duqueine D09 P3",
+      "car_name": "Duqueine D09 P3",
+      "best_lap_ms": 139459,
+      "finish_status": "DNF",
+      "sr_change": -3.3,
+      "dr_change": -8.8,
+      "sessions": {
+        "practice": {
+          "position": 7,
+          "class_position": 7,
+          "class_size": 19,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "None"
+        },
+        "qualifying": {
+          "position": 15,
+          "class_position": 15,
+          "class_size": 19,
+          "best_lap_ms": 138737,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "Finished Normally"
+        },
+        "race": {
+          "position": 19,
+          "class_position": 19,
+          "class_size": 19,
+          "grid_position": 15,
+          "best_lap_ms": 139459,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "DNF"
+        }
+      },
+      "car_id": "12_25_WTM_7FC250D8",
+      "car_image_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/12_25_WTM_7FC250D8_frontAngle.webp",
+      "manufacturer": "Duqueine",
+      "manufacturer_logo_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/Brand=Duqueine.svg"
+    },
+    {
+      "date": "2026-06-24T14:15:00Z",
+      "title": "LMP3 Fixed",
+      "event_id": "7af26ec1-0abb-4eb8-ac97-f796371b32f9",
+      "series_id": "e3bbf368-fb2e-48d6-999f-4472480f3818",
+      "track": "Spa",
+      "track_logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_4bb77fd10958555c1ede236761d3345fa96de1a9.svg",
+      "tier": "beginner",
+      "event_type": "daily",
+      "official": true,
+      "split": 6,
+      "field_size": 20,
+      "position": 13,
+      "class_position": 13,
+      "class_race_position": 13,
+      "class_race_size": 20,
+      "class_quali_position": 18,
+      "class_quali_size": 20,
+      "grid_position": 18,
+      "car_class": "LMP3",
+      "car": "ADESS AD25 LMP3",
+      "car_name": "ADESS AD25 LMP3",
+      "best_lap_ms": 138637,
+      "finish_status": "Finished Normally",
+      "sr_change": 7.0,
+      "dr_change": -2.9,
+      "sessions": {
+        "practice": {
+          "position": 3,
+          "class_position": 3,
+          "class_size": 20,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "None"
+        },
+        "qualifying": {
+          "position": 18,
+          "class_position": 18,
+          "class_size": 20,
+          "best_lap_ms": 138731,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "Finished Normally"
+        },
+        "race": {
+          "position": 13,
+          "class_position": 13,
+          "class_size": 20,
+          "grid_position": 18,
+          "best_lap_ms": 138637,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_time_ms": 1280258,
+          "finish_status": "Finished Normally"
+        }
+      },
+      "car_id": "46_25_ADES81662442",
+      "car_image_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/46_25_ADES81662442_frontAngle.webp",
+      "manufacturer": "ADESS",
+      "manufacturer_logo_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/Brand=ADESS.svg"
+    },
+    {
+      "date": "2026-06-23T19:45:00Z",
+      "title": "LOGITECH MCLAREN G CHALLENGE Q4",
+      "event_id": "fe299e9a-38a0-429c-9fce-cee16b9eb42b",
+      "series_id": "e3bbf368-fb2e-48d6-999f-4472480f3818",
+      "track": "Le Mans",
+      "track_logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_2858da03dbb6e4f958bfbb30ea33cbb7bcdd0ea2.svg",
+      "tier": "beginner",
+      "event_type": "daily",
+      "official": true,
+      "split": 16,
+      "field_size": 19,
+      "position": 9,
+      "class_position": 9,
+      "class_race_position": 9,
+      "class_race_size": 19,
+      "class_quali_position": 9,
+      "class_quali_size": 19,
+      "grid_position": 9,
+      "car_class": "GT3",
+      "car": "McLaren 720S LMGT3 Evo",
+      "car_name": "McLaren 720S LMGT3 Evo",
+      "best_lap_ms": 246213,
+      "finish_status": "Finished Normally",
+      "sr_change": 8.2,
+      "dr_change": 1.2,
+      "sessions": {
+        "practice": {
+          "position": 3,
+          "class_position": 3,
+          "class_size": 19,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "None"
+        },
+        "qualifying": {
+          "position": 9,
+          "class_position": 9,
+          "class_size": 19,
+          "best_lap_ms": 245672,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "Finished Normally"
+        },
+        "race": {
+          "position": 9,
+          "class_position": 9,
+          "class_size": 19,
+          "grid_position": 9,
+          "best_lap_ms": 246213,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_time_ms": 1248718,
+          "finish_status": "Finished Normally"
+        }
+      },
+      "car_id": "12_26_GCHA18747807",
+      "car_image_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/12_26_GCHA18747807_frontAngle.webp",
+      "manufacturer": "McLaren",
+      "manufacturer_logo_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/Brand=McLaren.svg"
+    },
+    {
+      "date": "2026-06-22T20:50:00Z",
+      "title": "ELMS Sprint Trophy",
+      "event_id": "abbbb50e-fc09-4f3c-86db-bacc01ceeb9d",
+      "series_id": "ed89b473-4220-4377-8e3d-1a94c1c5180a",
+      "track": "Sebring",
+      "track_logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_39353507085362c736910ba6cbd842a7022aa5e0.svg",
+      "tier": "intermediate",
+      "event_type": "daily",
+      "official": true,
+      "split": 4,
+      "field_size": 30,
+      "position": 12,
+      "class_position": 10,
+      "class_race_position": 10,
+      "class_race_size": 23,
+      "class_quali_position": 11,
+      "class_quali_size": 23,
+      "grid_position": 18,
+      "car_class": "GT3",
+      "car": "Ford Mustang LMGT3",
+      "car_name": "Ford Mustang LMGT3",
+      "best_lap_ms": 124429,
+      "finish_status": "Finished Normally",
+      "sr_change": 16.3,
+      "dr_change": 1.8,
+      "sessions": {
+        "practice": {
+          "position": 9,
+          "class_position": 9,
+          "class_size": 23,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "Finished Normally"
+        },
+        "qualifying": {
+          "position": 17,
+          "class_position": 11,
+          "class_size": 23,
+          "best_lap_ms": 124589,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "Finished Normally"
+        },
+        "race": {
+          "position": 12,
+          "class_position": 10,
+          "class_size": 23,
+          "grid_position": 18,
+          "best_lap_ms": 124429,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_time_ms": 1912158,
+          "finish_status": "Finished Normally"
+        }
+      },
+      "car_id": "44_24_PROT92DCFAD4",
+      "car_image_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/44_24_PROT92DCFAD4_frontAngle.webp",
+      "manufacturer": "Ford",
+      "manufacturer_logo_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/Brand=Ford.svg"
+    },
+    {
+      "date": "2026-06-22T11:50:00Z",
+      "title": "ELMS Sprint Trophy",
+      "event_id": "b9a4a70c-2181-47ba-9776-49d806397c5a",
+      "series_id": "ed89b473-4220-4377-8e3d-1a94c1c5180a",
+      "track": "Sebring",
+      "track_logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_39353507085362c736910ba6cbd842a7022aa5e0.svg",
+      "tier": "intermediate",
+      "event_type": "daily",
+      "official": true,
+      "split": 3,
+      "field_size": 32,
+      "position": 9,
+      "class_position": 4,
+      "class_race_position": 4,
+      "class_race_size": 23,
+      "class_quali_position": 8,
+      "class_quali_size": 23,
+      "grid_position": 17,
+      "car_class": "GT3",
+      "car": "Ford Mustang LMGT3",
+      "car_name": "Ford Mustang LMGT3",
+      "best_lap_ms": 124442,
+      "finish_status": "Finished Normally",
+      "sr_change": 8.8,
+      "dr_change": 9.9,
+      "sessions": {
+        "practice": {
+          "position": 2,
+          "class_position": 1,
+          "class_size": 23,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "None"
+        },
+        "qualifying": {
+          "position": 17,
+          "class_position": 8,
+          "class_size": 23,
+          "best_lap_ms": 123681,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_status": "Finished Normally"
+        },
+        "race": {
+          "position": 9,
+          "class_position": 4,
+          "class_size": 23,
+          "grid_position": 17,
+          "best_lap_ms": 124442,
+          "best_lap_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "best_sectors_ms": [
+            null,
+            null,
+            null
+          ],
+          "finish_time_ms": 1901738,
+          "finish_status": "Finished Normally"
+        }
+      },
+      "car_id": "44_24_PROT92DCFAD4",
+      "car_image_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/44_24_PROT92DCFAD4_frontAngle.webp",
+      "manufacturer": "Ford",
+      "manufacturer_logo_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/Brand=Ford.svg"
+    }
+  ],
+  "stats": {
+    "total": {
+      "races": 175,
+      "wins": 15,
+      "podiums": 47,
+      "top5": 65,
+      "dnfs": 85,
+      "pole_positions": 13,
+      "laps_completed": 2262,
+      "laps_lead": 217,
+      "fastest_laps": 3,
+      "grand_slams": 1,
+      "poles_converted": 7,
+      "wins_no_pole": 8
+    }
+  },
+  "rating_history": {
+    "dr": [
+      {
+        "date": "2026-02-14T14:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 46.068157,
+        "score": 246.06815699999999,
+        "change": -3.9
+      },
+      {
+        "date": "2026-02-14T15:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 39.451946,
+        "score": 239.451946,
+        "change": -6.6
+      },
+      {
+        "date": "2026-02-14T16:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 38.391113,
+        "score": 238.391113,
+        "change": -7.7
+      },
+      {
+        "date": "2026-02-14T17:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 25.455078,
+        "score": 225.45507800000001,
+        "change": -6.3
+      },
+      {
+        "date": "2026-02-14T18:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 16.864746,
+        "score": 216.864746,
+        "change": -8.6
+      },
+      {
+        "date": "2026-02-14T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 18.531982,
+        "score": 218.531982,
+        "change": -6.9
+      },
+      {
+        "date": "2026-02-14T19:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 8.56897,
+        "score": 208.56897,
+        "change": -8.3
+      },
+      {
+        "date": "2026-02-14T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 99.8042,
+        "score": 199.80419999999998,
+        "change": -1.8
+      },
+      {
+        "date": "2026-02-14T22:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 95.043335,
+        "score": 195.043335,
+        "change": -4.8
+      },
+      {
+        "date": "2026-02-15T12:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 92.72855,
+        "score": 192.72854999999998,
+        "change": -2.3
+      },
+      {
+        "date": "2026-02-15T13:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 87.64595,
+        "score": 187.64595,
+        "change": -7.4
+      },
+      {
+        "date": "2026-02-16T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 84.007034,
+        "score": 184.007034,
+        "change": -1.3
+      },
+      {
+        "date": "2026-02-16T20:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 85.05945,
+        "score": 185.05945,
+        "change": 1.1
+      },
+      {
+        "date": "2026-02-16T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 84.57202,
+        "score": 184.57202,
+        "change": -0.5
+      },
+      {
+        "date": "2026-02-16T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 84.93042,
+        "score": 184.93042,
+        "change": 0.4
+      },
+      {
+        "date": "2026-02-16T22:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 81.97306,
+        "score": 181.97306,
+        "change": -3.0
+      },
+      {
+        "date": "2026-02-20T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 79.772705,
+        "score": 179.772705,
+        "change": -2.2
+      },
+      {
+        "date": "2026-02-20T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 79.49796,
+        "score": 179.49796,
+        "change": -0.3
+      },
+      {
+        "date": "2026-02-20T22:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 74.73202,
+        "score": 174.73202,
+        "change": -4.8
+      },
+      {
+        "date": "2026-02-20T23:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 75.699905,
+        "score": 175.699905,
+        "change": 1.0
+      },
+      {
+        "date": "2026-02-20T23:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 73.510376,
+        "score": 173.510376,
+        "change": -2.2
+      },
+      {
+        "date": "2026-02-21T10:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 73.95105,
+        "score": 173.95105,
+        "change": 0.4
+      },
+      {
+        "date": "2026-02-21T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 72.375,
+        "score": 172.375,
+        "change": -1.6
+      },
+      {
+        "date": "2026-02-21T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 76.91052,
+        "score": 176.91052000000002,
+        "change": 4.5
+      },
+      {
+        "date": "2026-02-21T15:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 72.73844,
+        "score": 172.73844,
+        "change": -4.2
+      },
+      {
+        "date": "2026-02-21T17:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 74.444496,
+        "score": 174.44449600000002,
+        "change": 1.7
+      },
+      {
+        "date": "2026-02-21T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 68.96863,
+        "score": 168.96863000000002,
+        "change": -5.5
+      },
+      {
+        "date": "2026-02-21T23:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 70.90654,
+        "score": 170.90654,
+        "change": 1.9
+      },
+      {
+        "date": "2026-02-22T11:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 69.3324,
+        "score": 169.3324,
+        "change": -1.6
+      },
+      {
+        "date": "2026-02-22T12:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 72.44116,
+        "score": 172.44116,
+        "change": 1.5
+      },
+      {
+        "date": "2026-02-22T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 66.486534,
+        "score": 166.486534,
+        "change": -4.4
+      },
+      {
+        "date": "2026-02-24T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 63.90202,
+        "score": 163.90202,
+        "change": -2.6
+      },
+      {
+        "date": "2026-02-26T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 62.57943,
+        "score": 162.57943,
+        "change": -1.3
+      },
+      {
+        "date": "2026-02-27T19:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 62.819336,
+        "score": 162.819336,
+        "change": 0.2
+      },
+      {
+        "date": "2026-02-27T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 57.248127,
+        "score": 157.248127,
+        "change": -5.6
+      },
+      {
+        "date": "2026-03-03T17:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 63.816936,
+        "score": 163.816936,
+        "change": 6.6
+      },
+      {
+        "date": "2026-03-03T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 58.455486,
+        "score": 158.455486,
+        "change": -5.4
+      },
+      {
+        "date": "2026-03-05T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 61.05135,
+        "score": 161.05135,
+        "change": 2.6
+      },
+      {
+        "date": "2026-03-05T23:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 56.086506,
+        "score": 156.08650599999999,
+        "change": -5.0
+      },
+      {
+        "date": "2026-03-07T14:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 56.50171,
+        "score": 156.50171,
+        "change": 0.4
+      },
+      {
+        "date": "2026-03-08T14:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 59.19397,
+        "score": 159.19397,
+        "change": 2.7
+      },
+      {
+        "date": "2026-03-08T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 57.404663,
+        "score": 157.404663,
+        "change": -1.8
+      },
+      {
+        "date": "2026-03-08T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 61.13798,
+        "score": 161.13798,
+        "change": 3.7
+      },
+      {
+        "date": "2026-03-08T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 61.088867,
+        "score": 161.088867,
+        "change": 0.0
+      },
+      {
+        "date": "2026-03-09T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 62.377037,
+        "score": 162.377037,
+        "change": 1.3
+      },
+      {
+        "date": "2026-03-09T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 66.3997,
+        "score": 166.3997,
+        "change": 4.0
+      },
+      {
+        "date": "2026-03-12T17:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 74.920494,
+        "score": 174.92049400000002,
+        "change": 8.5
+      },
+      {
+        "date": "2026-03-12T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 80.37931,
+        "score": 180.37931,
+        "change": 5.5
+      },
+      {
+        "date": "2026-03-12T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 88.44682,
+        "score": 188.44682,
+        "change": 8.1
+      },
+      {
+        "date": "2026-03-13T11:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 83.517006,
+        "score": 183.51700599999998,
+        "change": -4.9
+      },
+      {
+        "date": "2026-03-13T12:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 83.80692,
+        "score": 183.80692,
+        "change": 0.3
+      },
+      {
+        "date": "2026-03-13T13:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 79.53528,
+        "score": 179.53528,
+        "change": -4.0
+      },
+      {
+        "date": "2026-03-13T19:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 75.43083,
+        "score": 175.43083000000001,
+        "change": -4.4
+      },
+      {
+        "date": "2026-03-13T20:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 86.16781,
+        "score": 186.16781,
+        "change": 6.3
+      },
+      {
+        "date": "2026-03-13T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 91.19149,
+        "score": 191.19149,
+        "change": 9.4
+      },
+      {
+        "date": "2026-03-14T11:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 96.46428,
+        "score": 196.46428,
+        "change": 5.3
+      },
+      {
+        "date": "2026-03-14T14:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 5.3918047,
+        "score": 205.3918047,
+        "change": 8.9
+      },
+      {
+        "date": "2026-03-14T17:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 9.546712,
+        "score": 209.546712,
+        "change": 4.2
+      },
+      {
+        "date": "2026-03-14T19:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 11.210652,
+        "score": 211.210652,
+        "change": 1.7
+      },
+      {
+        "date": "2026-03-14T22:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 17.967245,
+        "score": 217.967245,
+        "change": 6.8
+      },
+      {
+        "date": "2026-03-15T12:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 25.470785,
+        "score": 225.470785,
+        "change": 7.5
+      },
+      {
+        "date": "2026-03-15T16:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 28.9281,
+        "score": 228.9281,
+        "change": 3.5
+      },
+      {
+        "date": "2026-03-15T17:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 35.131348,
+        "score": 235.131348,
+        "change": 6.2
+      },
+      {
+        "date": "2026-03-15T18:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 38.95398,
+        "score": 238.95398,
+        "change": 3.8
+      },
+      {
+        "date": "2026-03-15T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 42.636475,
+        "score": 242.636475,
+        "change": 3.7
+      },
+      {
+        "date": "2026-03-15T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 45.61275,
+        "score": 245.61275,
+        "change": 3.0
+      },
+      {
+        "date": "2026-03-15T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 47.92985,
+        "score": 247.92985,
+        "change": 2.3
+      },
+      {
+        "date": "2026-03-17T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 46.632404,
+        "score": 246.632404,
+        "change": -1.3
+      },
+      {
+        "date": "2026-03-17T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 53.479534,
+        "score": 253.479534,
+        "change": 6.8
+      },
+      {
+        "date": "2026-03-18T12:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 52.588135,
+        "score": 252.588135,
+        "change": -0.9
+      },
+      {
+        "date": "2026-03-20T17:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 51.35327,
+        "score": 251.35327,
+        "change": -1.2
+      },
+      {
+        "date": "2026-03-21T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 44.41219,
+        "score": 244.41219,
+        "change": -6.9
+      },
+      {
+        "date": "2026-03-21T15:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 44.625813,
+        "score": 244.625813,
+        "change": -6.7
+      },
+      {
+        "date": "2026-03-24T13:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 33.39522,
+        "score": 233.39522,
+        "change": -4.3
+      },
+      {
+        "date": "2026-03-24T14:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 27.055624,
+        "score": 227.055624,
+        "change": -6.3
+      },
+      {
+        "date": "2026-03-25T09:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 23.875732,
+        "score": 223.875732,
+        "change": -3.2
+      },
+      {
+        "date": "2026-03-28T11:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 23.931112,
+        "score": 223.93111199999998,
+        "change": 0.1
+      },
+      {
+        "date": "2026-03-28T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 22.058065,
+        "score": 222.058065,
+        "change": -1.9
+      },
+      {
+        "date": "2026-03-28T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 24.673666,
+        "score": 224.673666,
+        "change": 2.6
+      },
+      {
+        "date": "2026-03-28T22:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 24.715698,
+        "score": 224.715698,
+        "change": 0.0
+      },
+      {
+        "date": "2026-03-28T23:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 24.72644,
+        "score": 224.72644,
+        "change": 0.0
+      },
+      {
+        "date": "2026-03-29T00:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 18.905193,
+        "score": 218.905193,
+        "change": -5.8
+      },
+      {
+        "date": "2026-03-29T10:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 18.082724,
+        "score": 218.08272399999998,
+        "change": -0.8
+      },
+      {
+        "date": "2026-03-29T11:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 22.679361,
+        "score": 222.679361,
+        "change": 4.6
+      },
+      {
+        "date": "2026-03-29T12:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 29.396729,
+        "score": 229.396729,
+        "change": 6.7
+      },
+      {
+        "date": "2026-03-29T14:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 28.223633,
+        "score": 228.223633,
+        "change": -1.2
+      },
+      {
+        "date": "2026-03-29T15:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 34.363483,
+        "score": 234.363483,
+        "change": 6.1
+      },
+      {
+        "date": "2026-03-29T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 38.247925,
+        "score": 238.247925,
+        "change": 3.9
+      },
+      {
+        "date": "2026-03-29T19:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 40.336754,
+        "score": 240.33675399999998,
+        "change": 2.1
+      },
+      {
+        "date": "2026-03-30T12:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 40.396442,
+        "score": 240.396442,
+        "change": 0.1
+      },
+      {
+        "date": "2026-03-30T20:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 43.872272,
+        "score": 243.872272,
+        "change": 3.5
+      },
+      {
+        "date": "2026-03-31T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 34.126465,
+        "score": 234.126465,
+        "change": -9.7
+      },
+      {
+        "date": "2026-03-31T17:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 39.418255,
+        "score": 239.418255,
+        "change": 5.3
+      },
+      {
+        "date": "2026-03-31T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 34.504883,
+        "score": 234.504883,
+        "change": -4.9
+      },
+      {
+        "date": "2026-03-31T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 29.87268,
+        "score": 229.87268,
+        "change": -9.5
+      },
+      {
+        "date": "2026-03-31T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 41.674114,
+        "score": 241.674114,
+        "change": 7.2
+      },
+      {
+        "date": "2026-04-01T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 29.93921,
+        "score": 229.93921,
+        "change": -2.2
+      },
+      {
+        "date": "2026-04-01T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 36.232666,
+        "score": 236.232666,
+        "change": 4.1
+      },
+      {
+        "date": "2026-04-01T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 28.421185,
+        "score": 228.421185,
+        "change": -5.6
+      },
+      {
+        "date": "2026-04-02T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 21.439617,
+        "score": 221.439617,
+        "change": -7.0
+      },
+      {
+        "date": "2026-04-02T15:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 19.077597,
+        "score": 219.077597,
+        "change": -9.3
+      },
+      {
+        "date": "2026-04-02T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 8.408406,
+        "score": 208.408406,
+        "change": -3.7
+      },
+      {
+        "date": "2026-04-02T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 5.0159507,
+        "score": 205.0159507,
+        "change": -7.1
+      },
+      {
+        "date": "2026-04-02T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 2.9837239,
+        "score": 202.9837239,
+        "change": -5.4
+      },
+      {
+        "date": "2026-04-03T11:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 92.37972,
+        "score": 192.37972000000002,
+        "change": -3.5
+      },
+      {
+        "date": "2026-04-10T12:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 99.46594,
+        "score": 199.46594,
+        "change": 7.1
+      },
+      {
+        "date": "2026-04-10T18:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 8.789836,
+        "score": 208.789836,
+        "change": 9.3
+      },
+      {
+        "date": "2026-04-10T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 12.975952,
+        "score": 212.975952,
+        "change": 4.2
+      },
+      {
+        "date": "2026-04-10T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 21.22644,
+        "score": 221.22644,
+        "change": 8.3
+      },
+      {
+        "date": "2026-04-10T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 11.782023,
+        "score": 211.782023,
+        "change": -9.4
+      },
+      {
+        "date": "2026-04-11T09:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 20.565878,
+        "score": 220.565878,
+        "change": 8.8
+      },
+      {
+        "date": "2026-04-11T10:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 30.248209,
+        "score": 230.248209,
+        "change": 9.7
+      },
+      {
+        "date": "2026-04-11T13:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 26.486897,
+        "score": 226.486897,
+        "change": -3.8
+      },
+      {
+        "date": "2026-04-11T14:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 32.208496,
+        "score": 232.208496,
+        "change": 5.7
+      },
+      {
+        "date": "2026-04-11T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 36.801716,
+        "score": 236.801716,
+        "change": 4.6
+      },
+      {
+        "date": "2026-04-11T18:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 43.745934,
+        "score": 243.745934,
+        "change": 6.9
+      },
+      {
+        "date": "2026-04-11T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 50.84892,
+        "score": 250.84892,
+        "change": 7.1
+      },
+      {
+        "date": "2026-04-11T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 59.58769,
+        "score": 259.58769,
+        "change": 8.7
+      },
+      {
+        "date": "2026-04-11T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 53.781734,
+        "score": 253.781734,
+        "change": -5.8
+      },
+      {
+        "date": "2026-04-12T09:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 60.68913,
+        "score": 260.68913,
+        "change": 6.9
+      },
+      {
+        "date": "2026-04-12T09:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 56.55664,
+        "score": 256.55664,
+        "change": -4.1
+      },
+      {
+        "date": "2026-04-12T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 58.01754,
+        "score": 258.01754,
+        "change": 1.5
+      },
+      {
+        "date": "2026-04-12T18:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 64.55762,
+        "score": 264.55762,
+        "change": 6.5
+      },
+      {
+        "date": "2026-04-12T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 72.60392,
+        "score": 272.60392,
+        "change": 8.0
+      },
+      {
+        "date": "2026-04-12T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 70.48588,
+        "score": 270.48588,
+        "change": -2.1
+      },
+      {
+        "date": "2026-04-13T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 67.36272,
+        "score": 267.36271999999997,
+        "change": -3.1
+      },
+      {
+        "date": "2026-04-14T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 58.951134,
+        "score": 258.951134,
+        "change": -8.4
+      },
+      {
+        "date": "2026-04-14T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 51.20809,
+        "score": 251.20809,
+        "change": -7.7
+      },
+      {
+        "date": "2026-04-14T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 54.196983,
+        "score": 254.196983,
+        "change": 3.0
+      },
+      {
+        "date": "2026-04-16T15:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 49.08907,
+        "score": 249.08907,
+        "change": -5.1
+      },
+      {
+        "date": "2026-04-16T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 46.12447,
+        "score": 246.12447,
+        "change": -3.0
+      },
+      {
+        "date": "2026-04-18T14:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 38.407387,
+        "score": 238.407387,
+        "change": -7.7
+      },
+      {
+        "date": "2026-04-18T17:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 38.04309,
+        "score": 238.04309,
+        "change": -0.4
+      },
+      {
+        "date": "2026-04-18T18:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 39.52022,
+        "score": 239.52022,
+        "change": 1.5
+      },
+      {
+        "date": "2026-04-18T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 41.06991,
+        "score": 241.06991,
+        "change": 1.5
+      },
+      {
+        "date": "2026-04-19T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 41.26579,
+        "score": 241.26579,
+        "change": 0.2
+      },
+      {
+        "date": "2026-04-21T10:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 35.824665,
+        "score": 235.824665,
+        "change": -5.4
+      },
+      {
+        "date": "2026-04-21T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 35.374348,
+        "score": 235.374348,
+        "change": -0.5
+      },
+      {
+        "date": "2026-04-21T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 44.95072,
+        "score": 244.95072,
+        "change": 9.6
+      },
+      {
+        "date": "2026-04-21T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 54.435097,
+        "score": 254.43509699999998,
+        "change": 9.5
+      },
+      {
+        "date": "2026-04-21T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 47.845825,
+        "score": 247.845825,
+        "change": -6.6
+      },
+      {
+        "date": "2026-04-22T13:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 44.038002,
+        "score": 244.038002,
+        "change": -3.8
+      },
+      {
+        "date": "2026-04-22T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 52.09326,
+        "score": 252.09326,
+        "change": 8.1
+      },
+      {
+        "date": "2026-04-22T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 60.74597,
+        "score": 260.74597,
+        "change": 8.7
+      },
+      {
+        "date": "2026-04-23T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 65.01453,
+        "score": 265.01453,
+        "change": 4.3
+      },
+      {
+        "date": "2026-04-23T11:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 69.145676,
+        "score": 269.145676,
+        "change": 4.1
+      },
+      {
+        "date": "2026-04-23T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 76.916214,
+        "score": 276.91621399999997,
+        "change": 7.8
+      },
+      {
+        "date": "2026-04-23T15:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 85.04447,
+        "score": 285.04447,
+        "change": 8.1
+      },
+      {
+        "date": "2026-04-23T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 84.28662,
+        "score": 284.28661999999997,
+        "change": -0.8
+      },
+      {
+        "date": "2026-04-24T09:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 85.1141,
+        "score": 285.1141,
+        "change": 0.8
+      },
+      {
+        "date": "2026-04-25T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 85.74402,
+        "score": 285.74402,
+        "change": 0.6
+      },
+      {
+        "date": "2026-04-25T17:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 80.735634,
+        "score": 280.735634,
+        "change": -5.0
+      },
+      {
+        "date": "2026-04-25T23:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 83.97014,
+        "score": 283.97014,
+        "change": 3.2
+      },
+      {
+        "date": "2026-04-26T12:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 88.83154,
+        "score": 288.83154,
+        "change": 4.9
+      },
+      {
+        "date": "2026-04-26T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 86.085815,
+        "score": 286.085815,
+        "change": -2.7
+      },
+      {
+        "date": "2026-04-26T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 91.76644,
+        "score": 291.76644,
+        "change": 5.7
+      },
+      {
+        "date": "2026-04-28T11:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 91.059166,
+        "score": 291.059166,
+        "change": -0.7
+      },
+      {
+        "date": "2026-04-28T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 91.21765,
+        "score": 291.21765,
+        "change": 0.2
+      },
+      {
+        "date": "2026-04-29T10:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 86.663246,
+        "score": 286.663246,
+        "change": -4.6
+      },
+      {
+        "date": "2026-04-29T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 77.124146,
+        "score": 277.124146,
+        "change": -9.5
+      },
+      {
+        "date": "2026-04-30T20:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 75.57584,
+        "score": 275.57583999999997,
+        "change": -1.5
+      },
+      {
+        "date": "2026-05-01T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 65.93477,
+        "score": 265.93477,
+        "change": -9.6
+      },
+      {
+        "date": "2026-05-01T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 63.26278,
+        "score": 263.26278,
+        "change": -2.7
+      },
+      {
+        "date": "2026-05-01T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 60.9185,
+        "score": 260.9185,
+        "change": -2.3
+      },
+      {
+        "date": "2026-05-02T13:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 62.44763,
+        "score": 262.44763,
+        "change": 1.5
+      },
+      {
+        "date": "2026-05-02T14:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 54.61963,
+        "score": 254.61963,
+        "change": -7.8
+      },
+      {
+        "date": "2026-05-02T17:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 55.37423,
+        "score": 255.37423,
+        "change": 0.8
+      },
+      {
+        "date": "2026-05-03T13:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 50.78296,
+        "score": 250.78296,
+        "change": -4.6
+      },
+      {
+        "date": "2026-05-03T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 55.83675,
+        "score": 255.83675,
+        "change": 5.1
+      },
+      {
+        "date": "2026-05-03T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 63.331177,
+        "score": 263.331177,
+        "change": 7.5
+      },
+      {
+        "date": "2026-05-03T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 71.700966,
+        "score": 271.700966,
+        "change": 8.4
+      },
+      {
+        "date": "2026-05-04T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 71.67953,
+        "score": 271.67953,
+        "change": 0.0
+      },
+      {
+        "date": "2026-05-05T11:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 64.80354,
+        "score": 264.80354,
+        "change": -6.9
+      },
+      {
+        "date": "2026-05-05T12:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 63.227417,
+        "score": 263.227417,
+        "change": -1.6
+      },
+      {
+        "date": "2026-05-05T19:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 52.15824,
+        "score": 252.15824,
+        "change": -11.1
+      },
+      {
+        "date": "2026-05-07T15:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 47.66565,
+        "score": 247.66565,
+        "change": -4.5
+      },
+      {
+        "date": "2026-05-07T18:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 36.783813,
+        "score": 236.783813,
+        "change": -10.9
+      },
+      {
+        "date": "2026-05-07T19:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 38.182213,
+        "score": 238.182213,
+        "change": -9.5
+      },
+      {
+        "date": "2026-05-08T19:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 23.748617,
+        "score": 223.748617,
+        "change": -3.6
+      },
+      {
+        "date": "2026-05-14T14:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 24.362305,
+        "score": 224.362305,
+        "change": 0.6
+      },
+      {
+        "date": "2026-05-14T19:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 17.27596,
+        "score": 217.27596,
+        "change": -7.1
+      },
+      {
+        "date": "2026-05-15T19:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 12.216228,
+        "score": 212.216228,
+        "change": -5.1
+      },
+      {
+        "date": "2026-05-15T20:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 15.770549,
+        "score": 215.770549,
+        "change": 3.6
+      },
+      {
+        "date": "2026-05-15T21:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 9.672485,
+        "score": 209.672485,
+        "change": -6.1
+      },
+      {
+        "date": "2026-05-16T09:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 9.472372,
+        "score": 209.472372,
+        "change": -0.2
+      },
+      {
+        "date": "2026-05-16T20:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 9.595825,
+        "score": 209.595825,
+        "change": 0.1
+      },
+      {
+        "date": "2026-05-16T21:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 3.5701091,
+        "score": 203.5701091,
+        "change": -6.0
+      },
+      {
+        "date": "2026-05-17T10:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 4.6826982,
+        "score": 204.6826982,
+        "change": 1.1
+      },
+      {
+        "date": "2026-05-17T12:30:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 99.06986,
+        "score": 199.06986,
+        "change": -5.6
+      },
+      {
+        "date": "2026-05-17T18:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 4.035604,
+        "score": 204.035604,
+        "change": 5.0
+      },
+      {
+        "date": "2026-05-17T19:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 7.3229575,
+        "score": 207.3229575,
+        "change": 3.3
+      },
+      {
+        "date": "2026-05-20T16:10:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 2.26534,
+        "score": 202.26534,
+        "change": -5.1
+      },
+      {
+        "date": "2026-05-25T17:10:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 98.54231,
+        "score": 198.54231,
+        "change": -3.7
+      },
+      {
+        "date": "2026-05-25T19:10:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 0.10921224,
+        "score": 200.10921224,
+        "change": 1.6
+      },
+      {
+        "date": "2026-05-25T20:10:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 90.60852,
+        "score": 190.60852,
+        "change": -9.5
+      },
+      {
+        "date": "2026-05-26T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 99.95296,
+        "score": 199.95296000000002,
+        "change": 9.3
+      },
+      {
+        "date": "2026-05-26T13:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 9.777548,
+        "score": 209.777548,
+        "change": 9.8
+      },
+      {
+        "date": "2026-05-26T17:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 19.563517,
+        "score": 219.563517,
+        "change": 9.8
+      },
+      {
+        "date": "2026-05-26T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 28.429932,
+        "score": 228.429932,
+        "change": 8.9
+      },
+      {
+        "date": "2026-05-27T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 38.086872,
+        "score": 238.086872,
+        "change": 9.7
+      },
+      {
+        "date": "2026-05-28T11:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 47.87146,
+        "score": 247.87146,
+        "change": 9.8
+      },
+      {
+        "date": "2026-05-28T18:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 57.471966,
+        "score": 257.471966,
+        "change": 9.6
+      },
+      {
+        "date": "2026-05-29T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 50.889362,
+        "score": 250.889362,
+        "change": -6.6
+      },
+      {
+        "date": "2026-05-29T11:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 65.23502,
+        "score": 265.23502,
+        "change": 7.8
+      },
+      {
+        "date": "2026-05-29T18:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 65.0387,
+        "score": 265.0387,
+        "change": 6.4
+      },
+      {
+        "date": "2026-05-29T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 71.679726,
+        "score": 271.679726,
+        "change": 6.6
+      },
+      {
+        "date": "2026-05-29T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 78.21,
+        "score": 278.21,
+        "change": 6.5
+      },
+      {
+        "date": "2026-05-30T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 85.06246,
+        "score": 285.06246,
+        "change": 6.9
+      },
+      {
+        "date": "2026-05-30T17:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 73.255905,
+        "score": 273.255905,
+        "change": -11.8
+      },
+      {
+        "date": "2026-05-30T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 67.734375,
+        "score": 267.734375,
+        "change": -5.5
+      },
+      {
+        "date": "2026-05-31T12:50:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 59.696167,
+        "score": 259.696167,
+        "change": -8.0
+      },
+      {
+        "date": "2026-05-31T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 56.562824,
+        "score": 256.562824,
+        "change": -3.1
+      },
+      {
+        "date": "2026-05-31T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 66.05542,
+        "score": 266.05542,
+        "change": 9.5
+      },
+      {
+        "date": "2026-06-02T12:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 65.51554,
+        "score": 265.51554,
+        "change": -0.5
+      },
+      {
+        "date": "2026-06-02T14:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 71.19507,
+        "score": 271.19507,
+        "change": 5.7
+      },
+      {
+        "date": "2026-06-02T15:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 67.36454,
+        "score": 267.36454000000003,
+        "change": -3.8
+      },
+      {
+        "date": "2026-06-02T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 64.58878,
+        "score": 264.58878,
+        "change": -2.8
+      },
+      {
+        "date": "2026-06-02T20:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 72.4631,
+        "score": 272.4631,
+        "change": 7.9
+      },
+      {
+        "date": "2026-06-02T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 78.24223,
+        "score": 278.24223,
+        "change": 5.8
+      },
+      {
+        "date": "2026-06-03T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 80.0922,
+        "score": 280.0922,
+        "change": 1.8
+      },
+      {
+        "date": "2026-06-03T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 74.95874,
+        "score": 274.95874000000003,
+        "change": -5.1
+      },
+      {
+        "date": "2026-06-04T13:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 68.593994,
+        "score": 268.593994,
+        "change": -6.4
+      },
+      {
+        "date": "2026-06-04T14:10:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 61.45467,
+        "score": 261.45467,
+        "change": -7.1
+      },
+      {
+        "date": "2026-06-04T18:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 60.288654,
+        "score": 260.288654,
+        "change": -1.2
+      },
+      {
+        "date": "2026-06-04T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 65.90234,
+        "score": 265.90234,
+        "change": 5.6
+      },
+      {
+        "date": "2026-06-05T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 58.660072,
+        "score": 258.660072,
+        "change": -7.2
+      },
+      {
+        "date": "2026-06-06T13:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 47.25232,
+        "score": 247.25232,
+        "change": -11.4
+      },
+      {
+        "date": "2026-06-06T14:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 53.16854,
+        "score": 253.16854,
+        "change": -5.5
+      },
+      {
+        "date": "2026-06-06T16:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 40.109417,
+        "score": 240.109417,
+        "change": -1.7
+      },
+      {
+        "date": "2026-06-08T20:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 33.447063,
+        "score": 233.447063,
+        "change": -6.7
+      },
+      {
+        "date": "2026-06-11T15:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 35.64868,
+        "score": 235.64868,
+        "change": 2.2
+      },
+      {
+        "date": "2026-06-11T19:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 30.939045,
+        "score": 230.939045,
+        "change": -4.7
+      },
+      {
+        "date": "2026-06-12T11:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 28.009724,
+        "score": 228.009724,
+        "change": -2.9
+      },
+      {
+        "date": "2026-06-13T17:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 22.932495,
+        "score": 222.932495,
+        "change": -5.1
+      },
+      {
+        "date": "2026-06-13T19:45:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 29.97872,
+        "score": 229.97872,
+        "change": 7.0
+      },
+      {
+        "date": "2026-06-14T16:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 38.56608,
+        "score": 238.56608,
+        "change": 8.6
+      },
+      {
+        "date": "2026-06-14T20:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 46.91455,
+        "score": 246.91455,
+        "change": 8.3
+      },
+      {
+        "date": "2026-06-15T10:45:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 55.078857,
+        "score": 255.078857,
+        "change": 8.2
+      },
+      {
+        "date": "2026-06-15T20:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 63.51294,
+        "score": 263.51294,
+        "change": 8.4
+      },
+      {
+        "date": "2026-06-15T21:15:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 70.392784,
+        "score": 270.392784,
+        "change": 6.9
+      },
+      {
+        "date": "2026-06-16T09:15:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 69.29292,
+        "score": 269.29292,
+        "change": -1.1
+      },
+      {
+        "date": "2026-06-16T10:50:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 56.68339,
+        "score": 256.68339000000003,
+        "change": -12.6
+      },
+      {
+        "date": "2026-06-16T13:15:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 58.085896,
+        "score": 258.085896,
+        "change": 1.4
+      },
+      {
+        "date": "2026-06-16T17:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 61.01538,
+        "score": 261.01538,
+        "change": 2.9
+      },
+      {
+        "date": "2026-06-16T18:15:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 53.57499,
+        "score": 253.57499,
+        "change": -7.4
+      },
+      {
+        "date": "2026-06-16T20:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 56.759846,
+        "score": 256.759846,
+        "change": 3.2
+      },
+      {
+        "date": "2026-06-17T18:15:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 49.74345,
+        "score": 249.74345,
+        "change": -7.0
+      },
+      {
+        "date": "2026-06-17T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 42.926636,
+        "score": 242.926636,
+        "change": -6.8
+      },
+      {
+        "date": "2026-06-18T16:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 36.679077,
+        "score": 236.679077,
+        "change": -6.2
+      },
+      {
+        "date": "2026-06-18T18:15:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 44.715656,
+        "score": 244.715656,
+        "change": 8.0
+      },
+      {
+        "date": "2026-06-19T10:50:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 34.823364,
+        "score": 234.823364,
+        "change": -9.9
+      },
+      {
+        "date": "2026-06-19T20:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 39.094032,
+        "score": 239.094032,
+        "change": 4.3
+      },
+      {
+        "date": "2026-06-20T14:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 37.937336,
+        "score": 237.93733600000002,
+        "change": -1.2
+      },
+      {
+        "date": "2026-06-21T15:50:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 43.344563,
+        "score": 243.344563,
+        "change": 5.4
+      },
+      {
+        "date": "2026-06-21T18:50:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 55.746418,
+        "score": 255.746418,
+        "change": 12.4
+      },
+      {
+        "date": "2026-06-22T11:50:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 65.66643,
+        "score": 265.66643,
+        "change": 9.9
+      },
+      {
+        "date": "2026-06-22T20:50:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 67.48942,
+        "score": 267.48942,
+        "change": 1.8
+      },
+      {
+        "date": "2026-06-23T19:45:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 68.655396,
+        "score": 268.655396,
+        "change": 1.2
+      },
+      {
+        "date": "2026-06-24T14:15:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 65.770706,
+        "score": 265.770706,
+        "change": -2.9
+      },
+      {
+        "date": "2026-06-24T18:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 56.94995,
+        "score": 256.94995,
+        "change": -8.8
+      }
+    ],
+    "sr": [
+      {
+        "date": "2026-02-14T14:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-14T15:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-14T16:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-14T17:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-14T18:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-14T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-14T19:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-14T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-14T22:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-15T12:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-15T13:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-16T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-16T20:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 24.0,
+        "score": -76.0,
+        "change": 24.0
+      },
+      {
+        "date": "2026-02-16T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 27.000002,
+        "score": -72.999998,
+        "change": 3.0
+      },
+      {
+        "date": "2026-02-16T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 55.5,
+        "score": -44.5,
+        "change": 28.5
+      },
+      {
+        "date": "2026-02-16T22:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": -55.5
+      },
+      {
+        "date": "2026-02-20T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 27.954546,
+        "score": -72.045454,
+        "change": 28.0
+      },
+      {
+        "date": "2026-02-20T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 33.954544,
+        "score": -66.045456,
+        "change": 6.0
+      },
+      {
+        "date": "2026-02-20T22:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 33.954544,
+        "score": -66.045456,
+        "change": 0.0
+      },
+      {
+        "date": "2026-02-20T23:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 37.454544,
+        "score": -62.545456,
+        "change": 3.5
+      },
+      {
+        "date": "2026-02-20T23:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 49.454544,
+        "score": -50.545456,
+        "change": 12.0
+      },
+      {
+        "date": "2026-02-21T10:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 61.954544,
+        "score": -38.045456,
+        "change": 12.5
+      },
+      {
+        "date": "2026-02-21T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 75.454544,
+        "score": -24.545456,
+        "change": 13.5
+      },
+      {
+        "date": "2026-02-21T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 87.454544,
+        "score": -12.545456000000001,
+        "change": 12.0
+      },
+      {
+        "date": "2026-02-21T15:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 51.454544,
+        "score": -48.545456,
+        "change": -36.0
+      },
+      {
+        "date": "2026-02-21T17:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 64.954544,
+        "score": -35.045456,
+        "change": 13.5
+      },
+      {
+        "date": "2026-02-21T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 45.454544,
+        "score": -54.545456,
+        "change": -19.5
+      },
+      {
+        "date": "2026-02-21T23:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 63.454544,
+        "score": -36.545456,
+        "change": 18.0
+      },
+      {
+        "date": "2026-02-22T11:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 40.954544,
+        "score": -59.045456,
+        "change": -22.5
+      },
+      {
+        "date": "2026-02-22T12:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 0.654541,
+        "score": 0.654541,
+        "change": 37.2
+      },
+      {
+        "date": "2026-02-22T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 67.65454,
+        "score": -32.34546,
+        "change": -10.5
+      },
+      {
+        "date": "2026-02-24T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 32.440254,
+        "score": -67.55974599999999,
+        "change": -35.2
+      },
+      {
+        "date": "2026-02-26T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 1.4402542,
+        "score": -98.5597458,
+        "change": -31.0
+      },
+      {
+        "date": "2026-02-27T19:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": -1.4
+      },
+      {
+        "date": "2026-02-27T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-03-03T17:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 43.227272,
+        "score": -56.772728,
+        "change": 43.2
+      },
+      {
+        "date": "2026-03-03T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": -43.2
+      },
+      {
+        "date": "2026-03-05T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 30.681818,
+        "score": -69.31818200000001,
+        "change": 30.7
+      },
+      {
+        "date": "2026-03-05T23:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 9.709091,
+        "score": -90.290909,
+        "change": -21.0
+      },
+      {
+        "date": "2026-03-07T14:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": -9.7
+      },
+      {
+        "date": "2026-03-08T14:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-03-08T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-03-08T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 24.68182,
+        "score": -75.31818,
+        "change": 24.7
+      },
+      {
+        "date": "2026-03-08T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 47.18182,
+        "score": -52.81818,
+        "change": 22.5
+      },
+      {
+        "date": "2026-03-09T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 61.145462,
+        "score": -38.854538,
+        "change": 14.0
+      },
+      {
+        "date": "2026-03-09T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 71.78182,
+        "score": -28.218180000000004,
+        "change": 10.6
+      },
+      {
+        "date": "2026-03-12T17:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 88.28182,
+        "score": -11.718180000000004,
+        "change": 16.5
+      },
+      {
+        "date": "2026-03-12T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 8.081825,
+        "score": 8.081825,
+        "change": 19.8
+      },
+      {
+        "date": "2026-03-12T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 52.481823,
+        "score": 52.481823,
+        "change": 44.4
+      },
+      {
+        "date": "2026-03-13T11:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 1.4818268,
+        "score": 1.4818268,
+        "change": -51.0
+      },
+      {
+        "date": "2026-03-13T12:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 53.781826,
+        "score": -46.218174,
+        "change": -47.7
+      },
+      {
+        "date": "2026-03-13T13:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 84.23183,
+        "score": -15.768169999999998,
+        "change": -17.3
+      },
+      {
+        "date": "2026-03-13T19:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": -36.5
+      },
+      {
+        "date": "2026-03-13T20:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 63.231827,
+        "score": -36.768173,
+        "change": 26.7
+      },
+      {
+        "date": "2026-03-13T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 65.100006,
+        "score": -34.89999400000001,
+        "change": 38.4
+      },
+      {
+        "date": "2026-03-14T11:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 57.400013,
+        "score": -42.599987,
+        "change": -7.7
+      },
+      {
+        "date": "2026-03-14T14:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 71.600006,
+        "score": -28.399994000000007,
+        "change": 14.2
+      },
+      {
+        "date": "2026-03-14T17:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 98.3,
+        "score": -1.7000000000000028,
+        "change": 26.7
+      },
+      {
+        "date": "2026-03-14T19:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 7.300003,
+        "score": 7.300003,
+        "change": 9.0
+      },
+      {
+        "date": "2026-03-14T22:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 97.9,
+        "score": -2.0999999999999943,
+        "change": -9.4
+      },
+      {
+        "date": "2026-03-15T12:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 25.200003,
+        "score": 25.200003,
+        "change": 27.3
+      },
+      {
+        "date": "2026-03-15T16:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 21.90001,
+        "score": 21.90001,
+        "change": -3.3
+      },
+      {
+        "date": "2026-03-15T17:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 62.70001,
+        "score": 62.70001,
+        "change": 40.8
+      },
+      {
+        "date": "2026-03-15T18:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 72.80002,
+        "score": 72.80002,
+        "change": 10.1
+      },
+      {
+        "date": "2026-03-15T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 64.400024,
+        "score": 64.400024,
+        "change": -8.4
+      },
+      {
+        "date": "2026-03-15T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 76.60002,
+        "score": 76.60002,
+        "change": 12.2
+      },
+      {
+        "date": "2026-03-15T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 94.30002,
+        "score": 94.30002,
+        "change": 17.7
+      },
+      {
+        "date": "2026-03-17T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 91.30002,
+        "score": 91.30002,
+        "change": -3.0
+      },
+      {
+        "date": "2026-03-17T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 26.100021,
+        "score": 126.100021,
+        "change": 34.8
+      },
+      {
+        "date": "2026-03-18T12:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 34.500015,
+        "score": 134.500015,
+        "change": 8.4
+      },
+      {
+        "date": "2026-03-20T17:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 27.900011,
+        "score": 127.900011,
+        "change": -6.6
+      },
+      {
+        "date": "2026-03-21T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 7.900009,
+        "score": 107.900009,
+        "change": -20.0
+      },
+      {
+        "date": "2026-03-21T15:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 94.90001,
+        "score": 94.90001,
+        "change": -33.0
+      },
+      {
+        "date": "2026-03-24T13:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 12.536377,
+        "score": 112.536377,
+        "change": 4.6
+      },
+      {
+        "date": "2026-03-24T14:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 94.53638,
+        "score": 94.53638,
+        "change": -18.0
+      },
+      {
+        "date": "2026-03-25T09:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 6.7182007,
+        "score": 106.7182007,
+        "change": 12.2
+      },
+      {
+        "date": "2026-03-28T11:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 40.400024,
+        "score": 140.400024,
+        "change": 33.7
+      },
+      {
+        "date": "2026-03-28T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 8.900024,
+        "score": 108.900024,
+        "change": -31.5
+      },
+      {
+        "date": "2026-03-28T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 8.900024,
+        "score": 108.900024,
+        "change": 0.0
+      },
+      {
+        "date": "2026-03-28T22:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 66.900024,
+        "score": 66.900024,
+        "change": -42.0
+      },
+      {
+        "date": "2026-03-28T23:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 44.400024,
+        "score": 44.400024,
+        "change": -22.5
+      },
+      {
+        "date": "2026-03-29T00:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 11.400024,
+        "score": 11.400024,
+        "change": -33.0
+      },
+      {
+        "date": "2026-03-29T10:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 93.400024,
+        "score": -6.599975999999998,
+        "change": -18.0
+      },
+      {
+        "date": "2026-03-29T11:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 13.400024,
+        "score": 13.400024,
+        "change": 20.0
+      },
+      {
+        "date": "2026-03-29T12:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 9.8545685,
+        "score": 9.8545685,
+        "change": -3.5
+      },
+      {
+        "date": "2026-03-29T14:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 80.536385,
+        "score": -19.463615000000004,
+        "change": -29.3
+      },
+      {
+        "date": "2026-03-29T15:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 7.5363846,
+        "score": 7.5363846,
+        "change": 27.0
+      },
+      {
+        "date": "2026-03-29T18:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 13.536385,
+        "score": 13.536385,
+        "change": 6.0
+      },
+      {
+        "date": "2026-03-29T19:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 3.0363846,
+        "score": 3.0363846,
+        "change": -10.5
+      },
+      {
+        "date": "2026-03-30T12:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 15.636383,
+        "score": 15.636383,
+        "change": 12.6
+      },
+      {
+        "date": "2026-03-30T20:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 85.63638,
+        "score": -14.363619999999997,
+        "change": -30.0
+      },
+      {
+        "date": "2026-03-31T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 85.63638,
+        "score": -14.363619999999997,
+        "change": 0.0
+      },
+      {
+        "date": "2026-03-31T17:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 24.636383,
+        "score": 24.636383,
+        "change": 39.0
+      },
+      {
+        "date": "2026-03-31T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 0.63638306,
+        "score": 0.63638306,
+        "change": -24.0
+      },
+      {
+        "date": "2026-03-31T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 30.636383,
+        "score": 30.636383,
+        "change": 6.0
+      },
+      {
+        "date": "2026-03-31T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 6.136383,
+        "score": 6.136383,
+        "change": 5.5
+      },
+      {
+        "date": "2026-04-01T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 52.136387,
+        "score": -47.863613,
+        "change": -60.0
+      },
+      {
+        "date": "2026-04-01T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 53.136383,
+        "score": 53.136383,
+        "change": 41.0
+      },
+      {
+        "date": "2026-04-01T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 76.13638,
+        "score": -23.863619999999997,
+        "change": -17.0
+      },
+      {
+        "date": "2026-04-02T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": -76.1
+      },
+      {
+        "date": "2026-04-02T15:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 76.13638,
+        "score": -23.863619999999997,
+        "change": 0.0
+      },
+      {
+        "date": "2026-04-02T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-04-02T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-04-02T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-04-03T11:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 0.0,
+        "score": -100.0,
+        "change": 0.0
+      },
+      {
+        "date": "2026-04-10T12:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 25.300003,
+        "score": -74.699997,
+        "change": 25.3
+      },
+      {
+        "date": "2026-04-10T18:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 55.0,
+        "score": -45.0,
+        "change": 29.7
+      },
+      {
+        "date": "2026-04-10T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 25.100002,
+        "score": -74.899998,
+        "change": -29.9
+      },
+      {
+        "date": "2026-04-10T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 66.5,
+        "score": -33.5,
+        "change": 41.4
+      },
+      {
+        "date": "2026-04-10T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 66.5,
+        "score": -33.5,
+        "change": 0.0
+      },
+      {
+        "date": "2026-04-11T09:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 91.957146,
+        "score": -8.042854000000005,
+        "change": 25.5
+      },
+      {
+        "date": "2026-04-11T10:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 6.3571477,
+        "score": 6.3571477,
+        "change": 14.4
+      },
+      {
+        "date": "2026-04-11T13:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 80.35715,
+        "score": -19.642849999999996,
+        "change": -26.0
+      },
+      {
+        "date": "2026-04-11T14:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 21.15715,
+        "score": 21.15715,
+        "change": 40.8
+      },
+      {
+        "date": "2026-04-11T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 4.2571564,
+        "score": 4.2571564,
+        "change": -16.9
+      },
+      {
+        "date": "2026-04-11T18:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 17.05716,
+        "score": 17.05716,
+        "change": 12.8
+      },
+      {
+        "date": "2026-04-11T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 43.757156,
+        "score": 43.757156,
+        "change": 26.7
+      },
+      {
+        "date": "2026-04-11T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 58.05716,
+        "score": 58.05716,
+        "change": 14.3
+      },
+      {
+        "date": "2026-04-11T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 15.557159,
+        "score": 15.557159,
+        "change": -42.5
+      },
+      {
+        "date": "2026-04-12T09:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 35.357162,
+        "score": 35.357162,
+        "change": 19.8
+      },
+      {
+        "date": "2026-04-12T09:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 20.357162,
+        "score": 20.357162,
+        "change": -15.0
+      },
+      {
+        "date": "2026-04-12T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 2.0571594,
+        "score": 2.0571594,
+        "change": -18.3
+      },
+      {
+        "date": "2026-04-12T18:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 45.55716,
+        "score": 45.55716,
+        "change": 43.5
+      },
+      {
+        "date": "2026-04-12T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 92.55716,
+        "score": 92.55716,
+        "change": 47.0
+      },
+      {
+        "date": "2026-04-12T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 70.85716,
+        "score": 70.85716,
+        "change": -21.7
+      },
+      {
+        "date": "2026-04-13T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 68.157166,
+        "score": 68.157166,
+        "change": -2.7
+      },
+      {
+        "date": "2026-04-14T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 96.157166,
+        "score": -3.8428339999999963,
+        "change": -72.0
+      },
+      {
+        "date": "2026-04-14T19:40:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 49.657166,
+        "score": -50.342834,
+        "change": -46.5
+      },
+      {
+        "date": "2026-04-14T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 90.157166,
+        "score": -9.842833999999996,
+        "change": 40.5
+      },
+      {
+        "date": "2026-04-16T15:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 8.157166,
+        "score": 8.157166,
+        "change": 18.0
+      },
+      {
+        "date": "2026-04-16T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 12.657166,
+        "score": 12.657166,
+        "change": 4.5
+      },
+      {
+        "date": "2026-04-18T14:20:00Z",
+        "rank": "Bronze",
+        "tier": 0,
+        "progress": 81.657166,
+        "score": -18.342833999999996,
+        "change": -31.0
+      },
+      {
+        "date": "2026-04-18T17:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 9.857162,
+        "score": 9.857162,
+        "change": 28.2
+      },
+      {
+        "date": "2026-04-18T18:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 37.45717,
+        "score": 37.45717,
+        "change": 27.6
+      },
+      {
+        "date": "2026-04-18T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 20.957169,
+        "score": 20.957169,
+        "change": -16.5
+      },
+      {
+        "date": "2026-04-19T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 50.95717,
+        "score": 50.95717,
+        "change": 30.0
+      },
+      {
+        "date": "2026-04-21T10:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 4.4571686,
+        "score": 4.4571686,
+        "change": -46.5
+      },
+      {
+        "date": "2026-04-21T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 28.457169,
+        "score": 28.457169,
+        "change": 24.0
+      },
+      {
+        "date": "2026-04-21T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 55.45717,
+        "score": 55.45717,
+        "change": 27.0
+      },
+      {
+        "date": "2026-04-21T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 98.95717,
+        "score": 98.95717,
+        "change": 43.5
+      },
+      {
+        "date": "2026-04-21T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 89.95717,
+        "score": 89.95717,
+        "change": -9.0
+      },
+      {
+        "date": "2026-04-22T13:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 79.45717,
+        "score": 79.45717,
+        "change": -10.5
+      },
+      {
+        "date": "2026-04-22T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 1.9571686,
+        "score": 101.9571686,
+        "change": 22.5
+      },
+      {
+        "date": "2026-04-22T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 98.95717,
+        "score": 98.95717,
+        "change": -3.0
+      },
+      {
+        "date": "2026-04-23T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 89.95717,
+        "score": 89.95717,
+        "change": -9.0
+      },
+      {
+        "date": "2026-04-23T11:40:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 67.45717,
+        "score": 67.45717,
+        "change": -22.5
+      },
+      {
+        "date": "2026-04-23T15:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 89.45717,
+        "score": 89.45717,
+        "change": 22.0
+      },
+      {
+        "date": "2026-04-23T15:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 1.4571686,
+        "score": 101.4571686,
+        "change": 12.0
+      },
+      {
+        "date": "2026-04-23T19:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 10.457169,
+        "score": 110.457169,
+        "change": 9.0
+      },
+      {
+        "date": "2026-04-24T09:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 90.95717,
+        "score": 90.95717,
+        "change": -19.5
+      },
+      {
+        "date": "2026-04-25T16:20:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 77.45717,
+        "score": 77.45717,
+        "change": -13.5
+      },
+      {
+        "date": "2026-04-25T17:00:00Z",
+        "rank": "Bronze",
+        "tier": 1,
+        "progress": 95.95717,
+        "score": 95.95717,
+        "change": 18.5
+      },
+      {
+        "date": "2026-04-25T23:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 25.957167,
+        "score": 125.957167,
+        "change": 30.0
+      },
+      {
+        "date": "2026-04-26T12:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 52.957172,
+        "score": 152.957172,
+        "change": 27.0
+      },
+      {
+        "date": "2026-04-26T21:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 38.95717,
+        "score": 138.95717,
+        "change": -14.0
+      },
+      {
+        "date": "2026-04-26T21:40:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 59.957153,
+        "score": 159.957153,
+        "change": 21.0
+      },
+      {
+        "date": "2026-04-28T11:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 65.40451,
+        "score": 165.40451000000002,
+        "change": 5.4
+      },
+      {
+        "date": "2026-04-28T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 96.32556,
+        "score": 196.32556,
+        "change": 30.9
+      },
+      {
+        "date": "2026-04-29T10:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 6.825562,
+        "score": 206.825562,
+        "change": 10.5
+      },
+      {
+        "date": "2026-04-29T11:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 76.82556,
+        "score": 176.82556,
+        "change": -30.0
+      },
+      {
+        "date": "2026-04-30T20:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 87.48346,
+        "score": 187.48345999999998,
+        "change": 10.7
+      },
+      {
+        "date": "2026-05-01T20:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 78.48346,
+        "score": 178.48345999999998,
+        "change": -9.0
+      },
+      {
+        "date": "2026-05-01T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 54.536087,
+        "score": 154.536087,
+        "change": -23.9
+      },
+      {
+        "date": "2026-05-01T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 74.48346,
+        "score": 174.48345999999998,
+        "change": 19.9
+      },
+      {
+        "date": "2026-05-02T13:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 70.16766,
+        "score": 170.16766,
+        "change": -4.3
+      },
+      {
+        "date": "2026-05-02T14:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 57.66766,
+        "score": 157.66766,
+        "change": -12.5
+      },
+      {
+        "date": "2026-05-02T17:20:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 66.93082,
+        "score": 166.93081999999998,
+        "change": 9.3
+      },
+      {
+        "date": "2026-05-03T13:00:00Z",
+        "rank": "Bronze",
+        "tier": 2,
+        "progress": 93.93082,
+        "score": 193.93081999999998,
+        "change": 27.0
+      },
+      {
+        "date": "2026-05-03T20:40:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 27.062407,
+        "score": 227.062407,
+        "change": 33.1
+      },
+      {
+        "date": "2026-05-03T21:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 58.167667,
+        "score": 258.167667,
+        "change": 31.1
+      },
+      {
+        "date": "2026-05-03T22:00:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 93.69397,
+        "score": 293.69397,
+        "change": 35.5
+      },
+      {
+        "date": "2026-05-04T20:40:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 15.754883,
+        "score": 315.754883,
+        "change": 22.1
+      },
+      {
+        "date": "2026-05-05T11:20:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 81.509766,
+        "score": 281.509766,
+        "change": -34.2
+      },
+      {
+        "date": "2026-05-05T12:40:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 4.754883,
+        "score": 304.754883,
+        "change": 23.2
+      },
+      {
+        "date": "2026-05-05T19:30:00Z",
+        "rank": "Bronze",
+        "tier": 3,
+        "progress": 94.54309,
+        "score": 294.54309,
+        "change": -10.2
+      },
+      {
+        "date": "2026-05-07T15:20:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 8.521545,
+        "score": 308.521545,
+        "change": 14.0
+      },
+      {
+        "date": "2026-05-07T18:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 5.5715485,
+        "score": 305.5715485,
+        "change": -2.9
+      },
+      {
+        "date": "2026-05-07T19:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 24.121552,
+        "score": 324.121552,
+        "change": 15.6
+      },
+      {
+        "date": "2026-05-08T19:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 26.588226,
+        "score": 326.588226,
+        "change": 5.4
+      },
+      {
+        "date": "2026-05-14T14:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 26.553144,
+        "score": 326.553144,
+        "change": 0.0
+      },
+      {
+        "date": "2026-05-14T19:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 29.211044,
+        "score": 329.211044,
+        "change": 2.7
+      },
+      {
+        "date": "2026-05-15T19:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 46.739624,
+        "score": 346.739624,
+        "change": 17.5
+      },
+      {
+        "date": "2026-05-15T20:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 66.18698,
+        "score": 366.18698,
+        "change": 19.4
+      },
+      {
+        "date": "2026-05-15T21:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 25.533476,
+        "score": 325.533476,
+        "change": -40.7
+      },
+      {
+        "date": "2026-05-16T09:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 36.928207,
+        "score": 336.928207,
+        "change": 11.4
+      },
+      {
+        "date": "2026-05-16T20:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 55.62558,
+        "score": 355.62558,
+        "change": 18.7
+      },
+      {
+        "date": "2026-05-16T21:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 56.70453,
+        "score": 356.70453,
+        "change": 1.1
+      },
+      {
+        "date": "2026-05-17T10:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 74.63873,
+        "score": 374.63873,
+        "change": 17.9
+      },
+      {
+        "date": "2026-05-17T12:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 79.71768,
+        "score": 379.71768,
+        "change": 5.1
+      },
+      {
+        "date": "2026-05-17T18:30:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 90.36243,
+        "score": 390.36243,
+        "change": 10.6
+      },
+      {
+        "date": "2026-05-17T19:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 2.5466309,
+        "score": 402.5466309,
+        "change": 12.2
+      },
+      {
+        "date": "2026-05-20T16:10:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 90.507416,
+        "score": 390.50741600000003,
+        "change": -12.0
+      },
+      {
+        "date": "2026-05-25T17:10:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 76.2525,
+        "score": 376.2525,
+        "change": -14.3
+      },
+      {
+        "date": "2026-05-25T19:10:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 77.32602,
+        "score": 377.32601999999997,
+        "change": 1.1
+      },
+      {
+        "date": "2026-05-25T20:10:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 70.74759,
+        "score": 370.74759,
+        "change": -6.6
+      },
+      {
+        "date": "2026-05-26T11:00:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 85.74759,
+        "score": 385.74759,
+        "change": 15.0
+      },
+      {
+        "date": "2026-05-26T13:00:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 76.74759,
+        "score": 376.74759,
+        "change": -9.0
+      },
+      {
+        "date": "2026-05-26T17:00:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 85.74759,
+        "score": 385.74759,
+        "change": 9.0
+      },
+      {
+        "date": "2026-05-26T19:40:00Z",
+        "rank": "Silver",
+        "tier": 1,
+        "progress": 97.74759,
+        "score": 397.74759,
+        "change": 12.0
+      },
+      {
+        "date": "2026-05-27T21:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 12.747589,
+        "score": 412.747589,
+        "change": 15.0
+      },
+      {
+        "date": "2026-05-28T11:40:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 27.414244,
+        "score": 427.414244,
+        "change": 14.7
+      },
+      {
+        "date": "2026-05-28T18:20:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 45.414246,
+        "score": 445.414246,
+        "change": 18.0
+      },
+      {
+        "date": "2026-05-29T11:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 37.164246,
+        "score": 437.164246,
+        "change": -8.3
+      },
+      {
+        "date": "2026-05-29T11:40:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 52.164246,
+        "score": 452.164246,
+        "change": 6.8
+      },
+      {
+        "date": "2026-05-29T18:20:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 51.414246,
+        "score": 451.414246,
+        "change": 7.5
+      },
+      {
+        "date": "2026-05-29T19:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 63.414246,
+        "score": 463.414246,
+        "change": 12.0
+      },
+      {
+        "date": "2026-05-29T21:40:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 77.51425,
+        "score": 477.51425,
+        "change": 14.1
+      },
+      {
+        "date": "2026-05-30T16:20:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 77.51425,
+        "score": 477.51425,
+        "change": 0.0
+      },
+      {
+        "date": "2026-05-30T17:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 83.79202,
+        "score": 483.79202,
+        "change": 6.3
+      },
+      {
+        "date": "2026-05-30T20:20:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 75.54202,
+        "score": 475.54202,
+        "change": -8.3
+      },
+      {
+        "date": "2026-05-31T12:50:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 76.29202,
+        "score": 476.29202,
+        "change": 0.8
+      },
+      {
+        "date": "2026-05-31T19:40:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 62.042023,
+        "score": 462.042023,
+        "change": -14.3
+      },
+      {
+        "date": "2026-05-31T20:20:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 83.04202,
+        "score": 483.04202,
+        "change": 21.0
+      },
+      {
+        "date": "2026-06-02T12:40:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 83.063446,
+        "score": 483.063446,
+        "change": 0.0
+      },
+      {
+        "date": "2026-06-02T14:40:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 87.563446,
+        "score": 487.563446,
+        "change": 4.5
+      },
+      {
+        "date": "2026-06-02T15:20:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 73.863434,
+        "score": 473.863434,
+        "change": -13.7
+      },
+      {
+        "date": "2026-06-02T18:40:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 67.363434,
+        "score": 467.363434,
+        "change": -6.5
+      },
+      {
+        "date": "2026-06-02T20:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 82.313446,
+        "score": 482.313446,
+        "change": 15.0
+      },
+      {
+        "date": "2026-06-02T20:40:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 81.16345,
+        "score": 481.16345,
+        "change": -1.1
+      },
+      {
+        "date": "2026-06-03T20:40:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 83.41345,
+        "score": 483.41345,
+        "change": 2.3
+      },
+      {
+        "date": "2026-06-03T21:20:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 70.51346,
+        "score": 470.51346,
+        "change": -12.9
+      },
+      {
+        "date": "2026-06-04T13:20:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 61.299164,
+        "score": 461.299164,
+        "change": -9.2
+      },
+      {
+        "date": "2026-06-04T14:10:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 49.59915,
+        "score": 449.59915,
+        "change": -11.7
+      },
+      {
+        "date": "2026-06-04T18:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 41.499146,
+        "score": 441.499146,
+        "change": -8.1
+      },
+      {
+        "date": "2026-06-04T21:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 51.54913,
+        "score": 451.54913,
+        "change": 10.0
+      },
+      {
+        "date": "2026-06-05T11:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 36.549133,
+        "score": 436.549133,
+        "change": -15.0
+      },
+      {
+        "date": "2026-06-06T13:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 36.549133,
+        "score": 436.549133,
+        "change": 0.0
+      },
+      {
+        "date": "2026-06-06T14:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 40.14914,
+        "score": 440.14914,
+        "change": 3.6
+      },
+      {
+        "date": "2026-06-06T16:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 45.65207,
+        "score": 445.65207,
+        "change": 5.5
+      },
+      {
+        "date": "2026-06-08T20:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 35.15207,
+        "score": 435.15207,
+        "change": -10.5
+      },
+      {
+        "date": "2026-06-11T15:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 36.256226,
+        "score": 436.25622599999997,
+        "change": 1.1
+      },
+      {
+        "date": "2026-06-11T19:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 27.104279,
+        "score": 427.104279,
+        "change": -9.2
+      },
+      {
+        "date": "2026-06-12T11:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 24.104279,
+        "score": 424.104279,
+        "change": -3.0
+      },
+      {
+        "date": "2026-06-13T17:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 13.4670105,
+        "score": 413.4670105,
+        "change": -10.6
+      },
+      {
+        "date": "2026-06-13T19:45:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 24.367004,
+        "score": 424.367004,
+        "change": 10.9
+      },
+      {
+        "date": "2026-06-14T16:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 48.367004,
+        "score": 448.367004,
+        "change": 24.0
+      },
+      {
+        "date": "2026-06-14T20:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 66.81702,
+        "score": 466.81702,
+        "change": 18.5
+      },
+      {
+        "date": "2026-06-15T10:45:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 82.117004,
+        "score": 482.117004,
+        "change": 15.3
+      },
+      {
+        "date": "2026-06-15T20:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 97.517,
+        "score": 497.517,
+        "change": 15.4
+      },
+      {
+        "date": "2026-06-15T21:15:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 14.916992,
+        "score": 514.916992,
+        "change": 17.4
+      },
+      {
+        "date": "2026-06-16T09:15:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 20.617004,
+        "score": 520.617004,
+        "change": 5.7
+      },
+      {
+        "date": "2026-06-16T10:50:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 17.067017,
+        "score": 517.067017,
+        "change": -3.5
+      },
+      {
+        "date": "2026-06-16T13:15:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 15.067017,
+        "score": 515.067017,
+        "change": -2.0
+      },
+      {
+        "date": "2026-06-16T17:30:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 23.917023,
+        "score": 523.917023,
+        "change": 8.9
+      },
+      {
+        "date": "2026-06-16T18:15:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 7.6670227,
+        "score": 507.6670227,
+        "change": -16.3
+      },
+      {
+        "date": "2026-06-16T20:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 95.41702,
+        "score": 495.41702,
+        "change": -12.3
+      },
+      {
+        "date": "2026-06-17T18:15:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 72.16702,
+        "score": 472.16702,
+        "change": -35.5
+      },
+      {
+        "date": "2026-06-17T19:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 72.09558,
+        "score": 472.09558,
+        "change": -35.6
+      },
+      {
+        "date": "2026-06-18T16:00:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 92.66702,
+        "score": 492.66702,
+        "change": -15.0
+      },
+      {
+        "date": "2026-06-18T18:15:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 99.617035,
+        "score": 499.617035,
+        "change": 7.0
+      },
+      {
+        "date": "2026-06-19T10:50:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 66.70038,
+        "score": 466.70038,
+        "change": -32.9
+      },
+      {
+        "date": "2026-06-19T20:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 80.85037,
+        "score": 480.85037,
+        "change": 14.1
+      },
+      {
+        "date": "2026-06-20T14:30:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 66.800385,
+        "score": 466.800385,
+        "change": -14.0
+      },
+      {
+        "date": "2026-06-21T15:50:00Z",
+        "rank": "Silver",
+        "tier": 2,
+        "progress": 94.800385,
+        "score": 494.800385,
+        "change": 28.0
+      },
+      {
+        "date": "2026-06-21T18:50:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 22.800385,
+        "score": 522.800385,
+        "change": 28.0
+      },
+      {
+        "date": "2026-06-22T11:50:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 31.58789,
+        "score": 531.58789,
+        "change": 8.8
+      },
+      {
+        "date": "2026-06-22T20:50:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 47.875397,
+        "score": 547.875397,
+        "change": 16.3
+      },
+      {
+        "date": "2026-06-23T19:45:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 56.075405,
+        "score": 556.075405,
+        "change": 8.2
+      },
+      {
+        "date": "2026-06-24T14:15:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 63.075413,
+        "score": 563.075413,
+        "change": 7.0
+      },
+      {
+        "date": "2026-06-24T18:00:00Z",
+        "rank": "Silver",
+        "tier": 3,
+        "progress": 59.82541,
+        "score": 559.82541,
+        "change": -3.3
+      }
+    ]
+  },
+  "total_distance_km": 18010.2,
+  "track_breakdown": [
+    {
+      "track_id": "1264a521f81475e528c45fb44879b79985c46f24",
+      "track": "Algarve International Circuit",
+      "length_km": 4.653,
+      "num_turns": 15,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_1264a521f81475e528c45fb44879b79985c46f24.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_1264a521f81475e528c45fb44879b79985c46f24.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_1264a521f81475e528c45fb44879b79985c46f24.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_1264a521f81475e528c45fb44879b79985c46f24.webp",
+      "country_code": "PT",
+      "races": 75,
+      "laps": 1088,
+      "distance_km": 5062.5
+    },
+    {
+      "track_id": "39353507085362c736910ba6cbd842a7022aa5e0",
+      "track": "Sebring International Raceway",
+      "length_km": 6.019,
+      "num_turns": 17,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_39353507085362c736910ba6cbd842a7022aa5e0.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_39353507085362c736910ba6cbd842a7022aa5e0.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_39353507085362c736910ba6cbd842a7022aa5e0.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_39353507085362c736910ba6cbd842a7022aa5e0.webp",
+      "country_code": "US",
+      "races": 66,
+      "laps": 834,
+      "distance_km": 5019.8
+    },
+    {
+      "track_id": "4bb77fd10958555c1ede236761d3345fa96de1a9",
+      "track": "Circuit de Spa-Francorchamps",
+      "length_km": 7.004,
+      "num_turns": 20,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_4bb77fd10958555c1ede236761d3345fa96de1a9.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_4bb77fd10958555c1ede236761d3345fa96de1a9.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_4bb77fd10958555c1ede236761d3345fa96de1a9.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_4bb77fd10958555c1ede236761d3345fa96de1a9.webp",
+      "country_code": "BE",
+      "races": 28,
+      "laps": 257,
+      "distance_km": 1800.0
+    },
+    {
+      "track_id": "6b6d309a2a8b609af5c18ec3f26e69f683589a44",
+      "track": "Monza Curva Grande Circuit",
+      "length_km": 5.793,
+      "num_turns": 10,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_6b6d309a2a8b609af5c18ec3f26e69f683589a44.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_6b6d309a2a8b609af5c18ec3f26e69f683589a44.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_6b6d309a2a8b609af5c18ec3f26e69f683589a44.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_6b6d309a2a8b609af5c18ec3f26e69f683589a44.webp",
+      "country_code": "IT",
+      "races": 24,
+      "laps": 257,
+      "distance_km": 1488.8
+    },
+    {
+      "track_id": "7f6db5144429516d3df8d1a7159417ad030822fb",
+      "track": "Autodromo Enzo e Dino Ferrari",
+      "length_km": 4.909,
+      "num_turns": 20,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_7f6db5144429516d3df8d1a7159417ad030822fb.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_7f6db5144429516d3df8d1a7159417ad030822fb.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_7f6db5144429516d3df8d1a7159417ad030822fb.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_7f6db5144429516d3df8d1a7159417ad030822fb.webp",
+      "country_code": "IT",
+      "races": 12,
+      "laps": 242,
+      "distance_km": 1188.0
+    },
+    {
+      "track_id": "2858da03dbb6e4f958bfbb30ea33cbb7bcdd0ea2",
+      "track": "Circuit de la Sarthe",
+      "length_km": 13.626,
+      "num_turns": 38,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_2858da03dbb6e4f958bfbb30ea33cbb7bcdd0ea2.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_2858da03dbb6e4f958bfbb30ea33cbb7bcdd0ea2.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_2858da03dbb6e4f958bfbb30ea33cbb7bcdd0ea2.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_2858da03dbb6e4f958bfbb30ea33cbb7bcdd0ea2.webp",
+      "country_code": "FR",
+      "races": 13,
+      "laps": 64,
+      "distance_km": 872.1
+    },
+    {
+      "track_id": "4a6bc9ace673551de9a5167bd5c24f139e4c1ad5",
+      "track": "Sebring School Circuit",
+      "length_km": 3.219,
+      "num_turns": 7,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_4a6bc9ace673551de9a5167bd5c24f139e4c1ad5.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_4a6bc9ace673551de9a5167bd5c24f139e4c1ad5.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_4a6bc9ace673551de9a5167bd5c24f139e4c1ad5.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_4a6bc9ace673551de9a5167bd5c24f139e4c1ad5.webp",
+      "country_code": "US",
+      "races": 12,
+      "laps": 270,
+      "distance_km": 869.1
+    },
+    {
+      "track_id": "967e154b5d498a55d0b8e0e563a5644fd1ed8110",
+      "track": "Autodromo Nazionale Monza",
+      "length_km": 5.793,
+      "num_turns": 11,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_967e154b5d498a55d0b8e0e563a5644fd1ed8110.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_967e154b5d498a55d0b8e0e563a5644fd1ed8110.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_967e154b5d498a55d0b8e0e563a5644fd1ed8110.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_967e154b5d498a55d0b8e0e563a5644fd1ed8110.webp",
+      "country_code": "IT",
+      "races": 10,
+      "laps": 144,
+      "distance_km": 834.2
+    },
+    {
+      "track_id": "7b18540f3dbac237e9beba7d00f5b4265cc5d25f",
+      "track": "Fuji Speedway",
+      "length_km": 4.563,
+      "num_turns": 16,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_7b18540f3dbac237e9beba7d00f5b4265cc5d25f.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_7b18540f3dbac237e9beba7d00f5b4265cc5d25f.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_7b18540f3dbac237e9beba7d00f5b4265cc5d25f.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_7b18540f3dbac237e9beba7d00f5b4265cc5d25f.webp",
+      "country_code": "JP",
+      "races": 5,
+      "laps": 71,
+      "distance_km": 324.0
+    },
+    {
+      "track_id": "488bc89d709d64c620b0e889a6c70a1a19ae82d0",
+      "track": "Bahrain International Circuit",
+      "length_km": 5.412,
+      "num_turns": 15,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_488bc89d709d64c620b0e889a6c70a1a19ae82d0.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_488bc89d709d64c620b0e889a6c70a1a19ae82d0.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_488bc89d709d64c620b0e889a6c70a1a19ae82d0.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_488bc89d709d64c620b0e889a6c70a1a19ae82d0.webp",
+      "country_code": "BH",
+      "races": 3,
+      "laps": 39,
+      "distance_km": 211.1
+    },
+    {
+      "track_id": "686090c2872d3eefb1ca441b06ac603d3446d441",
+      "track": "Paul Ricard - 1A",
+      "length_km": 5.752,
+      "num_turns": 13,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_686090c2872d3eefb1ca441b06ac603d3446d441.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_686090c2872d3eefb1ca441b06ac603d3446d441.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_686090c2872d3eefb1ca441b06ac603d3446d441.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_686090c2872d3eefb1ca441b06ac603d3446d441.webp",
+      "country_code": "FR",
+      "races": 3,
+      "laps": 36,
+      "distance_km": 207.1
+    },
+    {
+      "track_id": "40e8e580d2a37b388457a32bce00acd4cf600499",
+      "track": "Bahrain Outer Circuit",
+      "length_km": 3.543,
+      "num_turns": 11,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_40e8e580d2a37b388457a32bce00acd4cf600499.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_40e8e580d2a37b388457a32bce00acd4cf600499.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_40e8e580d2a37b388457a32bce00acd4cf600499.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_40e8e580d2a37b388457a32bce00acd4cf600499.webp",
+      "country_code": "BH",
+      "races": 1,
+      "laps": 19,
+      "distance_km": 67.3
+    },
+    {
+      "track_id": "3a199f193d042aa11fdde0cd0f467c64324af628",
+      "track": "COTA National Circuit",
+      "length_km": 3.702,
+      "num_turns": 17,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_3a199f193d042aa11fdde0cd0f467c64324af628.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_3a199f193d042aa11fdde0cd0f467c64324af628.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_3a199f193d042aa11fdde0cd0f467c64324af628.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_3a199f193d042aa11fdde0cd0f467c64324af628.webp",
+      "country_code": "US",
+      "races": 1,
+      "laps": 13,
+      "distance_km": 48.1
+    },
+    {
+      "track_id": "f356b1c0275ba0c6489b170bcc819eb28597bcca",
+      "track": "Fuji Speedway Classic",
+      "length_km": 4.526,
+      "num_turns": 14,
+      "scheme": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/scheme_f356b1c0275ba0c6489b170bcc819eb28597bcca.svg",
+      "logo": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/logo_f356b1c0275ba0c6489b170bcc819eb28597bcca.svg",
+      "cover": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/cover_f356b1c0275ba0c6489b170bcc819eb28597bcca.webp",
+      "background": "https://pub-f1e0b505640b4d5bbe466c7b28b45f6d.r2.dev/background_f356b1c0275ba0c6489b170bcc819eb28597bcca.webp",
+      "country_code": "JP",
+      "races": 1,
+      "laps": 4,
+      "distance_km": 18.1
+    }
+  ],
+  "favorite_cars": [
+    {
+      "car_id": "44_24_PROT92DCFAD4",
+      "car": "Ford Mustang LMGT3",
+      "car_name": "Ford Mustang LMGT3",
+      "model": "Mustang LMGT3",
+      "manufacturer": "Ford",
+      "manufacturer_logo_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/Brand=Ford.svg",
+      "car_image_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/44_24_PROT92DCFAD4_frontAngle.webp",
+      "car_class": "GT3",
+      "class_info": {
+        "id": "GT3",
+        "name": "GT3",
+        "color_hex": "#f59e0b"
+      },
+      "class_color_hex": "#f59e0b",
+      "races": 112,
+      "distance_km": 7978.6,
+      "wins": 15,
+      "poles": 10,
+      "podiums": 36
+    },
+    {
+      "car_id": "12_26_GCHA18747807",
+      "car": "McLaren 720S LMGT3 Evo",
+      "car_name": "McLaren 720S LMGT3 Evo",
+      "model": "720S LMGT3 Evo",
+      "manufacturer": "McLaren",
+      "manufacturer_logo_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/Brand=McLaren.svg",
+      "car_image_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/12_26_GCHA18747807_frontAngle.webp",
+      "car_class": "GT3",
+      "class_info": {
+        "id": "GT3",
+        "name": "GT3",
+        "color_hex": "#f59e0b"
+      },
+      "class_color_hex": "#f59e0b",
+      "races": 43,
+      "distance_km": 3155.0,
+      "poles": 3,
+      "podiums": 9
+    },
+    {
+      "car_id": "9_25_IRONL246BF580",
+      "car": "Oreca 07",
+      "car_name": "Oreca 07",
+      "model": "07",
+      "manufacturer": "Oreca",
+      "manufacturer_logo_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/Brand=Oreca.svg",
+      "car_image_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/9_25_IRONL246BF580_frontAngle.webp",
+      "car_class": "LMP2",
+      "class_info": {
+        "id": "LMP2",
+        "name": "LMP2",
+        "color_hex": "#2563eb"
+      },
+      "class_color_hex": "#2563eb",
+      "races": 24,
+      "distance_km": 2078.8
+    },
+    {
+      "car_id": "60_25_IRON7779B4B1",
+      "car": "Mercedes-AMG LMGT3",
+      "car_name": "Mercedes-AMG LMGT3",
+      "model": "LMGT3",
+      "manufacturer": "Mercedes-AMG",
+      "manufacturer_logo_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/Brand=Mercedes-AMG.svg",
+      "car_image_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/60_25_IRON7779B4B1_frontAngle.webp",
+      "car_class": "GT3",
+      "class_info": {
+        "id": "GT3",
+        "name": "GT3",
+        "color_hex": "#f59e0b"
+      },
+      "class_color_hex": "#f59e0b",
+      "races": 20,
+      "distance_km": 1455.6,
+      "podiums": 1
+    },
+    {
+      "car_id": "33_CORVETT9BB51D89",
+      "car": "Corvette C8.R GTE",
+      "car_name": "Corvette C8.R GTE",
+      "model": "C8.R GTE",
+      "manufacturer": "Corvette",
+      "manufacturer_logo_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/Brand=Corvette.svg",
+      "car_image_url": "https://pub-1e39c32c0fde4897a9f2e5b1baad1762.r2.dev/33_CORVETT9BB51D89_frontAngle.webp",
+      "car_class": "GTE",
+      "class_info": {
+        "id": "GTE",
+        "name": "GTE",
+        "color_hex": "#16a34a"
+      },
+      "class_color_hex": "#16a34a",
+      "races": 14,
+      "distance_km": 814.3
+    }
+  ]
+}

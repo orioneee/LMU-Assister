@@ -12,6 +12,7 @@
     <!-- Bottom navigation -->
     <string name="nav_schedule">Schedule</string>
     <string name="nav_tracks">Tracks</string>
+    <string name="nav_drivers">Drivers</string>
     <string name="nav_profile">My Profile</string>
 
     <!-- Profile / Steam login -->

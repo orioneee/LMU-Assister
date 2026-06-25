@@ -45,6 +45,18 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
                 path == "/tracks" -> json(MockData.tracks())
                 path == "/privacy" -> respond(MockData.privacy(), HttpStatusCode.OK)
 
+                path == "/users/summary" -> json(MockData.usersSummary())
+                path == "/users/search" -> json(MockData.usersSearch(params["q"].orEmpty(), params["page"]?.toIntOrNull() ?: 1))
+                path.startsWith("/users/") && "/track/" in path -> {
+                    val rest = path.removePrefix("/users/")
+                    val uid = rest.substringBefore("/track/")
+                    val trackId = rest.substringAfter("/track/")
+                    MockData.publicUserTrack(uid, trackId)?.let(::json)
+                        ?: respond("""{"error":"track_not_found"}""", HttpStatusCode.NotFound, jsonHeaders)
+                }
+                path.startsWith("/users/") -> MockData.publicUser(path.removePrefix("/users/"))?.let(::json)
+                    ?: respond("""{"error":"user_not_found"}""", HttpStatusCode.NotFound, jsonHeaders)
+
                 path == "/profile" -> json(MockData.profile())
                 path == "/profile/stats" -> json(MockData.stats())
                 path == "/profile/races" -> json(MockData.racesPage(params["page"]?.toIntOrNull() ?: 1))

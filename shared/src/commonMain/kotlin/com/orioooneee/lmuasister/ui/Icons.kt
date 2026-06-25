@@ -120,6 +120,18 @@ val IconChevronRight: ImageVector by lazy {
     }
 }
 
+val IconSearch: ImageVector by lazy {
+    icon("Search") {
+        path(stroke = white, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round) {
+            moveTo(10.8f, 5f)
+            arcToRelative(5.8f, 5.8f, 0f, true, true, 0f, 11.6f)
+            arcToRelative(5.8f, 5.8f, 0f, true, true, 0f, -11.6f)
+            moveTo(15.2f, 15.2f)
+            lineTo(20f, 20f)
+        }
+    }
+}
+
 val IconFlag: ImageVector by lazy {
     icon("Flag") {
         path(fill = white) {

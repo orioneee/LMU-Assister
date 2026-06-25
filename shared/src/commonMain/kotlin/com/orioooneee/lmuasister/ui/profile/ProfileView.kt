@@ -66,6 +66,7 @@ import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.formatIsoTimeAndDate
+import com.orioooneee.lmuasister.ui.util.formatIsoDateTime
 import com.orioooneee.lmuasister.ui.util.formatKm
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.susp_active_count
@@ -107,6 +108,8 @@ private const val FAVORITE_CARS_PREVIEW = 5
 fun ProfileView(
     profile: SteamProfile,
     accountName: String,
+    readOnly: Boolean = false,
+    enableTrackBreakdown: Boolean = !readOnly,
     onSeeAllRaces: () -> Unit = {},
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
     onOpenSuspensions: (active: Boolean) -> Unit = {},
@@ -114,13 +117,13 @@ fun ProfileView(
     onOpenTracks: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        ProfileHeader(profile, accountName, onOpenSuspensions, onOpenTracks)
+        ProfileHeader(profile, accountName, readOnly, enableTrackBreakdown, onOpenSuspensions, onOpenTracks)
         RatingsRow(profile.driverRating, profile.safetyRating)
 
         profile.ratingHistory?.takeIf { it.dr.isNotEmpty() || it.sr.isNotEmpty() }?.let {
             RatingProgressionCard(it)
         }
-        profile.stats?.total?.let { CareerStatsGrid(it, onOpenCategory = onOpenCategory) }
+        profile.stats?.total?.let { CareerStatsGrid(it, enableCategoryClicks = !readOnly, onOpenCategory = onOpenCategory) }
         if (profile.favoriteCars.isNotEmpty()) {
             FavoriteCarsSection(profile.favoriteCars.take(FAVORITE_CARS_PREVIEW))
         }
@@ -131,14 +134,14 @@ fun ProfileView(
                 profile.recentRaces.take(RECENT_PREVIEW).forEach { race ->
                     Box(
                         Modifier.clip(RoundedCornerShape(12.dp))
-                            .clickable(enabled = race.eventId != null) {
+                            .clickable(enabled = !readOnly && race.eventId != null) {
                                 race.eventId?.let { onOpenRace(it, race.split) }
                             },
                     ) {
                         RaceHistoryRow(race)
                     }
                 }
-                if (profile.recentRaces.size > RECENT_PREVIEW) {
+                if (!readOnly && profile.recentRaces.size > RECENT_PREVIEW) {
                     SeeMoreButton(onSeeAllRaces)
                 }
             }
@@ -368,6 +371,8 @@ fun ProfileSkeleton() {
 private fun ProfileHeader(
     profile: SteamProfile,
     accountName: String,
+    readOnly: Boolean,
+    enableTrackBreakdown: Boolean,
     onOpenSuspensions: (active: Boolean) -> Unit,
     onOpenTracks: () -> Unit,
 ) {
@@ -396,13 +401,16 @@ private fun ProfileHeader(
             RatingPill("SR", profile.safetyRating)
             // Tap the distance badge to open the per-track breakdown screen.
             if (profile.totalDistanceKm > 0) {
-                ClickablePill("${formatKm(profile.totalDistanceKm)} km", DistAccent, onClick = onOpenTracks)
+                ClickablePill("${formatKm(profile.totalDistanceKm)} km", DistAccent, onClick = if (enableTrackBreakdown) onOpenTracks else null)
             }
             GameVersionBadge(profile.currentGameVersion)
+            formatIsoDateTime(profile.lastUpdatedAt ?: profile.syncedAt)?.let {
+                ClickablePill("Synced $it", FlagGray, onClick = null)
+            }
         }
         // Status badges (e.g. "Sr Probation") sit on the SAME row as the suspensions, after them.
         val badges = profile.badges.ifEmpty { listOfNotNull(profile.badge) }
-        SuspensionFlags(profile, onOpenSuspensions) {
+        SuspensionFlags(profile, if (readOnly) null else onOpenSuspensions) {
             badges.take(3).forEach { OutlinePill(prettyBadge(it), Amber) }
         }
     }
@@ -446,7 +454,7 @@ private val DistAccent = Color(0xFF7FB2E8) // total distance badge — soft blue
 @Composable
 private fun SuspensionFlags(
     profile: SteamProfile,
-    onOpen: (active: Boolean) -> Unit,
+    onOpen: ((active: Boolean) -> Unit)?,
     trailing: @Composable () -> Unit = {},
 ) {
     val all = profile.suspensions
@@ -461,7 +469,10 @@ private fun SuspensionFlags(
         if (all.isEmpty()) {
             // No detailed list (e.g. legacy cache): keep the simple count-based status.
             if (profile.activeSuspensions > 0) {
-                ClickablePill(stringResource(Res.string.susp_active_count, profile.activeSuspensions)) { onOpen(true) }
+                ClickablePill(
+                    stringResource(Res.string.susp_active_count, profile.activeSuspensions),
+                    onClick = onOpen?.let { open -> { open(true) } },
+                )
             } else {
                 ClickablePill(stringResource(Res.string.susp_license_clean), PosGreen, onClick = null)
             }
@@ -469,12 +480,16 @@ private fun SuspensionFlags(
             if (active.isNotEmpty()) {
                 val label = if (active.any { it.permanent }) stringResource(Res.string.susp_banned)
                 else stringResource(Res.string.susp_active_count, active.size)
-                ClickablePill(label, NegRed) { onOpen(true) }
+                ClickablePill(label, NegRed, onClick = onOpen?.let { open -> { open(true) } })
             } else {
                 ClickablePill(stringResource(Res.string.susp_no_active), PosGreen, onClick = null)
             }
             if (past.isNotEmpty()) {
-                ClickablePill(stringResource(Res.string.susp_past_count, past.size), FlagGray) { onOpen(false) }
+                ClickablePill(
+                    stringResource(Res.string.susp_past_count, past.size),
+                    FlagGray,
+                    onClick = onOpen?.let { open -> { open(false) } },
+                )
             }
         }
         trailing()

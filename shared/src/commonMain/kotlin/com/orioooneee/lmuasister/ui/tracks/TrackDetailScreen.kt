@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.orioooneee.lmuasister.data.RaceRepository
+import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.TrackAttemptDto
 import com.orioooneee.lmuasister.data.remote.TrackFullDto
 import com.orioooneee.lmuasister.data.remote.TrackPersonalDto
@@ -145,6 +146,61 @@ fun TrackDetailScreen(
     }
 }
 
+@Composable
+fun PublicTrackDetailScreen(
+    uid: String,
+    trackId: String,
+    insets: PaddingValues,
+    onBack: () -> Unit,
+) {
+    val api = koinInject<BackendApi>()
+    val result by produceState<Result<TrackDetailData>?>(null, uid, trackId) {
+        value = runCatching {
+            val resp = api.publicUserTrack(uid, trackId)
+            TrackDetailData(resp.track, PersonalRecordsState.Ready(resp.personal))
+        }
+    }
+
+    Column(Modifier.fillMaxSize().background(Carbon)) {
+        val track = result?.getOrNull()?.track
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp + insets.calculateTopPadding(), end = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircleButton(Modifier, onBack)
+            Text(
+                track?.let { trackTitle(it) } ?: "Track",
+                style = MaterialTheme.typography.titleLarge,
+                color = TextHigh,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        when (val res = result) {
+            null -> TrackDetailSkeleton()
+            else -> res.fold(
+                onSuccess = {
+                    TrackContent(
+                        d = it,
+                        bottomInset = insets.calculateBottomPadding(),
+                        onOpenRace = { _, _ -> },
+                        allowRaceLinks = false,
+                    )
+                },
+                onFailure = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(it.message ?: "Couldn't load this track", style = MaterialTheme.typography.bodyMedium, color = TextMed)
+                    }
+                },
+            )
+        }
+    }
+}
+
 private enum class AuthAvailability { Pending, SignedIn, SignedOut }
 
 private fun SteamLoginUiState.authAvailability(): AuthAvailability = when (this) {
@@ -181,6 +237,7 @@ private fun TrackContent(
     d: TrackDetailData,
     bottomInset: androidx.compose.ui.unit.Dp,
     onOpenRace: (String, Int?) -> Unit,
+    allowRaceLinks: Boolean = true,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -212,6 +269,7 @@ private fun TrackContent(
                                     byClass = personal.bestByClass,
                                     versionLabel = (versionFullLabel(current.gameVersion) ?: versionFullLabel(personal.currentPatch))?.let { "v$it" },
                                     onOpenRace = onOpenRace,
+                                    allowRaceLinks = allowRaceLinks,
                                 )
                             }
                         }
@@ -224,16 +282,17 @@ private fun TrackContent(
                                 byClass = personal.bestByClass,
                                 versionLabel = versionPatchWildcardLabel(ever.gameVersion),
                                 onOpenRace = onOpenRace,
+                                allowRaceLinks = allowRaceLinks,
                             )
                         }
                     }
                     if (personal.bestByClass.isNotEmpty()) {
                         item { SectionLabel("BEST BY CLASS") }
-                        item { ByClassCard(personal.bestByClass, onOpenRace) }
+                        item { ByClassCard(personal.bestByClass, onOpenRace, allowRaceLinks) }
                     }
                     if (personal.recent.isNotEmpty()) {
                         item { SectionLabel("RECENT") }
-                        item { RecentCard(personal.recent, onOpenRace) }
+                        item { RecentCard(personal.recent, onOpenRace, allowRaceLinks) }
                     }
                 }
             }
@@ -242,8 +301,9 @@ private fun TrackContent(
 }
 
 /** Opens the race-detail screen for an attempt's event, when it carries an eventId. */
-private fun Modifier.openRaceOf(a: TrackAttemptDto, onOpenRace: (String, Int?) -> Unit): Modifier =
-    a.eventId?.takeIf { it.isNotBlank() }?.let { id -> this.clickable { onOpenRace(id, a.split) } } ?: this
+private fun Modifier.openRaceOf(a: TrackAttemptDto, onOpenRace: (String, Int?) -> Unit, enabled: Boolean = true): Modifier =
+    if (!enabled) this
+    else a.eventId?.takeIf { it.isNotBlank() }?.let { id -> this.clickable { onOpenRace(id, a.split) } } ?: this
 
 private fun sameAttempt(a: TrackAttemptDto, b: TrackAttemptDto): Boolean =
     a.bestLapMs == b.bestLapMs &&
@@ -284,11 +344,12 @@ private fun BestLapCard(
     byClass: Map<String, TrackAttemptDto>,
     versionLabel: String?,
     onOpenRace: (String, Int?) -> Unit,
+    allowRaceLinks: Boolean,
 ) {
     // The absolute best may belong to a faster class than the driver's usual one — flag that.
     val fasterClass = best.carClass?.takeIf {  byClass.size > 1 }
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).openRaceOf(best, onOpenRace).padding(14.dp),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).openRaceOf(best, onOpenRace, allowRaceLinks).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -304,13 +365,13 @@ private fun BestLapCard(
 }
 
 @Composable
-private fun ByClassCard(byClass: Map<String, TrackAttemptDto>, onOpenRace: (String, Int?) -> Unit) {
+private fun ByClassCard(byClass: Map<String, TrackAttemptDto>, onOpenRace: (String, Int?) -> Unit, allowRaceLinks: Boolean) {
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Outline, RoundedCornerShape(12.dp)),
     ) {
         byClass.entries.sortedBy { it.value.bestLapMs ?: Long.MAX_VALUE }.forEachIndexed { i, (cls, a) ->
             Row(
-                modifier = Modifier.fillMaxWidth().background(if (i % 2 == 1) Surface2 else Color.Transparent).openRaceOf(a, onOpenRace).padding(horizontal = 12.dp, vertical = 9.dp),
+                modifier = Modifier.fillMaxWidth().background(if (i % 2 == 1) Surface2 else Color.Transparent).openRaceOf(a, onOpenRace, allowRaceLinks).padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -327,13 +388,13 @@ private fun ByClassCard(byClass: Map<String, TrackAttemptDto>, onOpenRace: (Stri
 }
 
 @Composable
-private fun RecentCard(recent: List<TrackAttemptDto>, onOpenRace: (String, Int?) -> Unit) {
+private fun RecentCard(recent: List<TrackAttemptDto>, onOpenRace: (String, Int?) -> Unit, allowRaceLinks: Boolean) {
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Outline, RoundedCornerShape(12.dp)),
     ) {
         recent.forEachIndexed { i, a ->
             Row(
-                modifier = Modifier.fillMaxWidth().background(if (i % 2 == 1) Surface2 else Color.Transparent).openRaceOf(a, onOpenRace).padding(horizontal = 12.dp, vertical = 9.dp),
+                modifier = Modifier.fillMaxWidth().background(if (i % 2 == 1) Surface2 else Color.Transparent).openRaceOf(a, onOpenRace, allowRaceLinks).padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {

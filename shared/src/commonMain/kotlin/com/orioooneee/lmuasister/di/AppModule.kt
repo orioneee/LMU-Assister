@@ -9,6 +9,7 @@ import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
 import com.orioooneee.lmuasister.ui.profile.SteamAuthRunner
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
+import com.orioooneee.lmuasister.ui.publicusers.PublicUsersViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import org.koin.core.module.dsl.viewModelOf
@@ -32,6 +33,7 @@ val appModule = module {
     single { RaceRepository(get(), get()) }
     single { SteamAuthRunner(get()) }
     viewModelOf(::ScheduleViewModel)
+    viewModelOf(::PublicUsersViewModel)
     // SteamSignIn / SteamSessionStore are bound per-platform via steamModule().
     viewModelOf(::SteamLoginViewModel)
 }

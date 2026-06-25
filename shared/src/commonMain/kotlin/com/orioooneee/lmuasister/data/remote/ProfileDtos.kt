@@ -39,6 +39,9 @@ data class SteamProfile(
     @SerialName("track_breakdown") val trackBreakdown: List<TrackBreakdownDto> = emptyList(),
     // Top favourite car models by race count, grouped server-side by manufacturer + model + class.
     @SerialName("favorite_cars") val favoriteCars: List<FavoriteCarDto> = emptyList(),
+    @SerialName("synced_at") val syncedAt: String? = null,
+    @SerialName("last_updated_at") val lastUpdatedAt: String? = null,
+    @SerialName("total_laps") val totalLaps: Int = 0,
 )
 
 @Serializable
@@ -160,6 +163,7 @@ data class RatingDto(
     val progress: Double? = null,
     val elo: Double? = null,
     val rating: Double? = null,
+    val label: String? = null,
 )
 
 /** One component of an SR/DR change for a race: a signed weight + the human reason it moved.
