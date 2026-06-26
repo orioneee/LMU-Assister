@@ -83,6 +83,7 @@ fun CareerStatsGrid(
     totals: StatTotalsDto,
     modifier: Modifier = Modifier,
     enableCategoryClicks: Boolean = true,
+    hideUnavailableCategories: Boolean = false,
     onOpenCategory: (StatCategory) -> Unit = {},
 ) {
     val cells = listOf(
@@ -100,7 +101,9 @@ fun CareerStatsGrid(
         StatCell("POLE→WIN", totals.polesConverted, ClassGt3, StatCategory.PolesConverted, display = pctOf(totals.polesConverted, totals.polePositions)),
         StatCell("WIN W/O POLE", totals.winsNoPole, ClassLmp3, StatCategory.WinsNoPole),
         StatCell("DNF", totals.dnfs, SkillPro, StatCategory.Dnf),
-    )
+    ).filter { cell ->
+        !hideUnavailableCategories || cell.category == null || categoryAvailable(cell, totals)
+    }
 
     Column(
         modifier
@@ -124,6 +127,11 @@ fun CareerStatsGrid(
             }
         }
     }
+}
+
+private fun categoryAvailable(cell: StatCell, totals: StatTotalsDto): Boolean = when (cell.category) {
+    StatCategory.PolesConverted -> totals.polePositions > 0 && totals.polesConverted > 0
+    else -> cell.value > 0
 }
 
 @Composable

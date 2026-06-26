@@ -2,6 +2,8 @@ package com.orioooneee.lmuasister.data.remote
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonNames
 
 // Decoded with [ProfileJson] (no naming strategy): snake_case wire keys are stated explicitly
 // via @SerialName; the camelCase `stats.total` counters match the Kotlin name verbatim.
@@ -9,6 +11,7 @@ import kotlinx.serialization.Serializable
 // genuinely-optional data is nullable, and boolean flags keep `false` as "absent == off".
 
 /** Player profile from GET /api/v2/profile. */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class SteamProfile(
     val uid: String,
@@ -18,7 +21,15 @@ data class SteamProfile(
     val username: String? = null,
     val nationality: String? = null,
     val badge: String? = null,
+    @SerialName("badge_url") @JsonNames("badgeUrl") val badgeUrl: String? = null,
     val badges: List<String> = emptyList(),
+    @SerialName("external_id") val externalId: String? = null,
+    @SerialName("external_data") val externalData: Boolean = false,
+    val source: String? = null,
+    @SerialName("source_label") val sourceLabel: String? = null,
+    @SerialName("external_url") val externalUrl: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    val team: String? = null,
     val email: String? = null,
     @SerialName("driver_rating") val driverRating: RatingDto? = null,
     @SerialName("safety_rating") val safetyRating: RatingDto? = null,
@@ -158,8 +169,8 @@ data class SuspensionDto(
 
 @Serializable
 data class RatingDto(
-    val rank: String,
-    val tier: Int,
+    val rank: String = "",
+    val tier: Int = 0,
     val progress: Double? = null,
     val elo: Double? = null,
     val rating: Double? = null,
@@ -223,7 +234,7 @@ data class RecentRaceDto(
     // total splits for the event — NOT sent by /profile or /profile/races (list endpoints);
     // only the race-detail endpoint fills it, so it stays nullable here.
     @SerialName("total_splits") val totalSplits: Int? = null,
-    @SerialName("field_size") val fieldSize: Int,            // overall entries (all classes)
+    @SerialName("field_size") val fieldSize: Int = 0,        // overall entries (all classes)
     @SerialName("class_field_size") val classFieldSize: Int? = null, // entries in own class
     // Kept defaulted: a no-result race sends position: null, which coerces to 0 (see [ProfileJson]).
     val position: Int = 0,                                   // overall finishing position

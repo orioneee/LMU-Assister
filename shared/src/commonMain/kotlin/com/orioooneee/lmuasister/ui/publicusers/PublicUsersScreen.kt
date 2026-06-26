@@ -65,6 +65,7 @@ import com.orioooneee.lmuasister.ui.components.SectionHeader
 import com.orioooneee.lmuasister.ui.components.rankTierColor
 import com.orioooneee.lmuasister.ui.profile.ProfileSkeleton
 import com.orioooneee.lmuasister.ui.profile.ProfileView
+import com.orioooneee.lmuasister.ui.profile.StatCategory
 import com.orioooneee.lmuasister.ui.profile.TrackBreakdownView
 import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.Carbon
@@ -230,15 +231,19 @@ private fun DistributionRow(rank: String, bucket: RatingDistributionBucketDto) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PublicUserCard(index: Int?, user: PublicUserDto, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun PublicUserCard(index: Int?, user: PublicUserDto, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val accent = rankTierColor(user.safetyRating?.rank.orEmpty())
     Row(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(Surface1)
-            .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
+            .border(
+                1.dp,
+                if (user.externalData) Amber.copy(alpha = 0.5f) else accent.copy(alpha = 0.35f),
+                RoundedCornerShape(14.dp),
+            )
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -251,20 +256,38 @@ fun PublicUserCard(index: Int?, user: PublicUserDto, onClick: () -> Unit, modifi
                 Text("#$index", style = MaterialTheme.typography.labelLarge, color = accent, fontWeight = FontWeight.Black)
             }
         }
-        DriverFlag(user.nationality, accent, Modifier.size(42.dp))
+        DriverAvatar(user.nationality, user.avatarUrl, accent, Modifier.size(42.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                user.name ?: user.uid,
-                style = MaterialTheme.typography.titleMedium,
-                color = TextHigh,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    user.name ?: user.uid,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextHigh,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                DriverBadge(user.badgeUrl, user.badge)
+            }
+            if (!user.team.isNullOrBlank()) {
+                Text(
+                    user.team,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextLow,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (user.externalData) {
+                    SourcePill("External data")
+                }
                 RatingBadge("DR", user.driverRating)
                 RatingBadge("SR", user.safetyRating)
-                user.badge?.takeIf { it.isNotBlank() }?.let { BadgePill(it) }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 StatBadge("Races", user.races, TextMed)
@@ -278,22 +301,48 @@ fun PublicUserCard(index: Int?, user: PublicUserDto, onClick: () -> Unit, modifi
 }
 
 @Composable
-private fun RatingBadge(label: String, rating: RatingDto?) {
-    if (rating == null) return
-    val value = rating.label?.takeIf { it.isNotBlank() }
-        ?: "${rating.rank.firstOrNull()?.uppercaseChar() ?: '?'}${rating.tier}"
-    RankBadge(label, value, rankTierColor(rating.rank))
-}
-
-@Composable
-private fun BadgePill(text: String) {
-    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(Amber.copy(alpha = 0.12f)).padding(horizontal = 7.dp, vertical = 3.dp)) {
-        Text(text.replace('-', ' '), style = MaterialTheme.typography.labelSmall, color = Amber, fontWeight = FontWeight.SemiBold, maxLines = 1)
+private fun SourcePill(label: String) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Amber.copy(alpha = 0.12f))
+            .border(1.dp, Amber.copy(alpha = 0.42f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Amber, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
 @Composable
-private fun StatBadge(label: String, value: Int, color: Color) {
+private fun RatingBadge(label: String, rating: RatingDto?) {
+    if (rating == null) return
+    val value = rating.label?.takeIf { it.isNotBlank() }
+        ?: rating.rank.takeIf { it.isNotBlank() }?.let { "${it.first().uppercaseChar()}${rating.tier}" }
+        ?: rating.rating?.toInt()?.toString()
+        ?: rating.elo?.toInt()?.toString()
+        ?: return
+    RankBadge(label, value, rankTierColor(rating.rank))
+}
+
+@Composable
+private fun DriverBadge(url: String?, fallbackText: String?) {
+    val cleanUrl = url?.takeIf { it.isNotBlank() }
+    if (cleanUrl != null) {
+        AsyncImage(
+            model = cleanUrl,
+            contentDescription = fallbackText ?: "Badge",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.height(24.dp),
+        )
+        return
+    }
+}
+
+@Composable
+private fun StatBadge(label: String, value: Int?, color: Color) {
+    if (value == null) return
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
@@ -321,20 +370,18 @@ private fun StatBadge(label: String, value: Int, color: Color) {
 }
 
 @Composable
-private fun DriverFlag(nationality: String?, accent: Color, modifier: Modifier = Modifier) {
+private fun DriverAvatar(nationality: String?, avatarUrl: String?, accent: Color, modifier: Modifier = Modifier) {
     val cc = nationality?.takeIf { it.length == 2 && it.all(Char::isLetter) }?.lowercase()
     val shape = CircleShape
     Box(modifier.clip(shape).background(Surface2).border(1.dp, accent.copy(alpha = 0.65f), shape), contentAlignment = Alignment.Center) {
-        if (cc == null) {
-            Icon(IconFlag, contentDescription = null, tint = TextLow, modifier = Modifier.size(20.dp))
-        } else {
-            AsyncImage(
-                model = "https://flagcdn.com/w160/$cc.png",
-                contentDescription = nationality,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().clip(shape),
-            )
-        }
+        val image = avatarUrl?.takeIf { it.isNotBlank() } ?: cc?.let { "https://flagcdn.com/w160/$it.png" }
+        if (image == null) Icon(IconFlag, contentDescription = null, tint = TextLow, modifier = Modifier.size(20.dp))
+        else AsyncImage(
+            model = image,
+            contentDescription = nationality,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().clip(shape),
+        )
     }
 }
 
@@ -386,12 +433,7 @@ private fun SearchSheet(
 
             when {
                 state.query.isBlank() -> SearchEmpty("Type a name to search")
-                state.loading -> Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Amber)
-                }
-                state.error != null -> SearchEmpty(state.error)
-                state.users.isEmpty() -> SearchEmpty("No drivers found")
-                else -> {
+                state.users.isNotEmpty() -> {
                     Text(
                         "${state.total} results",
                         style = MaterialTheme.typography.labelMedium,
@@ -404,7 +446,11 @@ private fun SearchSheet(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         items(state.users, key = { it.uid }) { user ->
-                            PublicUserCard(index = null, user = user, onClick = { onOpenUser(user.uid) })
+                            PublicUserCard(
+                                index = null,
+                                user = user,
+                                onClick = { onOpenUser(user.uid) },
+                            )
                         }
                         if (state.loadingMore) {
                             item {
@@ -413,8 +459,34 @@ private fun SearchSheet(
                                 }
                             }
                         }
+                        if (state.loading && !state.loadingMore) {
+                            item {
+                                Box(Modifier.fillMaxWidth().height(54.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(color = Amber, modifier = Modifier.size(24.dp))
+                                }
+                            }
+                        }
+                        if (state.error != null) {
+                            item {
+                                Box(Modifier.fillMaxWidth().height(54.dp), contentAlignment = Alignment.Center) {
+                                    Text(
+                                        state.error,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Amber,
+                                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                            .clickable { onQuery(state.query) }
+                                            .padding(8.dp),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
+                state.loading -> Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Amber)
+                }
+                state.error != null -> SearchEmpty(state.error)
+                else -> SearchEmpty("No drivers found")
             }
             Spacer(Modifier.height(16.dp + bottomInset))
         }
@@ -434,6 +506,8 @@ fun PublicUserDetailScreen(
     viewModel: PublicUsersViewModel = koinViewModel(),
     insets: PaddingValues = PaddingValues(),
     onBack: () -> Unit,
+    onSeeAllRaces: () -> Unit,
+    onOpenCategory: (StatCategory) -> Unit,
     onOpenTracks: () -> Unit,
 ) {
     val state by viewModel.detail.collectAsStateWithLifecycle()
@@ -468,16 +542,49 @@ fun PublicUserDetailScreen(
                 modifier = Modifier.fillMaxWidth().height(360.dp),
             )
             is PublicUserDetailUiState.Success -> {
+                if (s.profile.externalData) {
+                    ExternalDataNotice()
+                    Spacer(Modifier.height(12.dp))
+                }
                 ProfileView(
                     profile = s.profile,
                     accountName = s.profile.name ?: s.profile.uid,
                     readOnly = true,
                     enableTrackBreakdown = s.profile.trackBreakdown.isNotEmpty(),
+                    enableAllRaces = true,
+                    enableCategoryClicks = !s.profile.externalData,
+                    onSeeAllRaces = onSeeAllRaces,
+                    onOpenCategory = onOpenCategory,
                     onOpenTracks = onOpenTracks,
                 )
             }
         }
         Spacer(Modifier.height(32.dp + bottomInset))
+    }
+}
+
+@Composable
+private fun ExternalDataNotice() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Amber.copy(alpha = 0.10f))
+            .border(1.dp, Amber.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            "External data",
+            style = MaterialTheme.typography.labelLarge,
+            color = Amber,
+            fontWeight = FontWeight.Black,
+        )
+        Text(
+            "May be incomplete. Showing what is available.",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextMed,
+        )
     }
 }
 

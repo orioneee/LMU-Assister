@@ -2,6 +2,8 @@ package com.orioooneee.lmuasister.data.remote
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonNames
 
 @Serializable
 data class UsersSummaryResponse(
@@ -33,20 +35,27 @@ data class UsersSearchResponse(
     val users: List<PublicUserDto> = emptyList(),
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class PublicUserDto(
     val uid: String,
     val name: String? = null,
     val nationality: String? = null,
     val badge: String? = null,
+    @SerialName("badge_url") @JsonNames("badgeUrl") val badgeUrl: String? = null,
+    val source: String? = null,
+    @SerialName("source_label") val sourceLabel: String? = null,
+    @SerialName("external_data") val externalData: Boolean = false,
+    @SerialName("external_url") val externalUrl: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    val team: String? = null,
     @SerialName("driver_rating") val driverRating: RatingDto? = null,
     @SerialName("safety_rating") val safetyRating: RatingDto? = null,
-    val races: Int = 0,
-    val wins: Int = 0,
-    val podiums: Int = 0,
-    @SerialName("pole_positions") val polePositions: Int = 0,
-    @SerialName("fastest_laps") val fastestLaps: Int = 0,
+    val races: Int? = null,
+    val wins: Int? = null,
+    val podiums: Int? = null,
+    @SerialName("pole_positions") val polePositions: Int? = null,
+    @SerialName("fastest_laps") val fastestLaps: Int? = null,
     @SerialName("synced_at") val syncedAt: String? = null,
     @SerialName("last_updated_at") val lastUpdatedAt: String? = null,
 )
-

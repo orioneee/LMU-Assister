@@ -93,6 +93,26 @@ class BackendApi(private val client: HttpClient) {
         return ProfileJson.decodeFromString(text)
     }
 
+    /** Public saved race history for a user. Reads our DB only; no Nakama sync/RPC. */
+    suspend fun publicUserRaces(uid: String, page: Int = 1): RacesPageDto {
+        val resp = client.get("$API_BASE/users/${uid.encodeURLPathPart()}/races?page=$page")
+        val text = resp.bodyAsText()
+        if (resp.status.value == 404) throw Exception("user_not_found")
+        if (resp.status.value !in 200..299) throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
+        return ProfileJson.decodeFromString(text)
+    }
+
+    /** Public saved race-history category for a user. Same shape as /profile/races/<category>. */
+    suspend fun publicUserCategoryRaces(uid: String, category: String, page: Int = 1): RacesPageDto {
+        val resp = client.get(
+            "$API_BASE/users/${uid.encodeURLPathPart()}/races/${category.encodeURLPathPart()}?page=$page",
+        )
+        val text = resp.bodyAsText()
+        if (resp.status.value == 404) throw Exception("user_not_found")
+        if (resp.status.value !in 200..299) throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
+        return ProfileJson.decodeFromString(text)
+    }
+
     /** Public saved track history for a user. Same payload shape as /profile/track/<track_id>. */
     suspend fun publicUserTrack(uid: String, trackId: String): TrackDetailResponse {
         val resp = client.get("$API_BASE/users/${uid.encodeURLPathPart()}/track/${trackId.encodeURLPathPart()}")

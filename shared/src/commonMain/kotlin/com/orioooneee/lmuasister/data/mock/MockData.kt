@@ -471,6 +471,11 @@ internal object MockData {
     fun publicUser(uid: String): String? {
         val user = publicUsers.firstOrNull { it.uid == uid } ?: return null
         val index = publicUsers.indexOf(user).coerceAtLeast(0)
+        val races = user.races ?: 0
+        val wins = user.wins ?: 0
+        val podiums = user.podiums ?: 0
+        val polePositions = user.polePositions ?: 0
+        val fastestLaps = user.fastestLaps ?: 0
         return ProfileJson.encodeToString(
             SteamProfile(
                 uid = user.uid,
@@ -486,27 +491,27 @@ internal object MockData {
                 recentRaces = recentRaces().drop(index.mod(4)).take(3),
                 stats = ProfileStatsDto(
                     total = StatTotalsDto(
-                        races = user.races,
-                        wins = user.wins,
-                        podiums = user.podiums,
-                        top5 = (user.podiums + 8).coerceAtMost(user.races),
+                        races = races,
+                        wins = wins,
+                        podiums = podiums,
+                        top5 = (podiums + 8).coerceAtMost(races),
                         dnfs = index.mod(6),
-                        polePositions = user.polePositions,
-                        lapsCompleted = user.races * 14 + index * 3,
-                        lapsLead = user.wins * 11 + index,
-                        fastestLaps = user.fastestLaps,
+                        polePositions = polePositions,
+                        lapsCompleted = races * 14 + index * 3,
+                        lapsLead = wins * 11 + index,
+                        fastestLaps = fastestLaps,
                         grandSlams = index.mod(3),
-                        polesConverted = (user.wins / 2).coerceAtMost(user.polePositions),
-                        winsNoPole = (user.wins - user.polePositions / 2).coerceAtLeast(0),
+                        polesConverted = (wins / 2).coerceAtMost(polePositions),
+                        winsNoPole = (wins - polePositions / 2).coerceAtLeast(0),
                     ),
                 ),
                 ratingHistory = ratingHistory(index),
-                totalDistanceKm = user.races * 82.7,
+                totalDistanceKm = races * 82.7,
                 trackBreakdown = mockTrackBreakdown(index),
                 favoriteCars = favoriteCars().drop(index.mod(2)).take(3),
                 syncedAt = user.syncedAt,
                 lastUpdatedAt = user.lastUpdatedAt,
-                totalLaps = user.races * 14 + index * 3,
+                totalLaps = races * 14 + index * 3,
             ),
         )
     }

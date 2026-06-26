@@ -110,6 +110,8 @@ fun ProfileView(
     accountName: String,
     readOnly: Boolean = false,
     enableTrackBreakdown: Boolean = !readOnly,
+    enableAllRaces: Boolean = !readOnly,
+    enableCategoryClicks: Boolean = !readOnly,
     onSeeAllRaces: () -> Unit = {},
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
     onOpenSuspensions: (active: Boolean) -> Unit = {},
@@ -123,7 +125,14 @@ fun ProfileView(
         profile.ratingHistory?.takeIf { it.dr.isNotEmpty() || it.sr.isNotEmpty() }?.let {
             RatingProgressionCard(it)
         }
-        profile.stats?.total?.let { CareerStatsGrid(it, enableCategoryClicks = !readOnly, onOpenCategory = onOpenCategory) }
+        profile.stats?.total?.let {
+            CareerStatsGrid(
+                it,
+                enableCategoryClicks = enableCategoryClicks,
+                hideUnavailableCategories = profile.externalData,
+                onOpenCategory = onOpenCategory,
+            )
+        }
         if (profile.favoriteCars.isNotEmpty()) {
             FavoriteCarsSection(profile.favoriteCars.take(FAVORITE_CARS_PREVIEW))
         }
@@ -141,7 +150,9 @@ fun ProfileView(
                         RaceHistoryRow(race)
                     }
                 }
-                if (!readOnly && profile.recentRaces.size > RECENT_PREVIEW) {
+                val totalRaces = profile.stats?.total?.races ?: 0
+                val hasMoreRaces = profile.recentRaces.size > RECENT_PREVIEW || totalRaces > RECENT_PREVIEW
+                if (enableAllRaces && hasMoreRaces) {
                     SeeMoreButton(onSeeAllRaces)
                 }
             }
@@ -389,8 +400,9 @@ private fun ProfileHeader(
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f, fill = false),
             )
+            DriverBadge(profile.badgeUrl, profile.badge)
         }
         // Ratings + distance first, flush to the left edge (not indented under the avatar).
         FlowRow(
@@ -409,9 +421,7 @@ private fun ProfileHeader(
             }
         }
         // Status badges (e.g. "Sr Probation") sit on the SAME row as the suspensions, after them.
-        val badges = profile.badges.ifEmpty { listOfNotNull(profile.badge) }
         SuspensionFlags(profile, if (readOnly) null else onOpenSuspensions) {
-            badges.take(3).forEach { OutlinePill(prettyBadge(it), Amber) }
         }
     }
 
@@ -843,6 +853,19 @@ private fun OutlinePill(text: String, color: Color) {
             .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
         Text(text, style = MaterialTheme.typography.labelMedium, color = color, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun DriverBadge(url: String?, fallbackText: String?) {
+    val cleanUrl = url?.takeIf { it.isNotBlank() }
+    if (cleanUrl != null) {
+        AsyncImage(
+            model = cleanUrl,
+            contentDescription = fallbackText ?: "Badge",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.height(28.dp),
+        )
     }
 }
 

@@ -75,7 +75,7 @@ data class CategoryRacesUi(
     val error: String? = null,
 )
 
-private const val PROFILE_CACHE_KEY = "steam_profile_v2"
+private const val PROFILE_CACHE_KEY = "steam_profile_v3"
 
 // App-store-review login: the reviewer types these into the normal form; we route them to
 // /auth/demo (a service-account session) instead of a real Steam sign-in. Configured via
