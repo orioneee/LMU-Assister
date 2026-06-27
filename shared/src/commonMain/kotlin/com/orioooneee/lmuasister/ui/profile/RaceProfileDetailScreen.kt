@@ -68,6 +68,7 @@ import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.ReasonDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
+import com.orioooneee.lmuasister.ui.publicusers.PublicUsersViewModel
 import com.orioooneee.lmuasister.ui.tracks.TrackPreview
 import com.orioooneee.lmuasister.ui.components.BlockSkeleton
 import com.orioooneee.lmuasister.ui.components.LeaderboardRowSkeleton
@@ -75,6 +76,7 @@ import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.ShimmerBar
 import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import com.orioooneee.lmuasister.ui.components.classColorFor
+import com.orioooneee.lmuasister.ui.components.classDisplayLabel
 import com.orioooneee.lmuasister.ui.components.onBadgeText
 import com.orioooneee.lmuasister.ui.components.RankLight
 import com.orioooneee.lmuasister.ui.details.CircleButton
@@ -89,6 +91,7 @@ import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.formatIsoDateTime
 import com.orioooneee.lmuasister.ui.util.formatLap
 import kotlin.math.roundToLong
+import org.koin.compose.viewmodel.koinViewModel
 
 private val PosGreen = Color(0xFF53D769)
 private val NegRed = Color(0xFFE5484D)
@@ -133,7 +136,15 @@ fun RaceProfileDetailScreen(
         when (val res = result) {
             null -> DetailSkeleton()
             else -> res.fold(
-                onSuccess = { DetailContent(viewModel, eventId, it, insets.calculateBottomPadding()) },
+                onSuccess = {
+                    DetailContent(
+                        eventId = eventId,
+                        d = it,
+                        bottomInset = insets.calculateBottomPadding(),
+                        cachedSplitSessions = { splitNo -> viewModel.cachedSplit(eventId, splitNo)?.sessions },
+                        loadSplitSessions = { splitNo -> viewModel.raceSplit(eventId, splitNo, it.seriesId).sessions },
+                    )
+                },
                 onFailure = {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -146,6 +157,75 @@ fun RaceProfileDetailScreen(
             )
         }
     }
+}
+
+@Composable
+fun PublicRaceProfileDetailScreen(
+    viewModel: PublicUsersViewModel = koinViewModel(),
+    insets: PaddingValues,
+    uid: String,
+    eventId: String,
+    split: Int?,
+    onBack: () -> Unit,
+) {
+    val result by produceState<Result<RaceDetailDto>?>(null, uid, eventId, split) {
+        viewModel.cachedRaceDetail(uid, eventId, split)?.let { value = Result.success(it) }
+        val fresh = runCatching { viewModel.raceDetail(uid, eventId, split) }
+        if (fresh.isSuccess || value == null) value = fresh
+    }
+
+    Column(Modifier.fillMaxSize().background(Carbon)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp + insets.calculateTopPadding(), end = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircleButton(Modifier, onBack)
+            Text(
+                result?.getOrNull()?.title ?: "Race",
+                style = MaterialTheme.typography.titleLarge,
+                color = TextHigh,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        when (val res = result) {
+            null -> DetailSkeleton()
+            else -> res.fold(
+                onSuccess = {
+                    DetailContent(
+                        eventId = eventId,
+                        d = it,
+                        bottomInset = insets.calculateBottomPadding(),
+                        cachedSplitSessions = { splitNo -> viewModel.cachedRaceDetail(uid, eventId, splitNo)?.sessions },
+                        loadSplitSessions = { splitNo -> viewModel.raceDetail(uid, eventId, splitNo).sessions },
+                    )
+                },
+                onFailure = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            publicRaceErrorMessage(it),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextMed,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(24.dp),
+                        )
+                    }
+                },
+            )
+        }
+    }
+}
+
+private fun publicRaceErrorMessage(error: Throwable): String = when (error.message) {
+    "race_not_found" -> "Race details unavailable"
+    "nakama_unavailable" -> "Race details unavailable. Try again later."
+    "user_not_found" -> "User not found"
+    "external_user_unsupported", "local_user_unsupported" -> "Race details unavailable"
+    else -> error.message ?: "Couldn't load this race"
 }
 
 @Composable
@@ -166,29 +246,37 @@ private fun DetailSkeleton() {
 
 @Composable
 private fun DetailContent(
-    vm: SteamLoginViewModel,
     eventId: String,
     d: RaceDetailDto,
     bottomInset: Dp,
+    cachedSplitSessions: (Int) -> Map<String, RaceSessionDetailDto?>? = { null },
+    loadSplitSessions: suspend (Int) -> Map<String, RaceSessionDetailDto?>,
 ) {
     val mySplit = d.split
-    val tabs = d.splitsAvailable.takeIf { it.isNotEmpty() } ?: listOfNotNull(mySplit)
+    val tabs = d.splitsAvailable.takeIf { it.isNotEmpty() }
+        ?: d.splits.map { it.splitNo }.takeIf { it.isNotEmpty() }
+        ?: listOfNotNull(mySplit)
     var selected by remember(eventId) { mutableStateOf(mySplit ?: tabs.firstOrNull()) }
     var reloadNonce by remember(eventId) { mutableStateOf(0) }
     // Foreign splits, loaded lazily; kept in memory across tab switches. null = still loading.
-    val loaded = remember(eventId) { mutableStateMapOf<Int, Result<Map<String, RaceSessionDetailDto>>>() }
+    val loaded = remember(eventId) { mutableStateMapOf<Int, Result<Map<String, RaceSessionDetailDto?>>>() }
 
     LaunchedEffect(selected, reloadNonce) {
         val s = selected
         if (s != null && s != mySplit && loaded[s] == null) {
-            // Offline-first: show the cached split instantly, then revalidate.
-            vm.cachedSplit(eventId, s)?.let { loaded[s] = Result.success(it.sessions) }
-            val fresh = runCatching { vm.raceSplit(eventId, s, d.seriesId) }
-            if (fresh.isSuccess || loaded[s] == null) loaded[s] = fresh.map { it.sessions }
+            val bundled = d.splits.firstOrNull { it.splitNo == s }?.sessions
+            if (bundled != null) {
+                loaded[s] = Result.success(bundled)
+            } else {
+                // Offline-first: show the cached split instantly, then revalidate.
+                cachedSplitSessions(s)?.let { loaded[s] = Result.success(it) }
+                val fresh = runCatching { loadSplitSessions(s) }
+                if (fresh.isSuccess || loaded[s] == null) loaded[s] = fresh
+            }
         }
     }
 
-    val selectedSessions: Result<Map<String, RaceSessionDetailDto>>? = when (selected) {
+    val selectedSessions: Result<Map<String, RaceSessionDetailDto?>>? = when (selected) {
         null, mySplit -> Result.success(d.sessions)
         else -> loaded[selected]
     }
@@ -216,14 +304,16 @@ private fun DetailContent(
             }
             else -> {
                 val sessions = selectedSessions.getOrThrow()
-                for (key in listOf("qualifying", "race")) {
+                for (key in listOf("practice", "qualifying", "race")) {
                     val session = sessions[key] ?: continue
-                    if (session.classification.isEmpty()) continue
+                    if (session.classification.isEmpty() && session.teamClassification.isEmpty()) continue
                     item(key = "$selected-$key") {
                         SessionCard(
                             sessionLabel(key),
-                            session.classification,
+                            session,
                             showRatingDeltas = key == "race",
+                            showSectors = d.features?.sectors != false,
+                            showTeamBadges = !d.externalData && d.source != "racecenter",
                         )
                     }
                 }
@@ -312,6 +402,7 @@ private fun SplitError(onRetry: () -> Unit) {
 }
 
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TrackCard(t: TrackDto) {
     val flag = flagFor(t.countryCode)
@@ -335,7 +426,11 @@ private fun TrackCard(t: TrackDto) {
         val name = t.simpleName?.takeIf { it.isNotBlank() } ?: t.name.takeIf { it.isNotBlank() }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             name?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 t.country?.let { MetaChip(it) }
                 t.lengthKm?.let { MetaChip("$it km") }
                 t.numTurns?.let { MetaChip("${it} turns") }
@@ -388,11 +483,12 @@ private fun SummaryCard(d: RaceDetailDto) {
     var showBreakdown by remember { mutableStateOf(false) }
     var lapSheet by remember { mutableStateOf<String?>(null) }
     val hasBreakdown = d.srReasons.isNotEmpty() || d.drReasons.isNotEmpty()
+    val showLapProgress = d.features?.lapProgress != false
     val laps = raceLaps(d)
     val qualifyingLaps = sessionLaps(d, "qualifying")
     // Any laps at all — laps without a time still get a row (shown as "—").
-    val hasRaceLaps = laps.isNotEmpty()
-    val hasQualifyingLaps = qualifyingLaps.isNotEmpty()
+    val hasRaceLaps = showLapProgress && laps.isNotEmpty()
+    val hasQualifyingLaps = showLapProgress && qualifyingLaps.isNotEmpty()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -427,18 +523,24 @@ private fun SummaryCard(d: RaceDetailDto) {
                 Text(cleanName, style = MaterialTheme.typography.bodyMedium, color = TextHigh, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             formatIsoDateTime(d.date)?.let { MetaChip(it) }
             d.gameVersion?.let { versionFullLabel(it) }?.let { MetaChip("v$it") }
             d.eventType?.let { MetaChip(it.replaceFirstChar(Char::uppercaseChar)) }
             d.split?.let { MetaChip(if (d.totalSplits != null) "Split $it/${d.totalSplits}" else "Split $it") }
+            if (d.externalData || d.source == "racecenter") MetaChip("RaceCenter data")
         }
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             // In-class start/finish/delta. Absolute positions aren't shown — users care about the class result.
             val start = d.classQualiPosition ?: d.gridPosition
             val finish = d.classRacePosition ?: d.position
             // Denominator is the in-class car count; falls back to the overall field only if class size is absent.
-            val finishSize = (if (d.classRacePosition != null) d.classRaceSize else d.fieldSize)?.takeIf { it > 0 }
+            val finishSize = (if (d.classRacePosition != null) d.classRaceSize else d.fieldSize.takeIf { it > 0 } ?: d.totalDrivers)
+                ?.takeIf { it > 0 }
             start?.takeIf { it > 0 }?.let { Stat("Start", "P$it") }
             finish?.takeIf { it > 0 }?.let { Stat("Finish", "P$it" + (finishSize?.let { s -> " / $s" } ?: "")) }
             gainLost(start, finish)?.let { (txt, color) -> StatColored("+/-", txt, color) }
@@ -447,7 +549,7 @@ private fun SummaryCard(d: RaceDetailDto) {
         }
         // Average pace over valid laps (skips the warm-up laps and pit laps), with the gap to
         // the best lap. The number of warm-up laps to drop is adjustable (default 1).
-        val maxSkip = maxOpeningSkip(laps)
+        val maxSkip = if (showLapProgress) maxOpeningSkip(laps) else -1
         if (maxSkip >= 0) {
             var showPaceInfo by remember { mutableStateOf(false) }
             var warmup by remember { mutableStateOf(if (maxSkip >= 1) 1 else 0) }
@@ -517,6 +619,7 @@ private fun SheetLink(label: String, onClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Unit) {
+    val showSectors = d.features?.sectors != false
     val sessionRow = sessionMeRow(d, sessionKey)
     val laps = sessionLaps(d, sessionKey)
     val bestMs = laps.mapNotNull { it.lapTimeMs?.takeIf { t -> t > 0L } }.minOrNull()
@@ -557,7 +660,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
                 pace?.let { Stat("Avg", formatLap(it.avgMs)) }
                 finishStatus?.takeIf { it.isNotBlank() }?.let { Stat("Result", it) }
             }
-            theoreticalBestMs?.let { TheoreticalBestLap(it, bestSectors) }
+            if (showSectors) theoreticalBestMs?.let { TheoreticalBestLap(it, bestSectors) }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -565,7 +668,14 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
                     .border(1.dp, Outline, RoundedCornerShape(10.dp)),
             ) {
                 laps.forEachIndexed { i, lap ->
-                    LapRow(lap, alt = i % 2 == 1, isBest = bestMs != null && lap.lapTimeMs == bestMs, bestSectors = bestSectors, lengthKm = lengthKm)
+                    LapRow(
+                        lap,
+                        alt = i % 2 == 1,
+                        isBest = bestMs != null && lap.lapTimeMs == bestMs,
+                        bestSectors = bestSectors,
+                        lengthKm = lengthKm,
+                        showSectors = showSectors,
+                    )
                 }
             }
         }
@@ -604,7 +714,7 @@ private fun TheoreticalBestLap(totalMs: Long, bestSectors: List<Long?>) {
 }
 
 @Composable
-private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List<Long?>, lengthKm: Double?) {
+private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List<Long?>, lengthKm: Double?, showSectors: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -636,7 +746,7 @@ private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List
                 fontWeight = if (isBest) FontWeight.Bold else FontWeight.Normal,
             )
         }
-        if (lap.sectorsMs.any { (it ?: 0L) > 0L }) {
+        if (showSectors && lap.sectorsMs.any { (it ?: 0L) > 0L }) {
             // Each sector green when it's the fastest of that sector across the whole race.
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 lap.sectorsMs.forEachIndexed { i, s ->
@@ -935,8 +1045,16 @@ private fun DeltaStat(label: String, delta: Double?) {
 
 
 @Composable
-private fun SessionCard(label: String, rows: List<ClassificationRowDto>, showRatingDeltas: Boolean) {
+private fun SessionCard(
+    label: String,
+    session: RaceSessionDetailDto,
+    showRatingDeltas: Boolean,
+    showSectors: Boolean,
+    showTeamBadges: Boolean,
+) {
     var expanded by remember { mutableStateOf(false) }
+    val rows = session.classification
+    val teamRows = session.teamClassification
     val meIndex = rows.indexOfFirst { it.isMe }
     val shown = when {
         expanded -> rows
@@ -956,7 +1074,33 @@ private fun SessionCard(label: String, rows: List<ClassificationRowDto>, showRat
                 .background(Surface1)
                 .border(1.dp, Outline, RoundedCornerShape(12.dp)),
         ) {
-            shown.forEachIndexed { i, row -> ClassificationLine(row, alt = i % 2 == 1, showRatingDeltas = showRatingDeltas) }
+            teamRows.forEachIndexed { i, row ->
+                ClassificationLine(
+                    row,
+                    alt = i % 2 == 1,
+                    showRatingDeltas = showRatingDeltas,
+                    showSectors = showSectors,
+                    showTeamBadges = showTeamBadges,
+                )
+            }
+            if (teamRows.isNotEmpty() && shown.isNotEmpty()) {
+                Text(
+                    "Drivers",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextLow,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth().background(Surface2).padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+            shown.forEachIndexed { i, row ->
+                ClassificationLine(
+                    row,
+                    alt = (i + teamRows.size) % 2 == 1,
+                    showRatingDeltas = showRatingDeltas,
+                    showSectors = showSectors,
+                    showTeamBadges = showTeamBadges,
+                )
+            }
             if (canToggle) {
                 Row(
                     modifier = Modifier
@@ -981,7 +1125,13 @@ private fun SessionCard(label: String, rows: List<ClassificationRowDto>, showRat
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean, showRatingDeltas: Boolean) {
+private fun ClassificationLine(
+    r: ClassificationRowDto,
+    alt: Boolean,
+    showRatingDeltas: Boolean,
+    showSectors: Boolean,
+    showTeamBadges: Boolean,
+) {
     // Zebra striping like the race leaderboards; the player's own row always wins with an amber tint.
     val bg = when {
         r.isMe -> Amber.copy(alpha = 0.12f)
@@ -1010,7 +1160,16 @@ private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean, showRating
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            flagFor(r.nationality)?.let { FlagCircle(it, 16.dp) }
+            val flag = flagFor(r.nationality)
+            when {
+                flag != null -> FlagCircle(flag, 16.dp)
+                !r.teamIcon.isNullOrBlank() -> AsyncImage(
+                    model = r.teamIcon,
+                    contentDescription = r.teamName,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(16.dp).clip(CircleShape),
+                )
+            }
         }
         // Name + badges share the flexible middle column; the name marquees if it can't fit.
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -1039,6 +1198,7 @@ private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean, showRating
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                if (showTeamBadges) r.teamName?.takeIf { it.isNotBlank() }?.let { TeamMiniBadge(it) }
                 r.carClass?.takeIf { it.isNotBlank() }?.let { ClassMiniBadge(it) }
                 // Position within the driver's own class (the leading number is the overall position).
                 r.classPosition?.takeIf { it > 0 }?.let { ClassPosBadge(it, r.carClass) }
@@ -1048,7 +1208,7 @@ private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean, showRating
             }
             // Best-lap sector splits, when the backend provides them.
             val sectors = r.bestLapSectorsMs.filterNotNull().filter { it > 0L }
-            if (sectors.isNotEmpty()) {
+            if (showSectors && sectors.isNotEmpty()) {
                 Text(
                     sectors.mapIndexed { i, s -> "S${i + 1} ${sectorFmt(s)}" }.joinToString("  "),
                     style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
@@ -1079,6 +1239,13 @@ private fun ClassificationLine(r: ClassificationRowDto, alt: Boolean, showRating
     }
 }
 
+@Composable
+private fun TeamMiniBadge(teamName: String) {
+    Box(Modifier.clip(RoundedCornerShape(5.dp)).background(Surface2).border(1.dp, Outline, RoundedCornerShape(5.dp)).padding(horizontal = 5.dp, vertical = 2.dp)) {
+        Text(teamName, style = MaterialTheme.typography.labelSmall, color = TextMed, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
 /** Class-relative gap to the leader: "+N LAPS" when laps down, "+S.mmm" for a time gap,
  *  null for the class leader (or a row with no gap data). */
 private fun gapToLeaderLabel(r: ClassificationRowDto): String? = when {
@@ -1090,9 +1257,10 @@ private fun gapToLeaderLabel(r: ClassificationRowDto): String? = when {
 /** Compact class chip (colored like the schedule badges) for a single classification line. */
 @Composable
 private fun ClassMiniBadge(carClass: String) {
+    val label = classDisplayLabel(carClass)
     val c = classColorFor(carClass)
     Box(Modifier.clip(RoundedCornerShape(5.dp)).background(c).padding(horizontal = 5.dp, vertical = 2.dp)) {
-        Text(carClass.uppercase(), style = MaterialTheme.typography.labelSmall, color = onBadgeText(c), fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = onBadgeText(c), fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
@@ -1198,9 +1366,10 @@ private fun FlagCircle(url: String, size: androidx.compose.ui.unit.Dp, modifier:
 
 @Composable
 private fun ClassPill(carClass: String) {
+    val label = classDisplayLabel(carClass)
     val c = classColorFor(carClass)
     Box(Modifier.clip(RoundedCornerShape(6.dp)).background(c).padding(horizontal = 8.dp, vertical = 3.dp)) {
-        Text(carClass.uppercase(), style = MaterialTheme.typography.labelMedium, color = onBadgeText(c), fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = onBadgeText(c), fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 

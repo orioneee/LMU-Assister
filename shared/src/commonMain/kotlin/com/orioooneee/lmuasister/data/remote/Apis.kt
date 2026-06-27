@@ -113,6 +113,23 @@ class BackendApi(private val client: HttpClient) {
         return ProfileJson.decodeFromString(text)
     }
 
+    /** Public race detail for both local saved users and external RaceCenter users. */
+    suspend fun publicUserRaceDetail(uid: String, eventId: String, split: Int? = null): RaceDetailDto {
+        val path = if (uid.startsWith("racecenter:")) {
+            "$API_BASE/users/${uid.encodeURLPathPart()}/external/race/${eventId.encodeURLPathPart()}"
+        } else {
+            "$API_BASE/users/${uid.encodeURLPathPart()}/race/${eventId.encodeURLPathPart()}"
+        }
+        val resp = client.get(path + split?.let { "?split=$it" }.orEmpty())
+        val text = resp.bodyAsText()
+        when (resp.status.value) {
+            404 -> throw Exception(text.publicRaceErrorCode() ?: "race_not_found")
+            502 -> throw Exception("nakama_unavailable")
+        }
+        if (resp.status.value !in 200..299) throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
+        return ProfileJson.decodeFromString(text)
+    }
+
     /** Public saved track history for a user. Same payload shape as /profile/track/<track_id>. */
     suspend fun publicUserTrack(uid: String, trackId: String): TrackDetailResponse {
         val resp = client.get("$API_BASE/users/${uid.encodeURLPathPart()}/track/${trackId.encodeURLPathPart()}")
@@ -144,3 +161,12 @@ class BackendApi(private val client: HttpClient) {
         val API_BASE = BuildConfig.BACKEND_URL.trimEnd('/')   // http://host/api/v2
     }
 }
+
+private fun String.publicRaceErrorCode(): String? =
+    listOf(
+        "user_not_found",
+        "race_not_found",
+        "external_user_unsupported",
+        "local_user_unsupported",
+        "nakama_unavailable",
+    ).firstOrNull { contains(it) }

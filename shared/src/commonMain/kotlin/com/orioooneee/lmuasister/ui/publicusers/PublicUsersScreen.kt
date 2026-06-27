@@ -509,6 +509,7 @@ fun PublicUserDetailScreen(
     onSeeAllRaces: () -> Unit,
     onOpenCategory: (StatCategory) -> Unit,
     onOpenTracks: () -> Unit,
+    onOpenRace: (eventId: String, split: Int?) -> Unit,
 ) {
     val state by viewModel.detail.collectAsStateWithLifecycle()
     val topInset = insets.calculateTopPadding()
@@ -552,8 +553,10 @@ fun PublicUserDetailScreen(
                     readOnly = true,
                     enableTrackBreakdown = s.profile.trackBreakdown.isNotEmpty(),
                     enableAllRaces = true,
+                    enableRaceClicks = true,
                     enableCategoryClicks = !s.profile.externalData,
                     onSeeAllRaces = onSeeAllRaces,
+                    onOpenRace = onOpenRace,
                     onOpenCategory = onOpenCategory,
                     onOpenTracks = onOpenTracks,
                 )

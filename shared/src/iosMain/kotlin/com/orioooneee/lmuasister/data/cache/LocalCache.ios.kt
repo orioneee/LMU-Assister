@@ -10,4 +10,15 @@ actual object LocalCache {
     actual fun write(key: String, value: String) {
         defaults.setObject(value, forKey = key)
     }
+
+    actual fun remove(key: String) {
+        defaults.removeObjectForKey(key)
+    }
+
+    actual fun removeByPrefix(prefix: String) {
+        defaults.dictionaryRepresentation().keys
+            .mapNotNull { it as? String }
+            .filter { it.startsWith(prefix) }
+            .forEach { defaults.removeObjectForKey(it) }
+    }
 }

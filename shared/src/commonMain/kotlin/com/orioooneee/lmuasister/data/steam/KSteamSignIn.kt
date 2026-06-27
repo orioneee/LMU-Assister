@@ -3,6 +3,7 @@ package com.orioooneee.lmuasister.data.steam
 import bruhcollective.itaysonlab.ksteam.SteamClient
 import bruhcollective.itaysonlab.ksteam.handlers.Account
 import bruhcollective.itaysonlab.ksteam.models.AppId
+import bruhcollective.itaysonlab.ksteam.models.SteamId
 import bruhcollective.itaysonlab.ksteam.models.account.AuthorizationState
 import com.orioooneee.lmuasister.data.remote.BackendAuthFailed
 import com.orioooneee.lmuasister.data.remote.SteamAuthResponse
@@ -16,9 +17,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.TimeSource
 
 private const val APPROVAL_WAIT_SECONDS = 120
 private const val LOGIN_WAIT_MS = 45_000L
+private const val RESTORE_WAIT_MS = 10_000L
 private const val APPROVAL_WAIT_MS = APPROVAL_WAIT_SECONDS * 1_000L
 private const val PROMPT_STATE_WAIT_MS = 2_000L
 
@@ -28,7 +31,7 @@ private const val PROMPT_STATE_WAIT_MS = 2_000L
  */
 internal class KSteamSignIn(
     private val backend: SteamBackendApi,
-    private val legacyStore: SteamSessionStore,
+    private val sessionStore: SteamSessionStore,
     private val clientFactory: () -> SteamClient = ::createKSteamClient,
 ) : SteamSignIn {
 
@@ -51,7 +54,7 @@ internal class KSteamSignIn(
                 steam.account.cancelSignInAttempt()
             }
 
-            SteamLog.d("ksteam: credential login start (user=${username.trim()})")
+            SteamLog.d("ksteam: credential login start userLen=${username.trim().length} state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}")
             val authResult = try {
                 steam.account.signIn(username.trim(), password, rememberSession = true)
             } catch (e: CancellationException) {
@@ -125,13 +128,51 @@ internal class KSteamSignIn(
     override suspend fun restore(): String? =
         mutex.withLock {
             val steam = startedClient()
-            if (!steam.account.hasSavedDataForAtLeastOneAccount() && !tryMigrateLegacySession(steam)) {
+            val saved = sessionStore.load()
+            val secureIds = secureAccountIds(steam)
+            SteamLog.d(
+                "ksteam: restore begin stored=${saved.summary()} secureIds=${secureIds.summary()} " +
+                    "state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}",
+            )
+            val hasKsteamSavedData = steam.account.hasSavedDataForAtLeastOneAccount()
+            val attemptedSavedRestore = saved != null || hasKsteamSavedData
+            SteamLog.d("ksteam: restore sources appStore=${saved != null} ksteamStore=$hasKsteamSavedData")
+
+            val restoreStarted = try {
+                withTimeout(RESTORE_WAIT_MS) { tryRestoreStoredSession(steam, saved) }
+            } catch (e: TimeoutCancellationException) {
+                val success = steam.account.clientAuthState.value is AuthorizationState.Success
+                SteamLog.d(
+                    "ksteam: refresh-token restore timed out after ${RESTORE_WAIT_MS}ms " +
+                        "state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value} success=$success",
+                )
+                if (!success) {
+                    resetClientAfterCredentialFailure(steam, "restore_timeout")
+                    throw SteamRestoreTimedOut()
+                }
+                true
+            }
+
+            if (!restoreStarted && !hasKsteamSavedData && steam.account.clientAuthState.value !is AuthorizationState.Success) {
+                SteamLog.d("ksteam: restore unavailable; clearing stored session")
+                clearStoredSession(steam)
                 return@withLock null
             }
-            runCatching { waitForSignedInAndExchange(steam, LOGIN_WAIT_MS) }
+
+            SteamLog.d("ksteam: restore waiting for signed-in state up to ${RESTORE_WAIT_MS}ms")
+            val restored = runCatching { waitForSignedInAndExchange(steam, RESTORE_WAIT_MS) }
                 .onFailure { SteamLog.e("ksteam: restore failed", it) }
                 .getOrNull()
                 ?.let { (it as? SignInOutcome.Success)?.appToken }
+            SteamLog.d(
+                "ksteam: restore wait completed success=${restored != null} " +
+                    "state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}",
+            )
+            if (restored == null && attemptedSavedRestore) {
+                SteamLog.d("ksteam: restore did not mint app token; keeping stored refresh token")
+                throw SteamRestoreTimedOut()
+            }
+            restored
         }
 
     override suspend fun reauth(): String? =
@@ -153,15 +194,23 @@ internal class KSteamSignIn(
             client = null
             started = false
         }
-        legacyStore.clear()
+        sessionStore.clear()
+    }
+
+    private fun clearStoredSession(steam: SteamClient) {
+        runCatching { steam.account.cancelSignInAttempt() }
+        runCatching { steam.configuration.getValidSecureAccountIds().forEach(steam.configuration::deleteSecureAccount) }
+        sessionStore.clear()
     }
 
     private suspend fun startedClient(): SteamClient {
         val steam = client ?: clientFactory().also { client = it }
         if (!started) {
-            SteamLog.d("ksteam: starting client")
+            SteamLog.d("ksteam: starting client root=persistent-app-store state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}")
+            val mark = TimeSource.Monotonic.markNow()
             steam.start()
             started = true
+            SteamLog.d("ksteam: client started in ${mark.elapsedNow().inWholeMilliseconds}ms state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}")
         }
         return steam
     }
@@ -199,14 +248,18 @@ internal class KSteamSignIn(
     }
 
     private suspend fun finishSignedIn(steam: SteamClient): SignInOutcome {
+        val mark = TimeSource.Monotonic.markNow()
         awaitSignedInWithLogs(steam)
-        return exchangeSignedIn(steam)
+        val outcome = exchangeSignedIn(steam)
+        SteamLog.d("ksteam: finishSignedIn completed in ${mark.elapsedNow().inWholeMilliseconds}ms")
+        return outcome
     }
 
     private suspend fun exchangeSignedIn(steam: SteamClient): SignInOutcome {
         SteamLog.d("ksteam: Steam sign-in success observed, requesting app ticket")
         val auth = exchangeTicket(steam)
         SteamLog.d("ksteam: backend token received uid=${auth.uid}")
+        saveCurrentSession(steam)
         return SignInOutcome.Success(auth.token, auth.uid)
     }
 
@@ -228,20 +281,27 @@ internal class KSteamSignIn(
 
     private suspend fun waitForSignedInAndExchange(steam: SteamClient, timeoutMs: Long): SignInOutcome =
         try {
+            val mark = TimeSource.Monotonic.markNow()
             withTimeout(timeoutMs) { finishSignedIn(steam) }
+                .also { SteamLog.d("ksteam: waitForSignedInAndExchange success in ${mark.elapsedNow().inWholeMilliseconds}ms") }
         } catch (_: TimeoutCancellationException) {
+            SteamLog.d("ksteam: waitForSignedInAndExchange timed out after ${timeoutMs}ms state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}")
             SignInOutcome.Failure("Steam sign-in timed out. Try again.")
         }
 
     private suspend fun exchangeTicket(steam: SteamClient): SteamAuthResponse {
         SteamLog.d("ksteam: requesting Steam auth session ticket app=$LMU_APP_ID")
+        val ticketMark = TimeSource.Monotonic.markNow()
         val ticket = withTimeout(LOGIN_WAIT_MS) {
             steam.authTickets.getAuthSessionTicket(AppId(LMU_APP_ID))
         }
-        SteamLog.d("ksteam: Steam auth session ticket received bytes=${ticket.ticket.size}")
+        SteamLog.d("ksteam: Steam auth session ticket received bytes=${ticket.ticket.size} in ${ticketMark.elapsedNow().inWholeMilliseconds}ms")
         return try {
+            val exchangeMark = TimeSource.Monotonic.markNow()
             SteamLog.d("ksteam: exchanging Steam ticket with backend")
-            backend.authSteam(ticket.ticket.hex())
+            backend.authSteam(ticket.ticket.hex()).also {
+                SteamLog.d("ksteam: backend ticket exchange ok uid=${it.uid} in ${exchangeMark.elapsedNow().inWholeMilliseconds}ms")
+            }
         } catch (e: BackendAuthFailed) {
             SteamLog.e("ksteam: backend rejected Steam ticket", e)
             throw e
@@ -251,20 +311,93 @@ internal class KSteamSignIn(
         }
     }
 
-    private suspend fun tryMigrateLegacySession(steam: SteamClient): Boolean {
-        val legacy = legacyStore.load() ?: return false
-        if (legacy.steamId == 0L || legacy.refreshToken.isBlank()) return false
-        SteamLog.d("ksteam: trying legacy Steam refresh token migration")
-        return runCatching {
+    private suspend fun tryRestoreStoredSession(steam: SteamClient, saved: SteamTokens?): Boolean {
+        if (saved == null) {
+            SteamLog.d("ksteam: no app-stored Steam refresh token")
+            return false
+        }
+        if (saved.steamId == 0L || saved.refreshToken.isBlank()) {
+            SteamLog.d("ksteam: app-stored Steam refresh token invalid ${saved.summary()}")
+            return false
+        }
+        SteamLog.d("ksteam: trying stored Steam refresh token restore ${saved.summary()}")
+        val mark = TimeSource.Monotonic.markNow()
+        return try {
             steam.account.signInWithRefreshToken(
-                steamId = bruhcollective.itaysonlab.ksteam.models.SteamId(legacy.steamId.toULong()),
-                refreshToken = legacy.refreshToken,
+                steamId = SteamId(saved.steamId.toULong()),
+                refreshToken = saved.refreshToken,
+            )
+            SteamLog.d(
+                "ksteam: signInWithRefreshToken returned in ${mark.elapsedNow().inWholeMilliseconds}ms " +
+                    "state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}",
             )
             true
-        }.onFailure {
-            SteamLog.e("ksteam: legacy session migration failed", it)
-        }.getOrDefault(false)
+        } catch (e: CancellationException) {
+            val success = steam.account.clientAuthState.value is AuthorizationState.Success
+            SteamLog.e(
+                "ksteam: stored session restore cancelled after ${mark.elapsedNow().inWholeMilliseconds}ms " +
+                    "state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value} success=$success",
+                e,
+            )
+            if (success) true else throw e
+        } catch (t: Throwable) {
+            SteamLog.e(
+                "ksteam: stored session restore failed after ${mark.elapsedNow().inWholeMilliseconds}ms " +
+                    "state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}",
+                t,
+            )
+            false
+        }
     }
+
+    private fun saveCurrentSession(steam: SteamClient) {
+        runCatching {
+            val current = steam.account.getCurrentAccount()
+            if (current == null) {
+                SteamLog.d("ksteam: cannot store Steam refresh token: current account is null secureIds=${secureAccountIds(steam).summary()}")
+                return
+            }
+            val steamId = steam.configuration.getValidSecureAccountIds()
+                .firstOrNull()
+                ?.toString()
+                ?.toULongOrNull()
+            if (steamId == null) {
+                SteamLog.d("ksteam: cannot store Steam refresh token: steamId is missing secureIds=${secureAccountIds(steam).summary()}")
+                return
+            }
+            if (current.refreshToken.isBlank()) {
+                SteamLog.d("ksteam: cannot store Steam refresh token: refresh token is blank account=${current.accountName.isNotBlank()} accessLen=${current.accessToken.length}")
+                return
+            }
+            sessionStore.save(
+                SteamTokens(
+                    steamId = steamId.toLong(),
+                    accountName = current.accountName,
+                    accessToken = current.accessToken,
+                    refreshToken = current.refreshToken,
+                ),
+            )
+            SteamLog.d(
+                "ksteam: stored Steam refresh token uid=${SteamLog.short(steamId.toString())} " +
+                    "accountSet=${current.accountName.isNotBlank()} accessLen=${current.accessToken.length} refreshLen=${current.refreshToken.length}",
+            )
+        }.onFailure {
+            SteamLog.e("ksteam: failed to persist Steam refresh token", it)
+        }
+    }
+
+    private fun secureAccountIds(steam: SteamClient): List<String> =
+        runCatching { steam.configuration.getValidSecureAccountIds().map { it.toString() } }
+            .getOrDefault(emptyList())
+
+    private fun List<String>.summary(): String =
+        if (isEmpty()) "none" else joinToString(prefix = "[", postfix = "]") { SteamLog.short(it) }
+
+    private fun SteamTokens?.summary(): String =
+        this?.let {
+            "uid=${SteamLog.short(it.steamId.toString())} accountSet=${it.accountName.isNotBlank()} " +
+                "accessLen=${it.accessToken.length} refreshLen=${it.refreshToken.length} guard=${it.guardData != null}"
+        } ?: "none"
 
     private fun AuthorizationState.AwaitingTwoFactor.ConfirmationMethod.isApprovalBased(): Boolean =
         this == AuthorizationState.AwaitingTwoFactor.ConfirmationMethod.DeviceConfirmation ||

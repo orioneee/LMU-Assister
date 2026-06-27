@@ -7,4 +7,6 @@ package com.orioooneee.lmuasister.data.cache
 expect object LocalCache {
     fun read(key: String): String?
     fun write(key: String, value: String)
+    fun remove(key: String)
+    fun removeByPrefix(prefix: String)
 }

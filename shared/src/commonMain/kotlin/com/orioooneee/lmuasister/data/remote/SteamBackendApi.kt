@@ -131,6 +131,7 @@ class SteamBackendApi(private val client: HttpClient) {
             contentType(ContentType.Application.Json)
             setBody("""{"ticket":"$ticketHex"}""") // hex is [0-9a-f], no escaping needed
         }
+        SteamLog.d("backend: POST /auth/steam → ${resp.status.value}")
         return when (resp.status.value) {
             in 200..299 -> AppJson.decodeFromString(resp.bodyAsText())
             else -> throw resp.toError()

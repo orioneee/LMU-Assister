@@ -44,6 +44,7 @@ fun PublicUserRacesScreen(
     viewModel: PublicUsersViewModel = koinViewModel(),
     insets: PaddingValues,
     onBack: () -> Unit,
+    onOpenRace: (eventId: String, split: Int?) -> Unit,
 ) {
     val state by viewModel.races.collectAsStateWithLifecycle()
     val current = state.takeIf { it.uid == uid } ?: PublicUserRacesState(uid = uid, loading = true)
@@ -95,7 +96,12 @@ fun PublicUserRacesScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(current.races) { race ->
-                Box(Modifier.clip(RoundedCornerShape(12.dp))) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(12.dp))
+                        .clickable(enabled = race.eventId != null) {
+                            race.eventId?.let { onOpenRace(it, race.split ?: race.splitNo) }
+                        },
+                ) {
                     RaceHistoryRow(race)
                 }
             }

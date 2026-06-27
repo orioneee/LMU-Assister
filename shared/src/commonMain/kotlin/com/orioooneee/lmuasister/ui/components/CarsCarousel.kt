@@ -55,19 +55,6 @@ fun carClassColor(carClass: String): Color {
     }
 }
 
-private fun classLabel(carClass: String): String {
-    val c = carClass.lowercase()
-    return when {
-        "hyper" in c -> "HY"
-        "gt3" in c -> "GT3"
-        "gte" in c -> "GTE"
-        "lmp2_elms" == c -> "LMP2"
-        "lmp2" in c -> "LMP2"
-        "lmp3" in c -> "LMP3"
-        else -> carClass.uppercase()
-    }
-}
-
 @Composable
 fun CarsCarousel(cars: List<CarModel>, modifier: Modifier = Modifier) {
     if (cars.isEmpty()) return
@@ -135,7 +122,7 @@ private fun CarCard(car: CarModel) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            ClassPill(classLabel(car.carClass), accent)
+            ClassPill(classDisplayLabel(car.carClass), accent)
         }
     }
 }

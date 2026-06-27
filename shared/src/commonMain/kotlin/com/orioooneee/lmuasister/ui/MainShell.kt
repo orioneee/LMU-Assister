@@ -48,6 +48,7 @@ import com.orioooneee.lmuasister.ui.legal.PrivacyPolicyScreen
 import com.orioooneee.lmuasister.ui.profile.AllRacesScreen
 import com.orioooneee.lmuasister.ui.profile.CategoryRacesScreen
 import com.orioooneee.lmuasister.ui.profile.ProfileScreen
+import com.orioooneee.lmuasister.ui.profile.PublicRaceProfileDetailScreen
 import com.orioooneee.lmuasister.ui.profile.RaceProfileDetailScreen
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
 import com.orioooneee.lmuasister.ui.profile.SuspensionsScreen
@@ -123,6 +124,9 @@ data class PublicUserTrackBreakdownRoute(val uid: String)
 
 @Serializable
 data class PublicUserTrackDetailRoute(val uid: String, val trackId: String)
+
+@Serializable
+data class PublicUserRaceDetailRoute(val uid: String, val eventId: String, val split: Int = -1)
 
 @Serializable
 object PrivacyRoute
@@ -259,13 +263,23 @@ fun MainShell(
                         val uid = entry.toRoute<PublicUserDetailRoute>().uid
                         nav.navigate(PublicUserTrackBreakdownRoute(uid))
                     },
+                    onOpenRace = { eventId, split ->
+                        val uid = entry.toRoute<PublicUserDetailRoute>().uid
+                        Telemetry.log(AnalyticsEvent.RaceDetailOpened(eventId, source = "public_profile_recent"))
+                        nav.navigate(PublicUserRaceDetailRoute(uid, eventId, split ?: -1))
+                    },
                 )
             }
             composable<PublicUserRacesRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+                val route = entry.toRoute<PublicUserRacesRoute>()
                 PublicUserRacesScreen(
-                    uid = entry.toRoute<PublicUserRacesRoute>().uid,
+                    uid = route.uid,
                     insets = insets,
                     onBack = { nav.popBackStack() },
+                    onOpenRace = { eventId, split ->
+                        Telemetry.log(AnalyticsEvent.RaceDetailOpened(eventId, source = "public_all_races"))
+                        nav.navigate(PublicUserRaceDetailRoute(route.uid, eventId, split ?: -1))
+                    },
                 )
             }
             composable<PublicUserCategoryRacesRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
@@ -276,6 +290,10 @@ fun MainShell(
                     title = route.title,
                     insets = insets,
                     onBack = { nav.popBackStack() },
+                    onOpenRace = { eventId, split ->
+                        Telemetry.log(AnalyticsEvent.RaceDetailOpened(eventId, source = "public_category_races"))
+                        nav.navigate(PublicUserRaceDetailRoute(route.uid, eventId, split ?: -1))
+                    },
                 )
             }
             composable<PublicUserTrackBreakdownRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
@@ -292,6 +310,16 @@ fun MainShell(
                 PublicTrackDetailScreen(
                     uid = route.uid,
                     trackId = route.trackId,
+                    insets = insets,
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable<PublicUserRaceDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+                val route = entry.toRoute<PublicUserRaceDetailRoute>()
+                PublicRaceProfileDetailScreen(
+                    uid = route.uid,
+                    eventId = route.eventId,
+                    split = route.split.takeIf { it >= 0 },
                     insets = insets,
                     onBack = { nav.popBackStack() },
                 )
@@ -443,6 +471,7 @@ private fun screenNameOf(dest: NavDestination): String = when {
     dest.hasRoute(PublicUserCategoryRacesRoute::class) -> "public_category_races"
     dest.hasRoute(PublicUserTrackBreakdownRoute::class) -> "public_track_breakdown"
     dest.hasRoute(PublicUserTrackDetailRoute::class) -> "public_track_detail"
+    dest.hasRoute(PublicUserRaceDetailRoute::class) -> "public_race_detail"
     dest.hasRoute(TracksRoute::class) -> "tracks"
     dest.hasRoute(TrackDetailRoute::class) -> "track_detail"
     dest.hasRoute(ProfileRoute::class) -> "profile"

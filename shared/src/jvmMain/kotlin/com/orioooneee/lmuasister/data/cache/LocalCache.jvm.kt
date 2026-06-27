@@ -12,4 +12,16 @@ actual object LocalCache {
     actual fun write(key: String, value: String) {
         runCatching { file(key).writeText(value) }
     }
+
+    actual fun remove(key: String) {
+        runCatching { file(key).delete() }
+    }
+
+    actual fun removeByPrefix(prefix: String) {
+        runCatching {
+            dir.listFiles()
+                ?.filter { it.isFile && it.name.removeSuffix(".json").startsWith(prefix) }
+                ?.forEach { it.delete() }
+        }
+    }
 }

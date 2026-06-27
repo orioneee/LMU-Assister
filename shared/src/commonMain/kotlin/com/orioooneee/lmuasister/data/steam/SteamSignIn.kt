@@ -32,3 +32,5 @@ interface SteamSignIn {
 
     fun signOut()
 }
+
+class SteamRestoreTimedOut : RuntimeException("Steam session restore timed out")

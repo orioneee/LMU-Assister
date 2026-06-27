@@ -97,7 +97,7 @@ fun CategoryRacesScreen(
                 Box(
                     Modifier.clip(RoundedCornerShape(12.dp))
                         .clickable(enabled = race.eventId != null) {
-                            race.eventId?.let { onOpenRace(it, race.split) }
+                            race.eventId?.let { onOpenRace(it, race.split ?: race.splitNo) }
                         },
                 ) {
                     RaceHistoryRow(race)

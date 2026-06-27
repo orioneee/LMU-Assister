@@ -231,6 +231,7 @@ data class RecentRaceDto(
     @SerialName("event_type") val eventType: String? = null, // daily / weekly / special …
     val official: Boolean = false,
     val split: Int? = null,          // which split the driver raced in
+    @SerialName("split_no") val splitNo: Int? = null,
     // total splits for the event — NOT sent by /profile or /profile/races (list endpoints);
     // only the race-detail endpoint fills it, so it stays nullable here.
     @SerialName("total_splits") val totalSplits: Int? = null,
@@ -298,7 +299,8 @@ data class RaceDetailDto(
     val split: Int? = null,          // YOUR split
     @SerialName("total_splits") val totalSplits: Int? = null,
     @SerialName("splits_available") val splitsAvailable: List<Int> = emptyList(),  // render as tabs
-    @SerialName("field_size") val fieldSize: Int,
+    @SerialName("field_size") val fieldSize: Int = 0,
+    @SerialName("total_drivers") val totalDrivers: Int? = null,
     val position: Int? = null,
     @SerialName("class_race_position") val classRacePosition: Int? = null,   // in-class finish
     @SerialName("class_race_size") val classRaceSize: Int? = null,           // cars in player's class in the race
@@ -321,10 +323,25 @@ data class RaceDetailDto(
     // shown as colored chips. Ordered by the backend.
     val categories: List<String> = emptyList(),
     // keyed "practice" / "qualifying" / "race" — YOUR split, fully here
-    val sessions: Map<String, RaceSessionDetailDto> = emptyMap(),
+    val sessions: Map<String, RaceSessionDetailDto?> = emptyMap(),
+    // External RaceCenter details carry every split in the first response. Local details
+    // still lazy-load splits through the regular endpoint.
+    val splits: List<SplitDetailDto> = emptyList(),
+    val features: RaceDetailFeaturesDto? = null,
+    @SerialName("external_data") val externalData: Boolean = false,
+    val source: String? = null,
     // Available cars grouped by class (from the schedule endpoint)
     @SerialName("available_cars") val availableCars: Map<String, List<AvailableCarDto>> = emptyMap(),
     @SerialName("game_version") val gameVersion: GameVersionDto? = null,
+)
+
+@Serializable
+data class RaceDetailFeaturesDto(
+    @SerialName("all_splits") val allSplits: Boolean = false,
+    @SerialName("team_classification") val teamClassification: Boolean = false,
+    @SerialName("lap_progress") val lapProgress: Boolean = true,
+    val sectors: Boolean = true,
+    @SerialName("nakama_detail") val nakamaDetail: Boolean = true,
 )
 
 /** GET /api/v2/profile/race/<eventId>/split/<n> — one foreign split's tables (no `me` row). */
@@ -332,14 +349,17 @@ data class RaceDetailDto(
 data class SplitDetailDto(
     @SerialName("split_no") val splitNo: Int,
     @SerialName("field_size") val fieldSize: Int,
+    val classes: List<String> = emptyList(),
+    @SerialName("class_sizes") val classSizes: Map<String, Int> = emptyMap(),
     // keyed "practice" / "qualifying" / "race"; rows are all is_me=false.
-    val sessions: Map<String, RaceSessionDetailDto> = emptyMap(),
+    val sessions: Map<String, RaceSessionDetailDto?> = emptyMap(),
 )
 
 @Serializable
 data class RaceSessionDetailDto(
     val me: SessionSummaryDto? = null,
     val classification: List<ClassificationRowDto> = emptyList(),
+    @SerialName("team_classification") val teamClassification: List<ClassificationRowDto> = emptyList(),
 )
 
 @Serializable
@@ -377,4 +397,6 @@ data class ClassificationRowDto(
     // Per-driver absolute ratings (driver_rating / safety_rating), same shape as the profile owner's.
     @SerialName("driver_rating") val driverRating: RatingDto? = null,
     @SerialName("safety_rating") val safetyRating: RatingDto? = null,
+    @SerialName("team_name") val teamName: String? = null,
+    @SerialName("team_icon") val teamIcon: String? = null,
 )

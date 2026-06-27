@@ -61,6 +61,21 @@ fun classColorFor(key: String): Color {
     }
 }
 
+fun classDisplayLabel(carClass: String): String {
+    val clean = carClass.trim()
+    val c = clean.lowercase()
+    return when {
+        c.isBlank() -> ""
+        "hyper" in c -> "HY"
+        "gt3" in c -> "GT3"
+        "gte" in c -> "GTE"
+        c == "lmp2_elms" -> "LMP2"
+        "lmp2" in c -> "LMP2"
+        "lmp3" in c -> "LMP3"
+        else -> clean.uppercase()
+    }
+}
+
 fun Race.accentColor(): Color =
     classInfos.firstOrNull()?.let { classColorFor("${it.id} ${it.name}") } ?: Amber
 

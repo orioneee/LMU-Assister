@@ -6,6 +6,7 @@ import com.orioooneee.lmuasister.data.cache.LocalCache
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.ProfileJson
 import com.orioooneee.lmuasister.data.remote.PublicUserDto
+import com.orioooneee.lmuasister.data.remote.RaceDetailDto
 import com.orioooneee.lmuasister.data.remote.RacesPageDto
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SteamProfile
@@ -275,6 +276,14 @@ class PublicUsersViewModel(
         loadMoreCategoryRaces()
     }
 
+    suspend fun raceDetail(uid: String, eventId: String, split: Int?): RaceDetailDto =
+        api.publicUserRaceDetail(uid, eventId, split)
+            .also { runCatching { LocalCache.write(raceDetailKey(uid, eventId, split), ProfileJson.encodeToString(it)) } }
+
+    fun cachedRaceDetail(uid: String, eventId: String, split: Int?): RaceDetailDto? =
+        LocalCache.read(raceDetailKey(uid, eventId, split))?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { ProfileJson.decodeFromString<RaceDetailDto>(it) }.getOrNull() }
+
     private fun runSearch(rawQuery: String, reset: Boolean) {
         searchJob?.cancel()
         val clean = rawQuery.trim()
@@ -422,6 +431,9 @@ class PublicUsersViewModel(
             "public_user_races_${cachePart(uid)}_${cachePart(category)}"
         }
 
+    private fun raceDetailKey(uid: String, eventId: String, split: Int?): String =
+        "public_user_race_detail_${cachePart(uid)}_${cachePart(eventId)}_${split ?: "auto"}"
+
     private inline fun <reified T> readCache(key: String): T? =
         runCatching {
             LocalCache.read(key)?.takeIf { it.isNotBlank() }?.let { ProfileJson.decodeFromString<T>(it) }
@@ -452,5 +464,5 @@ class PublicUsersViewModel(
     }
 
     private fun raceKey(race: RecentRaceDto): String =
-        listOfNotNull(race.eventId, race.seriesId, race.date, race.title, race.split?.toString()).joinToString("|")
+        listOfNotNull(race.eventId, race.seriesId, race.date, race.title, (race.split ?: race.splitNo)?.toString()).joinToString("|")
 }

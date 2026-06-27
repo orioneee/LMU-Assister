@@ -112,6 +112,7 @@ fun ProfileView(
     enableTrackBreakdown: Boolean = !readOnly,
     enableAllRaces: Boolean = !readOnly,
     enableCategoryClicks: Boolean = !readOnly,
+    enableRaceClicks: Boolean = !readOnly,
     onSeeAllRaces: () -> Unit = {},
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
     onOpenSuspensions: (active: Boolean) -> Unit = {},
@@ -143,8 +144,8 @@ fun ProfileView(
                 profile.recentRaces.take(RECENT_PREVIEW).forEach { race ->
                     Box(
                         Modifier.clip(RoundedCornerShape(12.dp))
-                            .clickable(enabled = !readOnly && race.eventId != null) {
-                                race.eventId?.let { onOpenRace(it, race.split) }
+                            .clickable(enabled = enableRaceClicks && race.eventId != null) {
+                                race.eventId?.let { onOpenRace(it, race.split ?: race.splitNo) }
                             },
                     ) {
                         RaceHistoryRow(race)
@@ -648,7 +649,7 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
                 DeltaText("DR", race.drChange)
                 DeltaText("SR", race.srChange)
             }
-            race.split?.let { MetaChip(splitLabel(it, race.totalSplits)) }
+            (race.split ?: race.splitNo)?.let { MetaChip(splitLabel(it, race.totalSplits)) }
         }
     }
 }

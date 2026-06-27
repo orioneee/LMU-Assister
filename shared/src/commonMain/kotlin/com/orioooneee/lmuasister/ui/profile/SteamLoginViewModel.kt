@@ -22,6 +22,7 @@ import com.orioooneee.lmuasister.data.remote.SteamProfile
 import com.orioooneee.lmuasister.data.steam.SignInOutcome
 import com.orioooneee.lmuasister.data.steam.SteamGuardKind
 import com.orioooneee.lmuasister.data.steam.SteamLog
+import com.orioooneee.lmuasister.data.steam.SteamRestoreTimedOut
 import com.orioooneee.lmuasister.data.steam.SteamSignIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,7 +86,7 @@ private val DEMO_PASSWORD = BuildConfig.DEMO_PASSWORD
 // Marks the active session as a demo one so we silently re-mint it on restart / 401.
 private const val DEMO_FLAG_KEY = "auth_demo_session"
 
-private const val AUTH_WAIT_MS = 60_000L
+private const val AUTH_WAIT_MS = 10_000L
 
 class SteamLoginViewModel(
     private val signIn: SteamSignIn,
@@ -116,10 +117,12 @@ class SteamLoginViewModel(
             field = value
             tokenHolder.set(value)
         }
+    private var restoreFinished = false
     private var handledAuthResultId = 0L
 
     init {
         val cached = loadCachedProfile()
+        SteamLog.d("vm: init cachedProfile=${cached != null} cachedUid=${SteamLog.short(cached?.uid)}")
         if (cached != null) {
             _state.value = SteamLoginUiState.SignedIn(BackendState.Ok(cached, fromCache = true))
         }
@@ -127,37 +130,47 @@ class SteamLoginViewModel(
         viewModelScope.launch {
             if (authRunner.state.value !is SteamAuthRunnerState.Idle) {
                 SteamLog.d("vm: auth runner already active, skipping restore")
+                restoreFinished = true
                 return@launch
             }
-            if (LocalCache.read(DEMO_FLAG_KEY) == "1") {
-                SteamLog.d("vm: restoring demo session…")
-                val r = runCatching { backend.authDemo(DEMO_USERNAME, DEMO_PASSWORD) }.getOrNull()
-                if (r != null) {
-                    appToken = r.token
+            try {
+                if (LocalCache.read(DEMO_FLAG_KEY) == "1") {
+                    SteamLog.d("vm: restoring demo session…")
+                    val r = runCatching { backend.authDemo(DEMO_USERNAME, DEMO_PASSWORD) }.getOrNull()
+                    if (r != null) {
+                        appToken = r.token
+                        Telemetry.log(AnalyticsEvent.LoginSuccess(restored = true))
+                        Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
+                        if (cached == null) _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
+                        loadProfile()
+                        return@launch
+                    }
+                    SteamLog.d("vm: demo restore failed, falling back")
+                    runCatching { LocalCache.write(DEMO_FLAG_KEY, "") }
+                }
+                SteamLog.d("vm: trying silent session restore…")
+                val restored = runCatching { signIn.restore() }
+                val token = restored.getOrNull()
+                if (token != null) {
+                    SteamLog.d("vm: session restored, loading profile tokenLen=${token.length}")
+                    appToken = token
                     Telemetry.log(AnalyticsEvent.LoginSuccess(restored = true))
                     Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
                     if (cached == null) _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
                     loadProfile()
-                    return@launch
+                } else {
+                    val restoreError = restored.exceptionOrNull()
+                    if (restoreError is SteamRestoreTimedOut) {
+                        SteamLog.d("vm: saved session restore timed out")
+                        forceLoginAfterMissingSession(clearSteamSession = false)
+                    } else {
+                        restoreError?.let { SteamLog.e("vm: silent session restore failed", it) }
+                        SteamLog.d("vm: no saved session")
+                        forceLoginAfterMissingSession(clearSteamSession = true)
+                    }
                 }
-                SteamLog.d("vm: demo restore failed, falling back")
-                runCatching { LocalCache.write(DEMO_FLAG_KEY, "") }
-            }
-            SteamLog.d("vm: trying silent session restore…")
-            val token = runCatching { signIn.restore() }.getOrNull()
-            if (token != null) {
-                SteamLog.d("vm: session restored, loading profile")
-                appToken = token
-                Telemetry.log(AnalyticsEvent.LoginSuccess(restored = true))
-                Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
-                if (cached == null) _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
-                loadProfile()
-            } else {
-                SteamLog.d("vm: no saved session")
-                if (cached == null) {
-                    _state.value = SteamLoginUiState.Idle
-                    Telemetry.log(AnalyticsEvent.LoginFormShown)
-                }
+            } finally {
+                restoreFinished = true
             }
         }
     }
@@ -361,13 +374,32 @@ class SteamLoginViewModel(
             authRunner.cancelRunning("exit_$action")
             signIn.signOut()
             appToken = null
-            runCatching { LocalCache.write(PROFILE_CACHE_KEY, "") }
-            runCatching { LocalCache.write(DEMO_FLAG_KEY, "") }
-            _allRaces.value = AllRacesUi()
-            _categoryRaces.value = CategoryRacesUi()
+            clearLocalAuthAndProfileData()
             _exiting.value = ExitAction.NONE
             _state.value = SteamLoginUiState.Idle
         }
+    }
+
+    private fun forceLoginAfterMissingSession(clearSteamSession: Boolean) {
+        SteamLog.d("vm: clearing cached signed-in profile because auth session is missing clearSteamSession=$clearSteamSession")
+        Telemetry.setUserId(null)
+        Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "false")
+        appToken = null
+        if (clearSteamSession) signIn.signOut()
+        clearLocalAuthAndProfileData()
+        _state.value = SteamLoginUiState.Idle
+        Telemetry.log(AnalyticsEvent.LoginFormShown)
+    }
+
+    private fun clearLocalAuthAndProfileData() {
+        SteamLog.d("vm: clearing local auth/profile caches")
+        runCatching { LocalCache.remove(PROFILE_CACHE_KEY) }
+        runCatching { LocalCache.remove(DEMO_FLAG_KEY) }
+        runCatching { LocalCache.removeByPrefix("race_detail_") }
+        runCatching { LocalCache.removeByPrefix("race_split_") }
+        runCatching { LocalCache.removeByPrefix("track_detail_") }
+        _allRaces.value = AllRacesUi()
+        _categoryRaces.value = CategoryRacesUi()
     }
 
     fun loadMoreAllRaces() {
@@ -497,8 +529,8 @@ class SteamLoginViewModel(
         // Auth may still be restoring at launch (Render cold start). Wait for the token
         // instead of failing instantly with "not signed in" — callers paint a loader
         // meanwhile. Only give up if it genuinely never arrives.
-        val token = appToken ?: tokenHolder.await(AUTH_WAIT_MS)
-            ?: throw IllegalStateException("not signed in")
+        val token = appToken ?: (if (restoreFinished) null else tokenHolder.await(AUTH_WAIT_MS))
+            ?: throw IllegalStateException("Session expired. Sign in again.")
         return try {
             block(token)
         } catch (e: BackendReauthRequired) {
