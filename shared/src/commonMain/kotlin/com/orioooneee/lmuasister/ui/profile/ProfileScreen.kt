@@ -24,6 +24,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -76,9 +77,8 @@ import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-private val SteamTop = Color(0xFF2A475E)
-private val SteamBottom = Color(0xFF171A21)
-private val SteamLogoBg = Color(0xFF1B2838)
+private val SteamLogoBg = Color(0xFF223044)
+private val AuthAccent = Color(0xFFE7B84E)
 private val DangerRed = Color(0xFFE5484D)
 private const val STEAM_GUARD_APPROVAL_SECONDS = 120
 
@@ -100,6 +100,7 @@ fun ProfileScreen(
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
+    var privacyAccepted by remember { mutableStateOf(false) }
     var guardApprovalSecondsLeft by remember { mutableStateOf(STEAM_GUARD_APPROVAL_SECONDS) }
 
     val pendingApproval = state as? SteamLoginUiState.DeviceConfirmationPending
@@ -216,96 +217,161 @@ fun ProfileScreen(
             .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(topInset + 48.dp))
-        Box(
-            Modifier.size(96.dp).clip(CircleShape).background(SteamLogoBg),
-            contentAlignment = Alignment.Center,
+        Spacer(Modifier.height(topInset + 30.dp))
+        AuthIntro()
+        Spacer(Modifier.height(18.dp))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(Surface1)
+                .border(1.dp, Outline, RoundedCornerShape(18.dp))
+                .padding(16.dp),
         ) {
-            Icon(IconSteam, contentDescription = null, tint = Color.White, modifier = Modifier.size(52.dp))
+            Field(
+                value = login,
+                onValueChange = { login = it },
+                label = stringResource(Res.string.profile_field_login),
+                keyboardType = KeyboardType.Text,
+                enabled = !loading,
+            )
+            Spacer(Modifier.height(14.dp))
+            Field(
+                value = password,
+                onValueChange = { password = it },
+                label = stringResource(Res.string.profile_field_password),
+                keyboardType = KeyboardType.Password,
+                isPassword = true,
+                enabled = !loading,
+            )
+            Spacer(Modifier.height(14.dp))
+            Field(
+                value = code,
+                onValueChange = { code = it },
+                label = stringResource(Res.string.profile_field_2fa),
+                keyboardType = KeyboardType.Number,
+                enabled = guardRequired || pendingApproval != null,
+            )
+
+            StatusLine(
+                state = state,
+                waitingForGuardApproval = waitingForGuardApproval,
+                guardApprovalSecondsLeft = guardApprovalSecondsLeft,
+                supportsGuardApproval = supportsSteamGuardMobileApproval,
+            )
+
+            Spacer(Modifier.height(16.dp))
+            PrivacyConsent(
+                accepted = privacyAccepted,
+                onAcceptedChange = { privacyAccepted = it },
+                enabled = !loading,
+                onOpenPrivacy = onOpenPrivacy,
+            )
+
+            Spacer(Modifier.height(18.dp))
+            SignInButton(
+                loading = loading && !canSubmitGuardCodeDuringApproval,
+                enabled = privacyAccepted && (!loading || canSubmitGuardCodeDuringApproval),
+                waitingForGuardApproval = waitingForGuardApproval,
+                onClick = { viewModel.login(login, password, code) },
+            )
         }
-        Spacer(Modifier.height(20.dp))
-        Text(
-            stringResource(Res.string.profile_login_title),
-            style = MaterialTheme.typography.headlineSmall,
-            color = TextHigh,
-            fontWeight = FontWeight.Black,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            stringResource(Res.string.profile_login_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextMed,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(32.dp))
-
-        Field(
-            value = login,
-            onValueChange = { login = it },
-            label = stringResource(Res.string.profile_field_login),
-            keyboardType = KeyboardType.Text,
-            enabled = !loading,
-        )
-        Spacer(Modifier.height(14.dp))
-        Field(
-            value = password,
-            onValueChange = { password = it },
-            label = stringResource(Res.string.profile_field_password),
-            keyboardType = KeyboardType.Password,
-            isPassword = true,
-            enabled = !loading,
-        )
-        Spacer(Modifier.height(14.dp))
-        Field(
-            value = code,
-            onValueChange = { code = it },
-            label = stringResource(Res.string.profile_field_2fa),
-            keyboardType = KeyboardType.Number,
-            enabled = guardRequired || pendingApproval != null,
-        )
-
-        StatusLine(
-            state = state,
-            waitingForGuardApproval = waitingForGuardApproval,
-            guardApprovalSecondsLeft = guardApprovalSecondsLeft,
-            supportsGuardApproval = supportsSteamGuardMobileApproval,
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        SignInButton(
-            loading = loading && !canSubmitGuardCodeDuringApproval,
-            waitingForGuardApproval = waitingForGuardApproval,
-            onClick = { viewModel.login(login, password, code) },
-        )
-
-        Spacer(Modifier.height(16.dp))
-        ConsentNote(onOpenPrivacy)
 
         Spacer(Modifier.height(32.dp + bottomInset))
     }
 }
 
+@Composable
+private fun AuthIntro() {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(Surface1)
+                .border(1.dp, Outline, RoundedCornerShape(999.dp))
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                Modifier.size(26.dp).clip(CircleShape).background(SteamLogoBg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(IconSteam, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+            Text(
+                "Steam account required",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextMed,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+        }
+        Text(
+            stringResource(Res.string.profile_login_title),
+            style = MaterialTheme.typography.headlineSmall,
+            color = TextHigh,
+            fontWeight = FontWeight.Black,
+        )
+        Text(
+            stringResource(Res.string.profile_login_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextMed,
+        )
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ConsentNote(onOpenPrivacy: () -> Unit) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+private fun PrivacyConsent(
+    accepted: Boolean,
+    onAcceptedChange: (Boolean) -> Unit,
+    enabled: Boolean,
+    onOpenPrivacy: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Carbon.copy(alpha = 0.62f))
+            .border(1.dp, if (accepted) AuthAccent.copy(alpha = 0.42f) else Outline, RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled) { onAcceptedChange(!accepted) }
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            "By signing in you agree to the",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextLow,
+        Checkbox(
+            checked = accepted,
+            onCheckedChange = if (enabled) onAcceptedChange else null,
+            colors = CheckboxDefaults.colors(
+                checkedColor = AuthAccent,
+                uncheckedColor = TextLow,
+                checkmarkColor = Carbon,
+            ),
         )
-        Text(
-            "Privacy Policy",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.clickable(onClick = onOpenPrivacy),
-        )
+        FlowRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                "I agree to the",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextLow,
+            )
+            Text(
+                "Privacy Policy",
+                style = MaterialTheme.typography.labelSmall,
+                color = AuthAccent,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable(onClick = onOpenPrivacy),
+            )
+        }
     }
 }
 
@@ -477,19 +543,19 @@ private fun Field(
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Surface1,
-            unfocusedContainerColor = Surface1,
+            focusedContainerColor = Carbon.copy(alpha = 0.64f),
+            unfocusedContainerColor = Carbon.copy(alpha = 0.64f),
             disabledContainerColor = Surface1.copy(alpha = 0.5f),
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            focusedBorderColor = AuthAccent,
             unfocusedBorderColor = Outline,
             disabledBorderColor = Outline.copy(alpha = 0.5f),
-            focusedLabelColor = MaterialTheme.colorScheme.primary,
+            focusedLabelColor = AuthAccent,
             unfocusedLabelColor = TextMed,
             disabledLabelColor = TextLow,
             focusedTextColor = TextHigh,
             unfocusedTextColor = TextHigh,
             disabledTextColor = TextLow,
-            cursorColor = MaterialTheme.colorScheme.primary,
+            cursorColor = AuthAccent,
         ),
     )
 }
@@ -497,28 +563,30 @@ private fun Field(
 @Composable
 private fun SignInButton(
     loading: Boolean,
+    enabled: Boolean,
     waitingForGuardApproval: Boolean,
     onClick: () -> Unit,
 ) {
+    val alpha = if (enabled && !loading) 1f else 0.48f
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(Brush.verticalGradient(listOf(SteamTop, SteamBottom)))
-            .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(14.dp))
-            .clickable(enabled = !loading, onClick = onClick)
+            .background(AuthAccent.copy(alpha = 0.18f * alpha))
+            .border(1.dp, AuthAccent.copy(alpha = 0.56f * alpha), RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled && !loading, onClick = onClick)
             .padding(vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         if (loading) {
-            CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+            CircularProgressIndicator(color = AuthAccent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
             if (waitingForGuardApproval) {
                 Spacer(Modifier.width(10.dp))
                 Text(
                     "Waiting for approval",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = AuthAccent,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                 )
@@ -527,7 +595,7 @@ private fun SignInButton(
             Text(
                 stringResource(Res.string.profile_sign_in),
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
+                color = AuthAccent.copy(alpha = alpha),
                 fontWeight = FontWeight.Bold,
             )
         }

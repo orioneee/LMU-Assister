@@ -135,8 +135,8 @@ private const val NAV_ANIM = 300
 
 private enum class TopTab(val icon: ImageVector) {
     Schedule(IconCalendarOutline),
-    Drivers(IconPersonOutline),
     Tracks(IconFlag),
+    Drivers(IconPersonOutline),
     Profile(IconPersonOutline),
 }
 

@@ -217,13 +217,13 @@ private fun FavoriteCarCard(rank: Int, car: FavoriteCarDto) {
         ) {
             ManufacturerMark(manufacturer, car.manufacturerLogoUrl)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     FavoriteRankBadge(rank, accent)
                     carClass?.let { ClassPill(it) }
-                    distanceKm?.let { ClickablePill("${formatKm(it.toDouble())} km", DistAccent, onClick = null) }
+                    distanceKm?.let { FavoriteDistanceBadge("${formatKm(it.toDouble())} km") }
                 }
                 cleanName?.let {
                     Text(
@@ -254,6 +254,28 @@ private fun FavoriteCarCard(rank: Int, car: FavoriteCarDto) {
             FavoriteStatBadge("Podiums", car.podiums, StatCategory.Podiums.color)
             FavoriteStatBadge("Poles", car.poles, StatCategory.Poles.color)
         }
+    }
+}
+
+@Composable
+private fun FavoriteDistanceBadge(text: String) {
+    val shape = RoundedCornerShape(6.dp)
+    Box(
+        modifier = Modifier
+            .widthIn(min = 82.dp)
+            .clip(shape)
+            .background(DistAccent.copy(alpha = 0.12f))
+            .border(1.dp, DistAccent.copy(alpha = 0.5f), shape)
+            .padding(horizontal = 9.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelMedium,
+            color = DistAccent,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
     }
 }
 

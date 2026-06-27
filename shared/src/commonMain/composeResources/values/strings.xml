@@ -16,12 +16,12 @@
     <string name="nav_profile">My Profile</string>
 
     <!-- Profile / Steam login -->
-    <string name="profile_login_title">Sign in through Steam</string>
-    <string name="profile_login_subtitle">Use your Steam account credentials.</string>
-    <string name="profile_field_login">Login</string>
-    <string name="profile_field_password">Password</string>
+    <string name="profile_login_title">Connect your Steam account</string>
+    <string name="profile_login_subtitle">Use the Steam account linked to Le Mans Ultimate.</string>
+    <string name="profile_field_login">Steam login</string>
+    <string name="profile_field_password">Steam password</string>
     <string name="profile_field_2fa">2FA code</string>
-    <string name="profile_sign_in">Sign in</string>
+    <string name="profile_sign_in">Connect profile</string>
 
     <!-- Profile / licence sanctions (bans, suspensions, warnings) -->
     <string name="susp_active_count">%1$d active</string>
