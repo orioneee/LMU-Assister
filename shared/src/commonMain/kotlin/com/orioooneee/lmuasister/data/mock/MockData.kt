@@ -585,6 +585,7 @@ internal object MockData {
             carName = "Ford Mustang LMGT3",
             model = "Mustang LMGT3",
             manufacturer = "Ford",
+            engine = "Ford Coyote 5.4L V8",
             manufacturerLogoUrl = null,
             carImageUrl = "https://placehold.co/260x150/1B1E25/F2F4F8.png?text=Ford+Mustang",
             carClass = "GT3",
@@ -602,6 +603,7 @@ internal object MockData {
             carName = "McLaren 720S LMGT3 Evo",
             model = "720S LMGT3 Evo",
             manufacturer = "McLaren",
+            engine = "McLaren M840T 4.0L V8 Twin Turbo",
             manufacturerLogoUrl = null,
             carImageUrl = "https://placehold.co/260x150/1B1E25/F2F4F8.png?text=McLaren+720S",
             carClass = "LMGT3",
@@ -619,6 +621,7 @@ internal object MockData {
             carName = "Ferrari 499P",
             model = "499P",
             manufacturer = "Ferrari",
+            engine = "Ferrari F163 3.0L V6 Twin Turbo",
             manufacturerLogoUrl = null,
             carImageUrl = "https://placehold.co/260x150/1B1E25/F2F4F8.png?text=Ferrari+499P",
             carClass = "Hypercar",
@@ -733,6 +736,7 @@ internal object MockData {
             car = card.car,
             carName = card.carName,
             carClass = card.carClass,
+            engine = engineForCar(card.carName ?: card.car),
             track = t.simple,
             trackInfo = trackDto(t),
             tier = card.tier,
@@ -807,12 +811,21 @@ internal object MockData {
                 nationality = d.cc,
                 isMe = isMe,
                 car = if (isMe) (card.car ?: carsByClass.getValue(cls).first()) else carsByClass.getValue(cls).random(r),
+                engine = if (isMe) engineForCar(card.carName ?: card.car) else null,
                 carClass = cls,
                 bestLapMs = lap,
                 bestLapSectorsMs = sectors(lap),
                 finishStatus = "Finished",
             )
         }
+    }
+
+    private fun engineForCar(car: String?): String? = when {
+        car == null -> null
+        car.contains("Mustang", ignoreCase = true) -> "Ford Coyote 5.4L V8"
+        car.contains("720S", ignoreCase = true) -> "McLaren M840T 4.0L V8 Twin Turbo"
+        car.contains("499P", ignoreCase = true) -> "Ferrari F163 3.0L V6 Twin Turbo"
+        else -> null
     }
 
     /** Split a lap time into three plausible sector times (34% / 33% / remainder). */

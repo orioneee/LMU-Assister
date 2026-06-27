@@ -196,6 +196,7 @@ private fun FavoriteCarCard(rank: Int, car: FavoriteCarDto) {
         ?.let { stripCarClass(it) }
         ?.takeIf { it.isNotBlank() }
     val manufacturer = car.manufacturer?.takeIf { it.isNotBlank() }
+    val engine = car.engine?.takeIf { it.isNotBlank() }
     val accent = carClass?.let { classColorFor(it) } ?: Outline
     val distanceKm = car.distanceKm.roundToInt().takeIf { it > 0 }
     val shape = RoundedCornerShape(14.dp)
@@ -231,6 +232,15 @@ private fun FavoriteCarCard(rank: Int, car: FavoriteCarDto) {
                         style = MaterialTheme.typography.titleMedium,
                         color = TextHigh,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier.fillMaxWidth().basicMarquee(),
+                    )
+                }
+                engine?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextLow,
                         maxLines = 1,
                         modifier = Modifier.fillMaxWidth().basicMarquee(),
                     )

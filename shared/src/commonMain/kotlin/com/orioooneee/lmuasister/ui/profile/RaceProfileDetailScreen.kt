@@ -489,6 +489,12 @@ private fun SummaryCard(d: RaceDetailDto) {
     // Any laps at all — laps without a time still get a row (shown as "—").
     val hasRaceLaps = showLapProgress && laps.isNotEmpty()
     val hasQualifyingLaps = showLapProgress && qualifyingLaps.isNotEmpty()
+    val engine = listOf(
+        d.engine,
+        sessionMeRow(d, "race")?.engine,
+        sessionMeRow(d, "qualifying")?.engine,
+        sessionMeRow(d, "practice")?.engine,
+    ).firstOrNull { !it.isNullOrBlank() }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -500,7 +506,11 @@ private fun SummaryCard(d: RaceDetailDto) {
     ) {
         // Highlight chips this race earned (win / pole / grand slam…), colored like the profile stats.
         if (d.categories.isNotEmpty()) CategoryChips(d.categories)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             d.carClass?.let { ClassPill(it) }
             if (d.manufacturerLogoUrl != null) {
                 AsyncImage(
@@ -518,9 +528,29 @@ private fun SummaryCard(d: RaceDetailDto) {
                     modifier = Modifier.width(96.dp).height(72.dp).clip(RoundedCornerShape(5.dp)),
                 )
             }
-            (d.carName ?: d.car)?.takeIf { it.isNotBlank() }?.let { name ->
-                val cleanName = stripCarClass(name)
-                Text(cleanName, style = MaterialTheme.typography.bodyMedium, color = TextHigh, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if ((d.carName ?: d.car)?.isNotBlank() == true || engine != null) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    (d.carName ?: d.car)?.takeIf { it.isNotBlank() }?.let { name ->
+                        val cleanName = stripCarClass(name)
+                        Text(
+                            cleanName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextHigh,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    engine?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextLow,
+                            maxLines = 1,
+                            modifier = Modifier.fillMaxWidth().basicMarquee(),
+                        )
+                    }
+                }
             }
         }
         FlowRow(

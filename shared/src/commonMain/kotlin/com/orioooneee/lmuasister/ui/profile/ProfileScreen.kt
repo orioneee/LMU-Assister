@@ -23,11 +23,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -99,6 +103,7 @@ fun ProfileScreen(
 
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
     var code by remember { mutableStateOf("") }
     var privacyAccepted by remember { mutableStateOf(false) }
     var guardApprovalSecondsLeft by remember { mutableStateOf(STEAM_GUARD_APPROVAL_SECONDS) }
@@ -243,6 +248,8 @@ fun ProfileScreen(
                 label = stringResource(Res.string.profile_field_password),
                 keyboardType = KeyboardType.Password,
                 isPassword = true,
+                passwordVisible = passwordVisible,
+                onPasswordVisibilityChange = { passwordVisible = it },
                 enabled = !loading,
             )
             Spacer(Modifier.height(14.dp))
@@ -530,6 +537,8 @@ private fun Field(
     label: String,
     keyboardType: KeyboardType,
     isPassword: Boolean = false,
+    passwordVisible: Boolean = false,
+    onPasswordVisibilityChange: (Boolean) -> Unit = {},
     enabled: Boolean = true,
 ) {
     OutlinedTextField(
@@ -538,8 +547,24 @@ private fun Field(
         label = { Text(label) },
         enabled = enabled,
         singleLine = true,
-        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+        visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        trailingIcon = if (isPassword) {
+            {
+                IconButton(
+                    enabled = enabled,
+                    onClick = { onPasswordVisibilityChange(!passwordVisible) },
+                ) {
+                    Icon(
+                        imageVector = if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                        tint = if (enabled) TextMed else TextLow,
+                    )
+                }
+            }
+        } else {
+            null
+        },
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
         colors = OutlinedTextFieldDefaults.colors(
