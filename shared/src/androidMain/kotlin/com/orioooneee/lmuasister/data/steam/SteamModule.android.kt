@@ -7,3 +7,4 @@ actual fun steamModule() = module {
     single<SteamSessionStore> { steamSessionStore() }
     single<SteamSignIn> { KSteamSignIn(get<SteamBackendApi>(), get()) }
 }
+

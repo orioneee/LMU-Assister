@@ -107,7 +107,8 @@ fun ProfileScreen(
     val guardRequired = state is SteamLoginUiState.GuardRequired
     val restoring = state is SteamLoginUiState.Restoring
     val signedIn = state as? SteamLoginUiState.SignedIn
-    val waitingForGuardApproval = supportsSteamGuardMobileApproval && loading && code.isBlank()
+    val waitingForGuardApproval = pendingApproval != null
+    val canSubmitGuardCodeDuringApproval = pendingApproval != null && code.isNotBlank()
     val approvalTimerStart = pendingApproval?.expiresIn?.takeIf { it > 0 } ?: STEAM_GUARD_APPROVAL_SECONDS
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -118,6 +119,7 @@ fun ProfileScreen(
             delay(1_000L)
             guardApprovalSecondsLeft -= 1
         }
+        viewModel.expireDeviceConfirmation()
     }
 
     DisposableEffect(lifecycleOwner, pendingApproval?.challengeId) {
@@ -260,7 +262,7 @@ fun ProfileScreen(
             onValueChange = { code = it },
             label = stringResource(Res.string.profile_field_2fa),
             keyboardType = KeyboardType.Number,
-            enabled = guardRequired && !loading,
+            enabled = guardRequired || pendingApproval != null,
         )
 
         StatusLine(
@@ -273,7 +275,7 @@ fun ProfileScreen(
         Spacer(Modifier.height(24.dp))
 
         SignInButton(
-            loading = loading,
+            loading = loading && !canSubmitGuardCodeDuringApproval,
             waitingForGuardApproval = waitingForGuardApproval,
             onClick = { viewModel.login(login, password, code) },
         )
@@ -431,7 +433,7 @@ private fun StatusLine(
         is SteamLoginUiState.DeviceConfirmationPending -> {
             val minutes = guardApprovalSecondsLeft / 60
             val seconds = guardApprovalSecondsLeft % 60
-            "Approve the sign-in request in the Steam app, then return here. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
+            "Approve the sign-in request in the Steam app, or enter the Steam Guard code here. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
                 MaterialTheme.colorScheme.primary
         }
         is SteamLoginUiState.GuardRequired -> {

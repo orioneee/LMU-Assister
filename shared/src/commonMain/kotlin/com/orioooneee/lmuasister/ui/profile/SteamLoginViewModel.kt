@@ -163,7 +163,16 @@ class SteamLoginViewModel(
     }
 
     fun login(username: String, password: String, guardCode: String?) {
-        if (_state.value is SteamLoginUiState.Loading || authRunner.state.value is SteamAuthRunnerState.Running) return
+        val currentState = _state.value
+        val code = guardCode?.trim().orEmpty()
+        if (currentState is SteamLoginUiState.DeviceConfirmationPending && code.isNotBlank()) {
+            SteamLog.d("vm: typed guard code submitted while approval pending")
+            _state.value = SteamLoginUiState.Loading
+            authRunner.cancelRunning("typed_guard_code_while_approval_pending")
+            authRunner.startSignIn(username, password, code)
+            return
+        }
+        if (currentState is SteamLoginUiState.Loading || authRunner.state.value is SteamAuthRunnerState.Running) return
         if (username.isBlank() || password.isBlank()) {
             _state.value = SteamLoginUiState.Error("Enter your login and password.")
             return
@@ -172,24 +181,51 @@ class SteamLoginViewModel(
             loginDemo()
             return
         }
+        SteamLog.d("vm: login submitted has2fa=${code.isNotBlank()}")
         _state.value = SteamLoginUiState.Loading
-        Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = !guardCode.isNullOrBlank()))
-        authRunner.startSignIn(username, password, guardCode)
+        Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = code.isNotBlank()))
+        authRunner.startSignIn(username, password, code)
+    }
+
+    fun expireDeviceConfirmation() {
+        val pending = _state.value as? SteamLoginUiState.DeviceConfirmationPending ?: return
+        SteamLog.d("vm: approval timer expired challenge=${SteamLog.short(pending.challengeId)}")
+        authRunner.cancelRunning("approval_timer_expired")
+        _state.value = SteamLoginUiState.Error("Steam Guard approval timed out. Try again or enter the Steam Guard code.")
     }
 
     fun continueDeviceConfirmation() {
         val pending = _state.value as? SteamLoginUiState.DeviceConfirmationPending ?: return
-        if (pending.continuing) return
+        if (pending.continuing) {
+            SteamLog.d("vm: continue approval ignored, already continuing challenge=${SteamLog.short(pending.challengeId)}")
+            return
+        }
+        SteamLog.d("vm: continue approval requested challenge=${SteamLog.short(pending.challengeId)}")
         _state.value = pending.copy(continuing = true)
-        authRunner.continueDeviceConfirmation(pending.challengeId)
+        val started = authRunner.continueDeviceConfirmation(pending.challengeId)
+        SteamLog.d("vm: continue approval start result=$started")
+        if (!started && authRunner.state.value !is SteamAuthRunnerState.Running) {
+            val latest = _state.value as? SteamLoginUiState.DeviceConfirmationPending
+            if (latest?.challengeId == pending.challengeId) {
+                SteamLog.d("vm: Steam Guard continuation did not start, keeping approval prompt retryable")
+                _state.value = latest.copy(continuing = false)
+            }
+        }
     }
 
     private fun observeAuthRunner() {
         viewModelScope.launch {
             authRunner.state.collect { auth ->
                 when (auth) {
-                    SteamAuthRunnerState.Idle -> Unit
+                    SteamAuthRunnerState.Idle -> {
+                        val pending = _state.value as? SteamLoginUiState.DeviceConfirmationPending
+                        if (pending?.continuing == true) {
+                            SteamLog.d("vm: runner idle while approval continuing, making prompt retryable")
+                            _state.value = pending.copy(continuing = false)
+                        }
+                    }
                     is SteamAuthRunnerState.Running -> {
+                        SteamLog.d("vm: runner running stage=${auth.stage}")
                         if (auth.stage == "login_continue") {
                             val pending = _state.value as? SteamLoginUiState.DeviceConfirmationPending
                             _state.value = pending?.copy(continuing = true) ?: SteamLoginUiState.Loading
@@ -200,39 +236,61 @@ class SteamLoginViewModel(
                     is SteamAuthRunnerState.Finished -> {
                         if (handledAuthResultId == auth.id) return@collect
                         handledAuthResultId = auth.id
-                        handleSignInOutcome(auth.outcome, auth.stage)
+                        SteamLog.d("vm: runner finished id=${auth.id} stage=${auth.stage}")
+                        val autoContinueChallenge = handleSignInOutcome(auth.outcome, auth.stage)
                         authRunner.resetFinished(auth.id)
+                        if (autoContinueChallenge != null) {
+                            SteamLog.d("vm: auto-continuing approval challenge=${SteamLog.short(autoContinueChallenge)}")
+                            continueDeviceConfirmation()
+                        }
                     }
                 }
             }
         }
     }
 
-    private suspend fun handleSignInOutcome(r: SignInOutcome, stage: String) {
+    private suspend fun handleSignInOutcome(r: SignInOutcome, stage: String): String? {
         when (r) {
             is SignInOutcome.Success -> {
+                SteamLog.d("vm: login success uid=${r.uid}")
                 appToken = r.appToken
                 Telemetry.log(AnalyticsEvent.LoginSuccess(restored = false))
                 Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
                 _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
                 loadProfile()
+                return null
             }
             is SignInOutcome.GuardRequired -> {
+                SteamLog.d("vm: guard code required kind=${r.kind}")
                 Telemetry.log(AnalyticsEvent.Login2faRequired(r.kind.name.lowercase()))
                 _state.value = SteamLoginUiState.GuardRequired(r.kind)
+                return null
             }
             is SignInOutcome.DeviceConfirmationPending -> {
-                _state.value = SteamLoginUiState.DeviceConfirmationPending(r.challengeId, r.expiresIn)
+                SteamLog.d(
+                    "vm: approval pending stage=$stage challenge=${SteamLog.short(r.challengeId)} expiresIn=${r.expiresIn}",
+                )
+                val pending = SteamLoginUiState.DeviceConfirmationPending(
+                    challengeId = r.challengeId,
+                    expiresIn = r.expiresIn,
+                    continuing = false,
+                )
+                _state.value = pending
+                return r.challengeId.takeIf { stage == "login" }
             }
             SignInOutcome.TunnelRequired -> {
+                SteamLog.d("vm: tunnel required stage=$stage")
                 Telemetry.log(AnalyticsEvent.LoginTunnelRequired)
                 Telemetry.recordError(TelemetryError("login_tunnel_required"), "stage" to stage)
                 _state.value = SteamLoginUiState.Error("Couldn't open the device tunnel — try again.")
+                return null
             }
             is SignInOutcome.Failure -> {
+                SteamLog.d("vm: login failed stage=$stage reason=${r.reason}")
                 Telemetry.log(AnalyticsEvent.LoginFailed(loginFailReason(r.reason)))
                 Telemetry.recordError(TelemetryError("login_failed: ${loginFailReason(r.reason)}"), "stage" to stage)
                 _state.value = SteamLoginUiState.Error(r.reason)
+                return null
             }
         }
     }
@@ -300,7 +358,7 @@ class SteamLoginViewModel(
             }
             Telemetry.setUserId(null)
             Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "false")
-            authRunner.cancelRunning()
+            authRunner.cancelRunning("exit_$action")
             signIn.signOut()
             appToken = null
             runCatching { LocalCache.write(PROFILE_CACHE_KEY, "") }

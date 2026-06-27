@@ -1,6 +1,7 @@
 package com.orioooneee.lmuasister.ui.profile
 
 import com.orioooneee.lmuasister.data.steam.SignInOutcome
+import com.orioooneee.lmuasister.data.steam.SteamLog
 import com.orioooneee.lmuasister.data.steam.SteamSignIn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +36,7 @@ class SteamAuthRunner(
     val state: StateFlow<SteamAuthRunnerState> = _state.asStateFlow()
 
     private var currentJob: Job? = null
+    private var activeRunId = 0L
     private var nextId = 1L
 
     fun startSignIn(username: String, password: String, guardCode: String?): Boolean =
@@ -49,26 +51,61 @@ class SteamAuthRunner(
         }
     }
 
-    fun cancelRunning() {
+    fun cancelRunning(reason: String) {
+        SteamLog.d("runner: cancel requested reason=$reason active=${currentJob?.isActive == true}")
+        activeRunId++
         currentJob?.cancel()
         currentJob = null
         _state.value = SteamAuthRunnerState.Idle
     }
 
     private fun run(stage: String, block: suspend () -> SignInOutcome): Boolean {
-        if (currentJob?.isActive == true) return false
+        if (currentJob?.isActive == true) {
+            SteamLog.d("runner: refusing stage=$stage because another auth job is active")
+            return false
+        }
+        val runId = ++activeRunId
+        SteamLog.d("runner: start stage=$stage")
         _state.value = SteamAuthRunnerState.Running(stage)
         currentJob = scope.launch {
-            val outcome = try {
-                block()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (t: Throwable) {
-                SignInOutcome.Failure(t.message ?: t::class.simpleName ?: "Steam login failed")
+            try {
+                val outcome = try {
+                    block()
+                } catch (e: CancellationException) {
+                    val requestedByApp = activeRunId != runId
+                    SteamLog.d(
+                        "runner: cancellation stage=$stage requestedByApp=$requestedByApp " +
+                            "type=${e::class.simpleName} message=${e.message.orEmpty()}",
+                    )
+                    if (requestedByApp) return@launch
+                    SignInOutcome.Failure(e.message ?: e::class.simpleName ?: "Steam login was interrupted")
+                } catch (t: Throwable) {
+                    SteamLog.e("runner: failed stage=$stage", t)
+                    SignInOutcome.Failure(t.message ?: t::class.simpleName ?: "Steam login failed")
+                }
+                if (activeRunId == runId) {
+                    currentJob = null
+                    SteamLog.d("runner: finished stage=$stage outcome=${outcome.describeForLog()}")
+                    _state.value = SteamAuthRunnerState.Finished(nextId++, stage, outcome)
+                } else {
+                    SteamLog.d("runner: ignored stale finish stage=$stage outcome=${outcome.describeForLog()}")
+                }
+            } finally {
+                if (activeRunId == runId) {
+                    currentJob = null
+                }
             }
-            _state.value = SteamAuthRunnerState.Finished(nextId++, stage, outcome)
-            currentJob = null
         }
         return true
     }
+
+    private fun SignInOutcome.describeForLog(): String =
+        when (this) {
+            is SignInOutcome.Success -> "Success(uid=$uid)"
+            is SignInOutcome.GuardRequired -> "GuardRequired(kind=$kind)"
+            is SignInOutcome.DeviceConfirmationPending ->
+                "DeviceConfirmationPending(challenge=${SteamLog.short(challengeId)}, expiresIn=$expiresIn)"
+            is SignInOutcome.Failure -> "Failure(reason=$reason)"
+            SignInOutcome.TunnelRequired -> "TunnelRequired"
+        }
 }

@@ -25,6 +25,7 @@ paging = "3.5.0"
 androidx-security = "1.1.0"
 javasteam = "1.8.0"
 bouncycastle = "1.78.1"
+ksteam = "r67"
 googleServices = "4.4.3"
 firebaseCrashlyticsPlugin = "3.0.4"
 firebaseBom = "34.1.0"
@@ -65,6 +66,9 @@ ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 # JavaSteam — SteamKit2 port (on-device Steam auth, Android + JVM) + BouncyCastle crypto
 javasteam = { module = "in.dragonbra:javasteam", version.ref = "javasteam" }
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+
+# kSteam — multiplatform Steam auth/network client published to mavenLocal.
+ksteam-core = { module = "bruhcollective.itaysonlab.ksteam:core", version.ref = "ksteam" }
 
 # Koin (DI)
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }

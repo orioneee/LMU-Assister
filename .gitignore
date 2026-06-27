@@ -34,3 +34,4 @@ GoogleService-Info.plist
 
 # Android signed-release output (not under build/)
 **/release/
+.codex/**

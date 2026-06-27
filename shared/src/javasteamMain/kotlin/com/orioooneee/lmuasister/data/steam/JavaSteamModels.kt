@@ -1,7 +1,5 @@
 package com.orioooneee.lmuasister.data.steam
 
-const val LMU_APP_ID: Int = 2399420
-
 class SteamSessionTicket(val appId: Int, val bytes: ByteArray) {
     val hex: String by lazy(LazyThreadSafetyMode.NONE) {
         buildString(bytes.size * 2) {

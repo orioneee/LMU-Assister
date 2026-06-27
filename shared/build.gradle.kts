@@ -17,9 +17,7 @@ kotlin {
         freeCompilerArgs.add("-Xexpect-actual-classes")
     }
 
-    // We add a custom intermediate source set (tunnelMain) with manual dependsOn,
-    // which disables auto-application of the default hierarchy — re-apply it explicitly
-    // so iosMain/jvmMain/etc. keep their standard link to commonMain.
+    // Keep the standard hierarchy explicit so iosMain/jvmMain/etc. stay linked to commonMain.
     applyDefaultHierarchyTemplate()
 
     listOf(
@@ -51,31 +49,12 @@ kotlin {
     }
     
     sourceSets {
-        // Steam device-tunnel (Ktor raw sockets + websockets) — iOS only (no native
-        // Steam lib there). Android/JVM do on-device Steam auth via JavaSteam instead.
-        val tunnelMain = create("tunnelMain") {
-            dependsOn(commonMain.get())
-            dependencies {
-                implementation(libs.ktor.client.websockets)
-                implementation(libs.ktor.network)
-            }
-        }
-        // On-device Steam auth (JavaSteam = SteamKit2 port, a plain JVM lib) — shared by
-        // Android + desktop JVM. BouncyCastle: Android ships a stripped "BC" provider, so
-        // the full bcprov is bundled and swapped in at runtime (harmless on desktop).
-        val javasteamMain = create("javasteamMain") {
-            dependsOn(commonMain.get())
-            dependencies {
-                implementation(libs.javasteam)
-                implementation(libs.bouncycastle.prov)
-            }
-        }
         androidMain {
-            dependsOn(javasteamMain)
             dependencies {
                 implementation(libs.compose.uiToolingPreview)
                 implementation(libs.ktor.client.okhttp)
-                // Encrypted token storage for the persisted Steam session.
+                implementation(libs.bouncycastle.prov)
+                // Encrypted storage for legacy/app-managed Steam session data.
                 implementation(libs.androidx.security.crypto)
                 // Firebase Analytics + Crashlytics (Android-only telemetry backend).
                 // `api` so the app module's Crashlytics Gradle plugin sees the dependency
@@ -113,18 +92,18 @@ kotlin {
             implementation(libs.navigation.compose)
             implementation(libs.paging.common)
             implementation(libs.paging.compose)
+            implementation(libs.ksteam.core)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
         jvmMain {
-            dependsOn(javasteamMain)
             dependencies {
                 implementation(libs.ktor.client.cio)
+                implementation(libs.bouncycastle.prov)
             }
         }
         iosMain {
-            dependsOn(tunnelMain)
             dependencies {
                 implementation(libs.ktor.client.darwin)
             }
