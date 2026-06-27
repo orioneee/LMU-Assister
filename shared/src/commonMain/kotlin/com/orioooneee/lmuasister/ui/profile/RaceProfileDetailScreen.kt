@@ -1204,6 +1204,9 @@ private fun ClassificationLine(
         // Name + badges share the flexible middle column; the name marquees if it can't fit.
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             val driverName = r.name ?: "—"
+            val teamBadgeName = r.teamName
+                ?.takeIf { it.isNotBlank() }
+                ?.takeUnless { isSameClassificationName(it, driverName) }
             val carName = r.car
                 ?.takeIf { it.isNotBlank() }
                 ?.let { car -> stripCarClass(car).ifBlank { car } }
@@ -1228,7 +1231,7 @@ private fun ClassificationLine(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (showTeamBadges) r.teamName?.takeIf { it.isNotBlank() }?.let { TeamMiniBadge(it) }
+                if (showTeamBadges) teamBadgeName?.let { TeamMiniBadge(it) }
                 r.carClass?.takeIf { it.isNotBlank() }?.let { ClassMiniBadge(it) }
                 // Position within the driver's own class (the leading number is the overall position).
                 r.classPosition?.takeIf { it > 0 }?.let { ClassPosBadge(it, r.carClass) }
@@ -1268,6 +1271,9 @@ private fun ClassificationLine(
         }
     }
 }
+
+private fun isSameClassificationName(a: String, b: String): Boolean =
+    a.trim().equals(b.trim(), ignoreCase = true)
 
 @Composable
 private fun TeamMiniBadge(teamName: String) {
