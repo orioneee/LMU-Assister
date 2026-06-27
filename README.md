@@ -48,14 +48,23 @@
 | --- | --- | --- |
 | **Android** | ✅ | On-device (JavaSteam) |
 | **Desktop (JVM)** | ✅ | On-device (JavaSteam) |
+| **iOS** | ✅ | On-device (kSteam) |
+<!-- TUNNEL_DISABLED:
 | **iOS** | ✅ | Backend + device tunnel |
+-->
 
+> **Android, iOS & Desktop** sign in to Steam **on-device** with kSteam/JavaSteam-style SteamKit support: your credentials never leave the machine — only a short-lived Steam Web API ticket is sent to the backend, which exchanges it for a game-data session. Session tokens are persisted securely per platform (Android `EncryptedSharedPreferences`, iOS **Keychain**, JVM a local file).
+<!-- TUNNEL_DISABLED:
 > **Android & Desktop** sign in to Steam **on-device** with JavaSteam (a SteamKit2 port): your credentials never leave the machine — only a short-lived Steam Web API ticket is sent to the backend, which exchanges it for a game-data session. **iOS** has no native Steam library, so credentials go to the backend sidecar (.NET SteamKit2); but the Steam connection itself is routed back out through the device over a SOCKS-over-WebSocket tunnel, so Steam sees your normal home IP. Session tokens are persisted securely per platform (Android `EncryptedSharedPreferences`, iOS **Keychain**, JVM a local file).
+-->
 
 ## 🔐 Security & privacy
 
+- **Android, iOS & Desktop — credentials never leave your device.** kSteam performs the whole Steam login locally; only a short-lived Steam Web API ticket is sent to the backend (exchanged for a game-data session). Your password and 2FA code never touch the network beyond Steam itself.
+<!-- TUNNEL_DISABLED:
 - **Android & Desktop — credentials never leave your device.** JavaSteam performs the whole Steam login locally; only a short-lived Steam Web API ticket is sent to the backend (exchanged for a game-data session). Your password and 2FA code never touch the network beyond Steam itself.
 - **iOS — credentials are used once, server-side, and never kept.** They go to the backend sidecar (.NET SteamKit2) over HTTPS, are used in memory to sign in, then discarded immediately — not stored, not logged, not shared. The login egresses through your device (tunnel), so Steam sees your home IP.
+-->
 - **Steam refresh tokens stay on your device, encrypted** (Android `EncryptedSharedPreferences`, iOS Keychain, JVM a local file). The backend stores only game-backend session tokens tied to your game-account id — never your Steam password or 2FA.
 - **No ads.** Public content (schedule, leaderboards) is read through a shared service account, so browsing needs no sign-in; only your own data (profile, ratings, history, your leaderboard row) requires it.
 - The full policy is fetched live and rendered in-app (`GET /api/v2/privacy`), linked from the sign-in screen.

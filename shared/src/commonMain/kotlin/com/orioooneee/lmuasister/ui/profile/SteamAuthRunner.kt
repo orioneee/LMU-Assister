@@ -106,6 +106,12 @@ class SteamAuthRunner(
             is SignInOutcome.DeviceConfirmationPending ->
                 "DeviceConfirmationPending(challenge=${SteamLog.short(challengeId)}, expiresIn=$expiresIn)"
             is SignInOutcome.Failure -> "Failure(reason=$reason)"
-            SignInOutcome.TunnelRequired -> "TunnelRequired"
+            /*
+             * TUNNEL_DISABLED:
+             * SignInOutcome.TunnelRequired is no longer part of the active SteamSignIn
+             * contract. The old log label is kept here for easy restoration.
+             *
+             * SignInOutcome.TunnelRequired -> "TunnelRequired"
+             */
         }
 }

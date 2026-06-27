@@ -2,6 +2,8 @@ package com.orioooneee.lmuasister.ui.publicusers
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.orioooneee.lmuasister.analytics.AnalyticsEvent
+import com.orioooneee.lmuasister.analytics.Telemetry
 import com.orioooneee.lmuasister.data.cache.LocalCache
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.ProfileJson
@@ -107,6 +109,7 @@ class PublicUsersViewModel(
     private var searchJob: Job? = null
 
     init {
+        Telemetry.log(AnalyticsEvent.DriversViewed)
         refresh()
         viewModelScope.launch {
             query
@@ -119,11 +122,13 @@ class PublicUsersViewModel(
     fun refresh() {
         val cached = loadCachedSummary()
         _state.value = cached?.let { PublicUsersUiState.Success(it) } ?: PublicUsersUiState.Loading
+        cached?.let { Telemetry.log(AnalyticsEvent.DriversLoaded(total = it.count, fromCache = true)) }
         viewModelScope.launch {
             apiCall { api.usersSummary() }
                 .onSuccess {
                     saveCachedSummary(it)
                     _state.value = PublicUsersUiState.Success(it)
+                    Telemetry.log(AnalyticsEvent.DriversLoaded(total = it.count, fromCache = false))
                 }
                 .onFailure {
                     if (cached == null) {
@@ -136,15 +141,20 @@ class PublicUsersViewModel(
     fun loadDetail(uid: String) {
         val cached = loadCachedDetail(uid)
         _detail.value = cached?.let { PublicUserDetailUiState.Success(it) } ?: PublicUserDetailUiState.Loading
+        cached?.let {
+            Telemetry.log(AnalyticsEvent.PublicProfileLoaded(fromCache = true, externalData = it.externalData))
+        }
         viewModelScope.launch {
             apiCall { api.publicUser(uid) }
                 .onSuccess {
                     saveCachedDetail(uid, it)
                     _detail.value = PublicUserDetailUiState.Success(it)
+                    Telemetry.log(AnalyticsEvent.PublicProfileLoaded(fromCache = false, externalData = it.externalData))
                 }
                 .onFailure {
                     if (cached == null) {
                         _detail.value = PublicUserDetailUiState.Error(it.readableMessage("User not found"))
+                        Telemetry.log(AnalyticsEvent.PublicProfileFailed(it.analyticsReason()))
                     }
                 }
         }
@@ -293,6 +303,9 @@ class PublicUsersViewModel(
         }
         val current = _search.value
         val page = if (reset) 1 else current.page + 1
+        if (reset) {
+            Telemetry.log(AnalyticsEvent.DriversSearchSubmitted(queryLength = clean.length))
+        }
         val cached = if (reset) loadCachedSearch(clean) else null
         _search.value = current.copy(
             query = rawQuery,
@@ -318,12 +331,28 @@ class PublicUsersViewModel(
                     )
                     _search.value = next
                     saveCachedSearch(clean, next)
+                    Telemetry.log(
+                        AnalyticsEvent.DriversSearchResults(
+                            queryLength = clean.length,
+                            page = resp.page,
+                            results = resp.users.size,
+                            total = resp.total,
+                            hasMore = resp.hasMore,
+                        ),
+                    )
                 }
                 .onFailure {
                     _search.value = _search.value.copy(
                         loading = false,
                         loadingMore = false,
                         error = it.readableMessage("Search failed"),
+                    )
+                    Telemetry.log(
+                        AnalyticsEvent.DriversSearchFailed(
+                            queryLength = clean.length,
+                            page = page,
+                            reason = it.analyticsReason(),
+                        ),
                     )
                 }
         }
@@ -333,6 +362,18 @@ class PublicUsersViewModel(
 
     private fun Throwable.readableMessage(fallback: String): String =
         message?.takeIf { it.isNotBlank() }?.take(160) ?: fallback
+
+    private fun Throwable.analyticsReason(): String {
+        val raw = message.orEmpty().lowercase()
+        return when {
+            "timeout" in raw -> "timeout"
+            "network" in raw || "connect" in raw || "unreachable" in raw -> "network"
+            "404" in raw || "not_found" in raw || "not found" in raw -> "not_found"
+            "401" in raw || "403" in raw || "auth" in raw -> "auth"
+            "500" in raw || "502" in raw || "503" in raw -> "server"
+            else -> "other"
+        }
+    }
 
     private fun refreshFirstRacesPage(
         uid: String,

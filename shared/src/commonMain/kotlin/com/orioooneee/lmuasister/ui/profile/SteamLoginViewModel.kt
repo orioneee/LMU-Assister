@@ -291,13 +291,20 @@ class SteamLoginViewModel(
                 _state.value = pending
                 return r.challengeId.takeIf { stage == "login" }
             }
-            SignInOutcome.TunnelRequired -> {
-                SteamLog.d("vm: tunnel required stage=$stage")
-                Telemetry.log(AnalyticsEvent.LoginTunnelRequired)
-                Telemetry.recordError(TelemetryError("login_tunnel_required"), "stage" to stage)
-                _state.value = SteamLoginUiState.Error("Couldn't open the device tunnel — try again.")
-                return null
-            }
+            /*
+             * TUNNEL_DISABLED:
+             * The old backend/device tunnel flow is no longer reachable from the active
+             * kSteam sign-in path. Keep the former UI mapping here commented out so the
+             * behavior can be restored deliberately if the tunnel ever comes back.
+             *
+             * SignInOutcome.TunnelRequired -> {
+             *     SteamLog.d("vm: tunnel required stage=$stage")
+             *     Telemetry.log(AnalyticsEvent.LoginTunnelRequired)
+             *     Telemetry.recordError(TelemetryError("login_tunnel_required"), "stage" to stage)
+             *     _state.value = SteamLoginUiState.Error("Couldn't open the device tunnel — try again.")
+             *     return null
+             * }
+             */
             is SignInOutcome.Failure -> {
                 SteamLog.d("vm: login failed stage=$stage reason=${r.reason}")
                 Telemetry.log(AnalyticsEvent.LoginFailed(loginFailReason(r.reason)))
@@ -366,8 +373,16 @@ class SteamLoginViewModel(
         Telemetry.log(event)
         viewModelScope.launch {
             appToken?.let { token ->
-                runCatching { backend.signOut(token) }
-                    .onFailure { SteamLog.e("vm: backend sign-out failed", it) }
+                runCatching {
+                    when (action) {
+                        ExitAction.SIGNING_OUT -> backend.signOut(token)
+                        ExitAction.CLEARING -> backend.clearMyData(token)
+                        ExitAction.NONE -> Unit
+                    }
+                }.onFailure {
+                    val label = if (action == ExitAction.CLEARING) "clear-my-data" else "sign-out"
+                    SteamLog.e("vm: backend $label failed", it)
+                }
             }
             Telemetry.setUserId(null)
             Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "false")

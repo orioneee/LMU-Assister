@@ -4,8 +4,10 @@ package com.orioooneee.lmuasister.data.steam
  * On-device Steam authentication, backed by JavaSteam (Android + desktop JVM).
  *
  * The architecture intent: do the login + ticket generation where the user physically
- * is (residential IP) and send only the short-lived session ticket to our backend. iOS,
- * which has no native Steam library, uses the device tunnel instead.
+ * is (residential IP) and send only the short-lived session ticket to our backend.
+ *
+ * TUNNEL_DISABLED:
+ * The previous iOS backend + device tunnel note is intentionally retired.
  */
 interface SteamAuthClient {
 

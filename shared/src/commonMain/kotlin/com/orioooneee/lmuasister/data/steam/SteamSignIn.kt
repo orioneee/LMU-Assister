@@ -7,8 +7,13 @@ sealed interface SignInOutcome {
     data class DeviceConfirmationPending(val challengeId: String, val expiresIn: Int) : SignInOutcome
     data class Failure(val reason: String) : SignInOutcome
 
-    /** The device egress tunnel is required / not connected — the UI should retry. */
-    data object TunnelRequired : SignInOutcome
+    /*
+     * TUNNEL_DISABLED:
+     * The old device-egress tunnel flow is intentionally kept out of the active sign-in
+     * contract. Leave this here as a marker instead of deleting the old path outright.
+     *
+     * data object TunnelRequired : SignInOutcome
+     */
 }
 
 /**

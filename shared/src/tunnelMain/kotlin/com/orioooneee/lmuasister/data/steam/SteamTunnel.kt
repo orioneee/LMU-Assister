@@ -1,5 +1,10 @@
 package com.orioooneee.lmuasister.data.steam
 
+/*
+ * TUNNEL_DISABLED:
+ * Device egress tunneling is no longer part of the active auth path. The relay remains
+ * here as commented reference code, but should not compile into any target.
+ *
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
@@ -229,3 +234,4 @@ internal class SteamTunnel(
         const val LAST_CONNECT_MS = 10_000L // last address gets the full budget
     }
 }
+*/

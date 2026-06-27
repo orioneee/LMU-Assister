@@ -83,6 +83,7 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
                 // Auth surface — never hit while MockSteamSignIn is active, but answered
                 // so anything calling the backend directly still gets a sane response.
                 path == "/auth/sign-out" -> respondOk()
+                path == "/auth/clear-my-data" -> json("""{"ok":true}""")
                 path.startsWith("/auth/") -> json("""{"token":"mock-token","uid":"mock-uid-0397"}""")
 
                 else -> json("{}")

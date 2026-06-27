@@ -1,5 +1,9 @@
 package com.orioooneee.lmuasister.data.steam
 
+/*
+ * TUNNEL_DISABLED:
+ * WebSocket client support for the old device egress tunnel. Kept only as commented reference.
+ *
 import io.ktor.client.HttpClient
 
 /**
@@ -9,3 +13,4 @@ import io.ktor.client.HttpClient
  * keepalive is installed so the upgraded connection stays live end-to-end.
  */
 internal expect fun tunnelWsClient(): HttpClient
+*/

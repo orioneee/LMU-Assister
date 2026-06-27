@@ -253,14 +253,17 @@ fun MainShell(
                     onBack = { nav.popBackStack() },
                     onSeeAllRaces = {
                         val uid = entry.toRoute<PublicUserDetailRoute>().uid
+                        Telemetry.log(AnalyticsEvent.PublicAllRacesOpened)
                         nav.navigate(PublicUserRacesRoute(uid))
                     },
                     onOpenCategory = { category ->
                         val uid = entry.toRoute<PublicUserDetailRoute>().uid
+                        Telemetry.log(AnalyticsEvent.PublicCategoryRacesOpened(category.key))
                         nav.navigate(PublicUserCategoryRacesRoute(uid, category.key, category.title))
                     },
                     onOpenTracks = {
                         val uid = entry.toRoute<PublicUserDetailRoute>().uid
+                        Telemetry.log(AnalyticsEvent.PublicTrackBreakdownOpened)
                         nav.navigate(PublicUserTrackBreakdownRoute(uid))
                     },
                     onOpenRace = { eventId, split ->
@@ -302,7 +305,10 @@ fun MainShell(
                     uid = route.uid,
                     insets = insets,
                     onBack = { nav.popBackStack() },
-                    onOpenTrack = { trackId -> nav.navigate(PublicUserTrackDetailRoute(route.uid, trackId)) },
+                    onOpenTrack = { trackId ->
+                        Telemetry.log(AnalyticsEvent.PublicTrackOpened(trackId))
+                        nav.navigate(PublicUserTrackDetailRoute(route.uid, trackId))
+                    },
                 )
             }
             composable<PublicUserTrackDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->

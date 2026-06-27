@@ -52,6 +52,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.orioooneee.lmuasister.analytics.AnalyticsEvent
+import com.orioooneee.lmuasister.analytics.Telemetry
 import coil3.compose.AsyncImage
 import com.orioooneee.lmuasister.data.remote.PublicUserDto
 import com.orioooneee.lmuasister.data.remote.RatingDistributionBucketDto
@@ -101,7 +103,10 @@ fun PublicUsersScreen(
             .padding(horizontal = 16.dp),
     ) {
         Spacer(Modifier.height(topInset + 18.dp))
-        DriversTopBar(onSearch = { showSearch = true })
+        DriversTopBar(onSearch = {
+            Telemetry.log(AnalyticsEvent.DriversSearchOpened)
+            showSearch = true
+        })
         Spacer(Modifier.height(16.dp))
 
         when (val s = state) {
@@ -128,7 +133,14 @@ fun PublicUsersScreen(
                 Spacer(Modifier.height(8.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     s.summary.topSafety.forEachIndexed { index, user ->
-                        PublicUserCard(index + 1, user, onClick = { onOpenUser(user.uid) })
+                        PublicUserCard(
+                            index + 1,
+                            user,
+                            onClick = {
+                                Telemetry.log(AnalyticsEvent.PublicUserOpened(source = "top_safety"))
+                                onOpenUser(user.uid)
+                            },
+                        )
                     }
                 }
             }
@@ -144,6 +156,7 @@ fun PublicUsersScreen(
             onLoadMore = viewModel::loadMoreSearch,
             onOpenUser = {
                 showSearch = false
+                Telemetry.log(AnalyticsEvent.PublicUserOpened(source = "search"))
                 onOpenUser(it)
             },
             onDismiss = {

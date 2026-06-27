@@ -7,7 +7,8 @@ package com.orioooneee.lmuasister.analytics
  * Grouped by the question they answer:
  *   - Schedule (anonymous funnel): who browses, which weeks/tiers, where it errors
  *   - Race detail / leaderboard:   do users go deeper than the schedule list
- *   - Login funnel:                the main drop-off (Steam creds → 2FA → tunnel → success)
+ *   - Public drivers:              search, profile opens, public drill-downs
+ *   - Login funnel:                the main drop-off (Steam creds → 2FA → success)
  *   - Profile:                     what signed-in (high-value) users do
  */
 sealed class AnalyticsEvent(
@@ -29,6 +30,54 @@ sealed class AnalyticsEvent(
     class LeaderboardOpened(leaderboardId: String) :
         AnalyticsEvent("leaderboard_full_opened", mapOf("leaderboard_id" to leaderboardId))
 
+    data object DriversViewed : AnalyticsEvent("drivers_viewed")
+
+    class DriversLoaded(total: Int, fromCache: Boolean) :
+        AnalyticsEvent("drivers_loaded", mapOf("total" to total, "from_cache" to fromCache))
+
+    data object DriversSearchOpened : AnalyticsEvent("drivers_search_opened")
+
+    class DriversSearchSubmitted(queryLength: Int) :
+        AnalyticsEvent("drivers_search_submitted", mapOf("query_length" to queryLength))
+
+    class DriversSearchResults(queryLength: Int, page: Int, results: Int, total: Int, hasMore: Boolean) :
+        AnalyticsEvent(
+            "drivers_search_results",
+            mapOf(
+                "query_length" to queryLength,
+                "page" to page,
+                "results" to results,
+                "total" to total,
+                "has_more" to hasMore,
+            ),
+        )
+
+    class DriversSearchFailed(queryLength: Int, page: Int, reason: String) :
+        AnalyticsEvent(
+            "drivers_search_failed",
+            mapOf("query_length" to queryLength, "page" to page, "reason" to reason),
+        )
+
+    /** [source] = top_safety | search. */
+    class PublicUserOpened(source: String) :
+        AnalyticsEvent("public_user_opened", mapOf("source" to source))
+
+    class PublicProfileLoaded(fromCache: Boolean, externalData: Boolean) :
+        AnalyticsEvent("public_profile_loaded", mapOf("from_cache" to fromCache, "external_data" to externalData))
+
+    class PublicProfileFailed(reason: String) :
+        AnalyticsEvent("public_profile_failed", mapOf("reason" to reason))
+
+    data object PublicAllRacesOpened : AnalyticsEvent("public_all_races_opened")
+
+    class PublicCategoryRacesOpened(category: String) :
+        AnalyticsEvent("public_category_races_opened", mapOf("category" to category))
+
+    data object PublicTrackBreakdownOpened : AnalyticsEvent("public_tracks_opened")
+
+    class PublicTrackOpened(trackId: String) :
+        AnalyticsEvent("public_track_opened", mapOf("track_id" to trackId))
+
     data object LoginFormShown : AnalyticsEvent("login_form_shown")
 
     class LoginSubmitted(has2fa: Boolean) :
@@ -45,7 +94,12 @@ sealed class AnalyticsEvent(
     class LoginFailed(reason: String) :
         AnalyticsEvent("login_failed", mapOf("reason" to reason))
 
-    data object LoginTunnelRequired : AnalyticsEvent("login_tunnel_required")
+    /*
+     * TUNNEL_DISABLED:
+     * The tunnel-required event belonged to the old device-egress auth path.
+     *
+     * data object LoginTunnelRequired : AnalyticsEvent("login_tunnel_required")
+     */
 
     data object ProfileReauthTriggered : AnalyticsEvent("profile_reauth_triggered")
 

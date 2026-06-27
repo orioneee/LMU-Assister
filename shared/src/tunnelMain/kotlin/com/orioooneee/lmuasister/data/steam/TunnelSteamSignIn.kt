@@ -1,5 +1,10 @@
 package com.orioooneee.lmuasister.data.steam
 
+/*
+ * TUNNEL_DISABLED:
+ * This entire old backend-side Steam login implementation is intentionally commented out.
+ * It is kept in place for reference, but no active platform module should bind or compile it.
+ *
 import com.orioooneee.lmuasister.data.remote.BackendAuthFailed
 import com.orioooneee.lmuasister.data.remote.BackendTunnelRequired
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
@@ -236,3 +241,4 @@ internal class TunnelSteamSignIn(
         else SteamCreds(account = it.accountName, refresh = it.refreshToken, guard = it.guardData)
     }
 }
+*/
