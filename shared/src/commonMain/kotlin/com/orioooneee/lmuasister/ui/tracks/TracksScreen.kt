@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -150,11 +149,11 @@ internal fun trackAsset(t: TrackFullDto, file: String): String? = when (file) {
     else -> null
 }
 
-/** ISO country code → circle-flag SVG url (null if not a 2-letter code). */
+/** ISO country code → rounded rectangular flag SVG url (null if not a 2-letter code). */
 internal fun trackFlagUrl(cc: String?): String? {
     val c = cc?.trim()?.lowercase() ?: return null
     if (c.length != 2 || c.any { it !in 'a'..'z' }) return null
-    return "https://cdn.jsdelivr.net/gh/HatScripts/circle-flags/flags/$c.svg"
+    return "https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/4x3/$c.svg"
 }
 
 @Composable
@@ -172,10 +171,11 @@ internal fun TrackSvgImage(url: String, modifier: Modifier) {
 
 @Composable
 internal fun FlagCircle(url: String, size: Dp, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(4.dp)
     AsyncImage(
         model = url,
         contentDescription = null,
         contentScale = ContentScale.Crop,
-        modifier = modifier.size(size).clip(CircleShape),
+        modifier = modifier.size(width = size * 1.333f, height = size).clip(shape).border(1.dp, Outline, shape),
     )
 }

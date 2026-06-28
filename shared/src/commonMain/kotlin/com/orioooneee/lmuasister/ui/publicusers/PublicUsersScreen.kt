@@ -50,6 +50,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.orioooneee.lmuasister.analytics.AnalyticsEvent
@@ -59,7 +60,6 @@ import com.orioooneee.lmuasister.data.remote.PublicUserDto
 import com.orioooneee.lmuasister.data.remote.RatingDistributionBucketDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.UsersDistributionDto
-import com.orioooneee.lmuasister.ui.IconFlag
 import com.orioooneee.lmuasister.ui.IconSearch
 import com.orioooneee.lmuasister.ui.components.EmptyState
 import com.orioooneee.lmuasister.ui.components.RankBadge
@@ -269,12 +269,12 @@ fun PublicUserCard(index: Int?, user: PublicUserDto, onClick: () -> Unit, modifi
                 Text("#$index", style = MaterialTheme.typography.labelLarge, color = accent, fontWeight = FontWeight.Black)
             }
         }
-        DriverAvatar(user.nationality, user.avatarUrl, accent, Modifier.size(42.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                DriverFlag(user.nationality, height = 16.dp)
                 Text(
                     user.name ?: user.uid,
                     style = MaterialTheme.typography.titleMedium,
@@ -383,19 +383,21 @@ private fun StatBadge(label: String, value: Int?, color: Color) {
 }
 
 @Composable
-private fun DriverAvatar(nationality: String?, avatarUrl: String?, accent: Color, modifier: Modifier = Modifier) {
-    val cc = nationality?.takeIf { it.length == 2 && it.all(Char::isLetter) }?.lowercase()
-    val shape = CircleShape
-    Box(modifier.clip(shape).background(Surface2).border(1.dp, accent.copy(alpha = 0.65f), shape), contentAlignment = Alignment.Center) {
-        val image = avatarUrl?.takeIf { it.isNotBlank() } ?: cc?.let { "https://flagcdn.com/w160/$it.png" }
-        if (image == null) Icon(IconFlag, contentDescription = null, tint = TextLow, modifier = Modifier.size(20.dp))
-        else AsyncImage(
-            model = image,
-            contentDescription = nationality,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().clip(shape),
-        )
-    }
+private fun DriverFlag(nationality: String?, height: Dp, modifier: Modifier = Modifier) {
+    val url = flagUrl(nationality) ?: return
+    val shape = RoundedCornerShape(4.dp)
+    AsyncImage(
+        model = url,
+        contentDescription = nationality,
+        contentScale = ContentScale.Crop,
+        modifier = modifier.size(width = height * 1.333f, height = height).clip(shape).border(1.dp, Outline, shape),
+    )
+}
+
+private fun flagUrl(value: String?): String? {
+    val cc = value?.trim()?.lowercase() ?: return null
+    if (cc.length != 2 || cc.any { it !in 'a'..'z' }) return null
+    return "https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/4x3/$cc.svg"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

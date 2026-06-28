@@ -1181,7 +1181,7 @@ private fun ClassificationLine(
             modifier = Modifier.width(18.dp),
         )
         Column(
-            modifier = Modifier.width(18.dp),
+            modifier = Modifier.width(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -1373,11 +1373,12 @@ private fun rankColor(rank: String): Color = when (rank.trim().firstOrNull()?.lo
 
 @Composable
 private fun FlagCircle(url: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(4.dp)
     AsyncImage(
         model = url,
         contentDescription = null,
         contentScale = ContentScale.Crop,
-        modifier = modifier.size(size).clip(CircleShape),
+        modifier = modifier.size(width = size * 1.333f, height = size).clip(shape).border(1.dp, Outline, shape),
     )
 }
 
@@ -1508,5 +1509,5 @@ private fun sessionLabel(key: String): String = when (key) {
 private fun flagFor(value: String?): String? {
     val cc = value?.trim()?.lowercase() ?: return null
     if (cc.length != 2 || cc.any { it !in 'a'..'z' }) return null
-    return "https://cdn.jsdelivr.net/gh/HatScripts/circle-flags/flags/$cc.svg"
+    return "https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/4x3/$cc.svg"
 }

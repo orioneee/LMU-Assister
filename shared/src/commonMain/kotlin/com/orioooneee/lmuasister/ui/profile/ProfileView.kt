@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -43,7 +42,6 @@ import com.orioooneee.lmuasister.data.remote.RaceSessionsDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SteamProfile
-import com.orioooneee.lmuasister.ui.IconFlag
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
 import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.RankBadge
@@ -420,12 +418,10 @@ private fun ProfileHeader(
     onOpenSuspensions: (active: Boolean) -> Unit,
     onOpenTracks: () -> Unit,
 ) {
-    val accent = rankColor(profile.driverRating?.rank.orEmpty())
     val name = profile.displayName ?: profile.name ?: profile.username ?: accountName.ifBlank { "Driver" }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Avatar sized to the name line, sitting inline with it.
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            CountryFlag(profile.nationality, accent, size = 28.dp)
+            CountryFlag(profile.nationality, height = 18.dp)
             Text(
                 name,
                 style = MaterialTheme.typography.titleLarge,
@@ -462,25 +458,21 @@ private fun ProfileHeader(
 
 
 @Composable
-private fun CountryFlag(nationality: String?, accent: Color, size: Dp = 68.dp) {
-    val box = Modifier
-        .size(size)
-        .clip(CircleShape)
-        .background(Surface2)
-        .border(1.5.dp, accent.copy(alpha = 0.7f), CircleShape)
-    val cc = nationality?.takeIf { it.length == 2 && it.all(Char::isLetter) }?.lowercase()
-    if (cc == null) {
-        Box(box, contentAlignment = Alignment.Center) {
-            Icon(IconFlag, contentDescription = null, tint = TextLow, modifier = Modifier.size(size * 0.5f))
-        }
-        return
-    }
+private fun CountryFlag(nationality: String?, height: Dp, modifier: Modifier = Modifier) {
+    val url = profileFlagUrl(nationality) ?: return
+    val shape = RoundedCornerShape(4.dp)
     AsyncImage(
-        model = "https://flagcdn.com/w160/$cc.png",
+        model = url,
         contentDescription = nationality,
         contentScale = ContentScale.Crop,
-        modifier = box,
+        modifier = modifier.size(width = height * 1.333f, height = height).clip(shape).border(1.dp, Outline, shape),
     )
+}
+
+private fun profileFlagUrl(value: String?): String? {
+    val cc = value?.trim()?.lowercase() ?: return null
+    if (cc.length != 2 || cc.any { it !in 'a'..'z' }) return null
+    return "https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/4x3/$cc.svg"
 }
 
 @Composable

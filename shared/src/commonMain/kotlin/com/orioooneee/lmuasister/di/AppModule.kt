@@ -6,6 +6,7 @@ import com.orioooneee.lmuasister.data.mock.mockHttpClient
 import com.orioooneee.lmuasister.data.remote.AppTokenHolder
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
+import com.orioooneee.lmuasister.analytics.installPerformanceMonitoring
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
 import com.orioooneee.lmuasister.ui.profile.SteamAuthRunner
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
@@ -20,6 +21,7 @@ val appModule = module {
         // No real backend configured (or backend.mock=true) → serve bundled mock data.
         if (BuildConfig.USE_MOCK) mockHttpClient()
         else HttpClient {
+            installPerformanceMonitoring()
             followRedirects = true
             install(HttpTimeout) {
                 requestTimeoutMillis = 20_000

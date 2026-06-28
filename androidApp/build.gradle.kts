@@ -8,6 +8,7 @@ plugins {
     // R8 mapping file to Crashlytics on release builds.
     alias(libs.plugins.googleServices)
     alias(libs.plugins.firebaseCrashlytics)
+    alias(libs.plugins.firebasePerformance)
 }
 
 kotlin {

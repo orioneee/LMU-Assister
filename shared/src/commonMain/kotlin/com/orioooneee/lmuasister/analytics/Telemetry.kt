@@ -30,6 +30,20 @@ interface CrashReporter {
     fun setUserId(id: String?)
 }
 
+/**
+ * Platform-agnostic Firebase Performance facade. Android and iOS emit real HTTP
+ * metrics; desktop keeps the same instrumentation calls as no-ops.
+ */
+interface PerformanceMonitor {
+    fun startHttpMetric(url: String, method: String): HttpPerformanceMetric
+}
+
+interface HttpPerformanceMetric {
+    fun setHttpResponseCode(code: Int)
+    fun setResponseContentType(contentType: String?)
+    fun stop()
+}
+
 internal object NoopAnalytics : Analytics {
     override fun logEvent(event: AnalyticsEvent) {}
     override fun logScreenView(screenName: String) {}
@@ -42,6 +56,16 @@ internal object NoopCrashReporter : CrashReporter {
     override fun log(message: String) {}
     override fun setCustomKey(key: String, value: Any?) {}
     override fun setUserId(id: String?) {}
+}
+
+internal object NoopPerformanceMonitor : PerformanceMonitor {
+    override fun startHttpMetric(url: String, method: String): HttpPerformanceMetric = NoopHttpPerformanceMetric
+}
+
+private object NoopHttpPerformanceMetric : HttpPerformanceMetric {
+    override fun setHttpResponseCode(code: Int) {}
+    override fun setResponseContentType(contentType: String?) {}
+    override fun stop() {}
 }
 
 /**
@@ -59,6 +83,7 @@ class TelemetryError(message: String, cause: Throwable? = null) : Exception(mess
 object Telemetry {
     var analytics: Analytics = NoopAnalytics
     var crashReporter: CrashReporter = NoopCrashReporter
+    var performanceMonitor: PerformanceMonitor = NoopPerformanceMonitor
 
     fun log(event: AnalyticsEvent) {
         analytics.logEvent(event)

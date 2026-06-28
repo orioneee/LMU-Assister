@@ -25,10 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.TrackAttemptDto
@@ -245,6 +247,9 @@ private fun TrackContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { TrackCard(d.track) }
+        detailedSchemeUrl(d.track)?.let { url ->
+            item { DetailedSchemeCard(url) }
+        }
         when (val personalState = d.personal) {
             PersonalRecordsState.Loading -> item { PersonalRecordsSkeleton() }
             PersonalRecordsState.SignedOut -> item { Hint("Sign in to see your records on this track.") }
@@ -311,6 +316,10 @@ private fun sameAttempt(a: TrackAttemptDto, b: TrackAttemptDto): Boolean =
         a.session == b.session &&
         a.date == b.date
 
+private fun detailedSchemeUrl(t: TrackFullDto): String? =
+    t.detailedScheme?.takeIf { it.isNotBlank() }
+        ?: t.assets?.detailedScheme?.takeIf { it.isNotBlank() }
+
 @Composable
 private fun TrackCard(t: TrackFullDto) {
     val logo = trackAsset(t, "logo.svg")
@@ -335,6 +344,22 @@ private fun TrackCard(t: TrackFullDto) {
                 t.openingYear?.let { MetaChip("est. $it") }
             }
         }
+    }
+}
+
+@Composable
+private fun DetailedSchemeCard(url: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        SectionLabel("ENGINEER SCHEME")
+        AsyncImage(
+            model = url,
+            contentDescription = null,
+            contentScale = ContentScale.FillWidth,
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)),
+        )
     }
 }
 

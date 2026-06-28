@@ -56,12 +56,13 @@ kotlin {
                 implementation(libs.bouncycastle.prov)
                 // Encrypted storage for legacy/app-managed Steam session data.
                 implementation(libs.androidx.security.crypto)
-                // Firebase Analytics + Crashlytics (Android-only telemetry backend).
+                // Firebase Analytics + Crashlytics + Performance (Android-only telemetry backend).
                 // `api` so the app module's Crashlytics Gradle plugin sees the dependency
                 // on its runtime classpath. The BoM pins the module versions.
                 api(project.dependencies.platform(libs.firebase.bom))
                 api(libs.firebase.analytics)
                 api(libs.firebase.crashlytics)
+                api(libs.firebase.performance)
             }
         }
         commonMain.dependencies {

@@ -23,6 +23,7 @@ data class TrackFullDto(
     val eventName: String? = null,
     val grandPrix: String? = null,
     val fullName: String? = null,
+    val detailedScheme: String? = null,
     val countryCode: String? = null,
     val lengthKm: String? = null,    // string per contract ("6.019")
     val corners: Int? = null,
@@ -36,6 +37,7 @@ data class TrackFullDto(
 @Serializable
 data class TrackAssetsDto(
     val scheme: String? = null,
+    val detailedScheme: String? = null,
     val logo: String? = null,
     val cover: String? = null,
     val background: String? = null,

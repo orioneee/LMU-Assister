@@ -2,6 +2,7 @@ import Foundation
 import Shared
 import FirebaseAnalytics
 import FirebaseCrashlytics
+import FirebasePerformance
 
 // Note: `Analytics` exists in BOTH Shared (our Kotlin protocol) and FirebaseAnalytics
 // (Firebase's class), so every reference is module-qualified to avoid ambiguity.
@@ -10,6 +11,7 @@ enum TelemetryBridge {
     static func install() {
         Telemetry.shared.analytics = FirebaseAnalyticsSink()
         Telemetry.shared.crashReporter = FirebaseCrashSink()
+        Telemetry.shared.performanceMonitor = FirebasePerformanceSink()
         Telemetry.shared.userProperty(key: UserProperties.shared.PLATFORM, value: "ios")
     }
 }
@@ -75,5 +77,61 @@ private final class FirebaseCrashSink: CrashReporter {
 
     func setUserId(id: String?) {
         crash.setUserID(id ?? "")
+    }
+}
+
+private final class FirebasePerformanceSink: PerformanceMonitor {
+    func startHttpMetric(url: String, method: String) -> HttpPerformanceMetric {
+        guard let url = URL(string: url) else {
+            return NoopHttpMetric()
+        }
+        guard let metric = HTTPMetric(url: url, httpMethod: method.firebaseHttpMethod) else {
+            return NoopHttpMetric()
+        }
+        metric.start()
+        return FirebaseHttpMetric(metric: metric)
+    }
+}
+
+private final class FirebaseHttpMetric: HttpPerformanceMetric {
+    private let metric: HTTPMetric
+
+    init(metric: HTTPMetric) {
+        self.metric = metric
+    }
+
+    func setHttpResponseCode(code: Int32) {
+        metric.responseCode = Int(code)
+    }
+
+    func setResponseContentType(contentType: String?) {
+        metric.responseContentType = contentType
+    }
+
+    func stop() {
+        metric.stop()
+    }
+}
+
+private final class NoopHttpMetric: HttpPerformanceMetric {
+    func setHttpResponseCode(code: Int32) {}
+    func setResponseContentType(contentType: String?) {}
+    func stop() {}
+}
+
+private extension String {
+    var firebaseHttpMethod: HTTPMethod {
+        switch uppercased() {
+        case "CONNECT": return .connect
+        case "DELETE": return .delete
+        case "GET": return .get
+        case "HEAD": return .head
+        case "OPTIONS": return .options
+        case "PATCH": return .patch
+        case "POST": return .post
+        case "PUT": return .put
+        case "TRACE": return .trace
+        default: return .get
+        }
     }
 }

@@ -4,10 +4,13 @@ import android.content.Context
 import android.os.Bundle
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.google.firebase.perf.FirebasePerformance
+import com.google.firebase.perf.metrics.HttpMetric
 
 fun initTelemetry(context: Context) {
     Telemetry.analytics = FirebaseAnalyticsSink(context.applicationContext)
     Telemetry.crashReporter = FirebaseCrashSink()
+    Telemetry.performanceMonitor = FirebasePerformanceSink()
     Telemetry.userProperty(UserProperties.PLATFORM, "android")
 }
 
@@ -54,6 +57,32 @@ private class FirebaseCrashSink : CrashReporter {
     }
 
     override fun setUserId(id: String?) = crash.setUserId(id ?: "")
+}
+
+private class FirebasePerformanceSink : PerformanceMonitor {
+    override fun startHttpMetric(url: String, method: String): HttpPerformanceMetric {
+        return runCatching {
+            val metric = FirebasePerformance.getInstance().newHttpMetric(url, method)
+            metric.start()
+            FirebaseHttpPerformanceMetric(metric)
+        }.getOrElse {
+            NoopPerformanceMonitor.startHttpMetric(url, method)
+        }
+    }
+}
+
+private class FirebaseHttpPerformanceMetric(private val metric: HttpMetric) : HttpPerformanceMetric {
+    override fun setHttpResponseCode(code: Int) {
+        metric.setHttpResponseCode(code)
+    }
+
+    override fun setResponseContentType(contentType: String?) {
+        if (!contentType.isNullOrBlank()) metric.setResponseContentType(contentType)
+    }
+
+    override fun stop() {
+        metric.stop()
+    }
 }
 
 private fun Map<String, Any?>.toBundle(): Bundle = Bundle().apply {

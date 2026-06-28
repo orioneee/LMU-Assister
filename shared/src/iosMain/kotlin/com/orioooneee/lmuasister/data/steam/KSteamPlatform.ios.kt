@@ -6,6 +6,7 @@ import bruhcollective.itaysonlab.ksteam.models.enums.EGamingDeviceType
 import bruhcollective.itaysonlab.ksteam.models.enums.EOSType
 import bruhcollective.itaysonlab.ksteam.persistence.MemoryPersistenceDriver
 import bruhcollective.itaysonlab.ksteam.platform.DeviceInformation
+import com.orioooneee.lmuasister.analytics.installPerformanceMonitoring
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -34,6 +35,10 @@ internal actual fun createKSteamClient(): SteamClient {
             deviceName = "LMU Assister iOS",
             platformType = EAuthTokenPlatformType.k_EAuthTokenPlatformType_SteamClient,
         )
-        ktor { HttpClient(Darwin) }
+        ktor {
+            HttpClient(Darwin) {
+                installPerformanceMonitoring()
+            }
+        }
     }
 }

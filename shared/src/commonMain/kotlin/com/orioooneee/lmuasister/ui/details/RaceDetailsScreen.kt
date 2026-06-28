@@ -1106,7 +1106,7 @@ private fun Card(title: String? = null, leading: (@Composable () -> Unit)? = nul
 private fun flagUrlFromCode(code: String): String? {
     val cc = code.trim().lowercase()
     if (cc.length != 2 || cc.any { it !in 'a'..'z' }) return null
-    return "https://cdn.jsdelivr.net/gh/HatScripts/circle-flags/flags/$cc.svg"
+    return "https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/4x3/$cc.svg"
 }
 
 private fun flagUrl(country: String): String? {
@@ -1133,7 +1133,7 @@ private fun flagUrl(country: String): String? {
         "china" -> "cn"
         else -> return null
     }
-    return "https://cdn.jsdelivr.net/gh/HatScripts/circle-flags/flags/$code.svg"
+    return "https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/4x3/$code.svg"
 }
 
 @Composable
