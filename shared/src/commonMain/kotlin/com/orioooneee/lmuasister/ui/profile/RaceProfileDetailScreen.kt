@@ -313,7 +313,6 @@ private fun DetailContent(
                             session,
                             showRatingDeltas = key == "race",
                             showSectors = d.features?.sectors != false,
-                            showTeamBadges = !d.externalData && d.source != "racecenter",
                         )
                     }
                 }
@@ -1080,7 +1079,6 @@ private fun SessionCard(
     session: RaceSessionDetailDto,
     showRatingDeltas: Boolean,
     showSectors: Boolean,
-    showTeamBadges: Boolean,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val rows = session.classification
@@ -1110,7 +1108,6 @@ private fun SessionCard(
                     alt = i % 2 == 1,
                     showRatingDeltas = showRatingDeltas,
                     showSectors = showSectors,
-                    showTeamBadges = showTeamBadges,
                 )
             }
             if (teamRows.isNotEmpty() && shown.isNotEmpty()) {
@@ -1128,7 +1125,6 @@ private fun SessionCard(
                     alt = (i + teamRows.size) % 2 == 1,
                     showRatingDeltas = showRatingDeltas,
                     showSectors = showSectors,
-                    showTeamBadges = showTeamBadges,
                 )
             }
             if (canToggle) {
@@ -1160,7 +1156,6 @@ private fun ClassificationLine(
     alt: Boolean,
     showRatingDeltas: Boolean,
     showSectors: Boolean,
-    showTeamBadges: Boolean,
 ) {
     // Zebra striping like the race leaderboards; the player's own row always wins with an amber tint.
     val bg = when {
@@ -1204,9 +1199,6 @@ private fun ClassificationLine(
         // Name + badges share the flexible middle column; the name marquees if it can't fit.
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             val driverName = r.name ?: "—"
-            val teamBadgeName = r.teamName
-                ?.takeIf { it.isNotBlank() }
-                ?.takeUnless { isSameClassificationName(it, driverName) }
             val carName = r.car
                 ?.takeIf { it.isNotBlank() }
                 ?.let { car -> stripCarClass(car).ifBlank { car } }
@@ -1231,7 +1223,6 @@ private fun ClassificationLine(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (showTeamBadges) teamBadgeName?.let { TeamMiniBadge(it) }
                 r.carClass?.takeIf { it.isNotBlank() }?.let { ClassMiniBadge(it) }
                 // Position within the driver's own class (the leading number is the overall position).
                 r.classPosition?.takeIf { it > 0 }?.let { ClassPosBadge(it, r.carClass) }
@@ -1269,16 +1260,6 @@ private fun ClassificationLine(
                 }
             }
         }
-    }
-}
-
-private fun isSameClassificationName(a: String, b: String): Boolean =
-    a.trim().equals(b.trim(), ignoreCase = true)
-
-@Composable
-private fun TeamMiniBadge(teamName: String) {
-    Box(Modifier.clip(RoundedCornerShape(5.dp)).background(Surface2).border(1.dp, Outline, RoundedCornerShape(5.dp)).padding(horizontal = 5.dp, vertical = 2.dp)) {
-        Text(teamName, style = MaterialTheme.typography.labelSmall, color = TextMed, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

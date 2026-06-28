@@ -69,6 +69,7 @@ private data class CarsCache(val ts: Long = 0, val data: List<CarDto> = emptyLis
 
 private const val CARS_KEY = "cars_v2"
 
+@Serializable
 private data class TracksCache(val ts: Long = 0, val data: List<TrackFullDto> = emptyList())
 
 private const val TRACKS_KEY = "tracks_v2"
