@@ -353,7 +353,7 @@ private fun DetailedSchemeCard(url: String) {
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        SectionLabel("ENGINEER SCHEME")
+        SectionLabel("DETAILED SCHEME")
         AsyncImage(
             model = url,
             contentDescription = null,
