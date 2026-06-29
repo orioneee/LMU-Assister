@@ -103,6 +103,7 @@ data class FavoriteCarDto(
     val wins: Int = 0,
     val poles: Int = 0,
     val podiums: Int = 0,
+    @SerialName("car_detail") val carDetail: CarDetailedDto? = null,
 )
 
 @Serializable

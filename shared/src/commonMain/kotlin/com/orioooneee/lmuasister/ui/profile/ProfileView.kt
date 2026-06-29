@@ -51,6 +51,7 @@ import com.orioooneee.lmuasister.ui.components.classColorFor
 import com.orioooneee.lmuasister.ui.components.onBadgeText
 import com.orioooneee.lmuasister.ui.components.shimmerBrush
 import androidx.compose.material3.Icon
+import com.orioooneee.lmuasister.data.remote.CarDetailedDto
 import com.orioooneee.lmuasister.data.remote.FavoriteCarDto
 import com.orioooneee.lmuasister.data.remote.GameVersionDto
 import com.orioooneee.lmuasister.ui.theme.Amber
@@ -116,6 +117,7 @@ fun ProfileView(
     onOpenSuspensions: (active: Boolean) -> Unit = {},
     onOpenCategory: (StatCategory) -> Unit = {},
     onOpenTracks: () -> Unit = {},
+    onOpenCar: (CarDetailedDto) -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         ProfileHeader(profile, accountName, readOnly, enableTrackBreakdown, onOpenSuspensions, onOpenTracks)
@@ -133,7 +135,7 @@ fun ProfileView(
             )
         }
         if (profile.favoriteCars.isNotEmpty()) {
-            FavoriteCarsSection(profile.favoriteCars.take(FAVORITE_CARS_PREVIEW))
+            FavoriteCarsSection(profile.favoriteCars.take(FAVORITE_CARS_PREVIEW), onOpenCar)
         }
 
         if (profile.recentRaces.isNotEmpty()) {
@@ -174,12 +176,12 @@ private fun GameVersionBadge(version: GameVersionDto?) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FavoriteCarsSection(cars: List<FavoriteCarDto>) {
+private fun FavoriteCarsSection(cars: List<FavoriteCarDto>, onOpenCar: (CarDetailedDto) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader("Favorite cars")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             cars.forEachIndexed { index, car ->
-                FavoriteCarCard(index + 1, car)
+                FavoriteCarCard(index + 1, car, onOpenCar)
             }
         }
     }
@@ -187,7 +189,7 @@ private fun FavoriteCarsSection(cars: List<FavoriteCarDto>) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FavoriteCarCard(rank: Int, car: FavoriteCarDto) {
+private fun FavoriteCarCard(rank: Int, car: FavoriteCarDto, onOpenCar: (CarDetailedDto) -> Unit) {
     val carClass = car.carClass?.takeIf { it.isNotBlank() }
     val cleanName = listOfNotNull(car.carName, car.car, car.model)
         .firstOrNull { it.isNotBlank() }
@@ -206,6 +208,7 @@ private fun FavoriteCarCard(rank: Int, car: FavoriteCarDto) {
             .clip(shape)
             .background(Surface1)
             .border(1.dp, Outline, shape)
+            .then(car.carDetail?.let { detail -> Modifier.clickable { onOpenCar(detail) } } ?: Modifier)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {

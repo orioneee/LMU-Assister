@@ -25,6 +25,7 @@ import com.orioooneee.lmuasister.data.cache.LocalCache
 import com.orioooneee.lmuasister.data.remote.AppJson
 import com.orioooneee.lmuasister.data.remote.AppTokenHolder
 import com.orioooneee.lmuasister.data.remote.BackendApi
+import com.orioooneee.lmuasister.data.remote.CarDetailedDto
 import com.orioooneee.lmuasister.data.remote.CarDto
 import com.orioooneee.lmuasister.data.remote.TrackFullDto
 import com.orioooneee.lmuasister.data.remote.ClassInfoDto
@@ -68,6 +69,11 @@ private data class HlCache(val ts: Long = 0, val data: List<HotlapDto> = emptyLi
 private data class CarsCache(val ts: Long = 0, val data: List<CarDto> = emptyList())
 
 private const val CARS_KEY = "cars_v2"
+
+@Serializable
+private data class DetailedCarsCache(val ts: Long = 0, val data: List<CarDetailedDto> = emptyList())
+
+private const val DETAILED_CARS_KEY = "cars_detailed_v2"
 
 @Serializable
 private data class TracksCache(val ts: Long = 0, val data: List<TrackFullDto> = emptyList())
@@ -178,6 +184,28 @@ class RaceRepository(
         models
     }
 
+    private var detailedCarsMem: List<CarDetailedDto>? = null
+
+    fun cachedDetailedCars(): List<CarDetailedDto>? =
+        detailedCarsMem ?: diskList<DetailedCarsCache>(DETAILED_CARS_KEY)?.data
+            ?.let { sortDetailedCars(it) }
+            ?.also { detailedCarsMem = it }
+
+    suspend fun detailedCars(): Result<List<CarDetailedDto>> = runCatching {
+        val raw = api.carsDetailed().cars
+        val list = sortDetailedCars(raw)
+        detailedCarsMem = list
+        runCatching { LocalCache.write(DETAILED_CARS_KEY, AppJson.encodeToString(DetailedCarsCache(nowMs(), raw))) }
+        list
+    }
+
+    suspend fun detailedCar(id: String): CarDetailedDto? {
+        fun List<CarDetailedDto>?.findCar(): CarDetailedDto? = this?.firstOrNull {
+            it.id == id || it.slug == id
+        }
+        return cachedDetailedCars().findCar() ?: detailedCars().getOrNull().findCar()
+    }
+
     private var tracksMem: List<TrackFullDto>? = null
 
     fun cachedTracks(): List<TrackFullDto>? =
@@ -198,6 +226,9 @@ class RaceRepository(
         val seen = HashSet<String>()
         return list.filter { seen.add("${it.base}|${it.lengthKm}|${it.corners}") }
     }
+
+    private fun sortDetailedCars(list: List<CarDetailedDto>): List<CarDetailedDto> =
+        list.sortedWith(compareBy({ it.category }, { it.manufacturer }, { it.name }))
 
     private var liveryModelsMem: Map<String, String>? = null
 

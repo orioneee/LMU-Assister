@@ -95,6 +95,29 @@ val IconPersonOutline: ImageVector by lazy {
     }
 }
 
+val IconGroupOutline: ImageVector by lazy {
+    icon("GroupOutline") {
+        path(stroke = white, strokeLineWidth = 1.7f, strokeLineJoin = StrokeJoin.Round) {
+            moveTo(14.8f, 8.1f)
+            arcToRelative(2.8f, 2.8f, 0f, true, true, -5.6f, 0f)
+            arcToRelative(2.8f, 2.8f, 0f, true, true, 5.6f, 0f)
+            close()
+            moveTo(6.3f, 19.2f)
+            arcToRelative(5.7f, 5.7f, 0f, false, true, 11.4f, 0f)
+        }
+        path(stroke = white, strokeLineWidth = 1.7f, strokeLineCap = StrokeCap.Round) {
+            moveTo(6.7f, 10.2f)
+            arcToRelative(2.1f, 2.1f, 0f, true, true, -1.7f, -3.8f)
+            moveTo(4.2f, 17.4f)
+            arcToRelative(4.1f, 4.1f, 0f, false, true, 3.5f, -3.2f)
+            moveTo(17.3f, 10.2f)
+            arcToRelative(2.1f, 2.1f, 0f, true, false, 1.7f, -3.8f)
+            moveTo(19.8f, 17.4f)
+            arcToRelative(4.1f, 4.1f, 0f, false, false, -3.5f, -3.2f)
+        }
+    }
+}
+
 val IconTools: ImageVector by lazy {
     icon("Tools") {
         path(fill = white) {
@@ -137,6 +160,34 @@ val IconFlag: ImageVector by lazy {
         path(fill = white) {
             moveTo(5f, 3f); lineTo(6.6f, 3f); lineTo(6.6f, 21f); lineTo(5f, 21f); close()
             moveTo(6.6f, 4f); lineTo(19f, 4f); lineTo(19f, 13f); lineTo(6.6f, 13f); close()
+        }
+    }
+}
+
+val IconCar: ImageVector by lazy {
+    icon("Car") {
+        path(stroke = white, strokeLineWidth = 1.8f, strokeLineJoin = StrokeJoin.Round, strokeLineCap = StrokeCap.Round) {
+            moveTo(5f, 12f)
+            lineTo(6.8f, 7.8f)
+            arcToRelative(2f, 2f, 0f, false, true, 1.8f, -1.2f)
+            lineTo(15.4f, 6.6f)
+            arcToRelative(2f, 2f, 0f, false, true, 1.8f, 1.2f)
+            lineTo(19f, 12f)
+            lineTo(20f, 12.8f)
+            lineTo(20f, 18f)
+            lineTo(18f, 18f)
+            lineTo(17.4f, 16.4f)
+            lineTo(6.6f, 16.4f)
+            lineTo(6f, 18f)
+            lineTo(4f, 18f)
+            lineTo(4f, 12.8f)
+            close()
+            moveTo(7f, 12f)
+            lineTo(17f, 12f)
+            moveTo(7.5f, 14.3f)
+            lineTo(7.5f, 14.3f)
+            moveTo(16.5f, 14.3f)
+            lineTo(16.5f, 14.3f)
         }
     }
 }

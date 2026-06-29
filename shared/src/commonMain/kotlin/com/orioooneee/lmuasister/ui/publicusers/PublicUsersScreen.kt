@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.orioooneee.lmuasister.analytics.AnalyticsEvent
 import com.orioooneee.lmuasister.analytics.Telemetry
 import coil3.compose.AsyncImage
+import com.orioooneee.lmuasister.data.remote.CarDetailedDto
 import com.orioooneee.lmuasister.data.remote.PublicUserDto
 import com.orioooneee.lmuasister.data.remote.RatingDistributionBucketDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
@@ -524,6 +525,7 @@ fun PublicUserDetailScreen(
     onSeeAllRaces: () -> Unit,
     onOpenCategory: (StatCategory) -> Unit,
     onOpenTracks: () -> Unit,
+    onOpenCar: (CarDetailedDto) -> Unit,
     onOpenRace: (eventId: String, split: Int?) -> Unit,
 ) {
     val state by viewModel.detail.collectAsStateWithLifecycle()
@@ -574,6 +576,7 @@ fun PublicUserDetailScreen(
                     onOpenRace = onOpenRace,
                     onOpenCategory = onOpenCategory,
                     onOpenTracks = onOpenTracks,
+                    onOpenCar = onOpenCar,
                 )
             }
         }

@@ -59,6 +59,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.orioooneee.lmuasister.data.remote.CarDetailedDto
 import com.orioooneee.lmuasister.supportsSteamGuardMobileApproval
 import com.orioooneee.lmuasister.data.steam.SteamGuardKind
 import com.orioooneee.lmuasister.ui.IconSteam
@@ -96,6 +97,7 @@ fun ProfileScreen(
     onOpenCategory: (StatCategory) -> Unit = {},
     onOpenPrivacy: () -> Unit = {},
     onOpenTracks: () -> Unit = {},
+    onOpenCar: (CarDetailedDto) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val topInset = insets.calculateTopPadding()
@@ -165,7 +167,7 @@ fun ProfileScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Spacer(Modifier.height(topInset + 24.dp))
-                ProfileContent(signedIn.backend, onSeeAllRaces, onOpenRace, onOpenSuspensions, onOpenCategory, onOpenTracks)
+                ProfileContent(signedIn.backend, onSeeAllRaces, onOpenRace, onOpenSuspensions, onOpenCategory, onOpenTracks, onOpenCar)
                 Spacer(Modifier.height(24.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -459,6 +461,7 @@ private fun ProfileContent(
     onOpenSuspensions: (active: Boolean) -> Unit,
     onOpenCategory: (StatCategory) -> Unit,
     onOpenTracks: () -> Unit,
+    onOpenCar: (CarDetailedDto) -> Unit,
 ) {
     when (backend) {
         is BackendState.Ok -> ProfileView(
@@ -469,6 +472,7 @@ private fun ProfileContent(
             onOpenSuspensions = onOpenSuspensions,
             onOpenCategory = onOpenCategory,
             onOpenTracks = onOpenTracks,
+            onOpenCar = onOpenCar,
         )
         BackendState.Loading -> ProfileSkeleton()
         is BackendState.AuthFailed -> ProfileMessage("Couldn't load profile", backend.message)

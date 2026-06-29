@@ -23,6 +23,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -39,6 +42,10 @@ import androidx.navigation.toRoute
 import com.orioooneee.lmuasister.analytics.AnalyticsEvent
 import com.orioooneee.lmuasister.analytics.Telemetry
 import com.orioooneee.lmuasister.data.model.Race
+import com.orioooneee.lmuasister.data.remote.CarDetailedDto
+import com.orioooneee.lmuasister.data.remote.displayId
+import com.orioooneee.lmuasister.ui.cars.CarDetailScreen
+import com.orioooneee.lmuasister.ui.cars.CarsScreen
 import com.orioooneee.lmuasister.ui.components.EmptyState
 import com.orioooneee.lmuasister.ui.components.RefreshableContent
 import com.orioooneee.lmuasister.ui.details.FullLeaderboardScreen
@@ -67,6 +74,7 @@ import com.orioooneee.lmuasister.ui.theme.TextMed
 import kotlinx.serialization.Serializable
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.error_title
+import lmuassister.shared.generated.resources.nav_cars
 import lmuassister.shared.generated.resources.nav_profile
 import lmuassister.shared.generated.resources.nav_drivers
 import lmuassister.shared.generated.resources.nav_schedule
@@ -88,7 +96,13 @@ object PublicUsersRoute
 object TracksRoute
 
 @Serializable
+object CarsRoute
+
+@Serializable
 data class TrackDetailRoute(val trackId: String)
+
+@Serializable
+data class CarDetailRoute(val carId: String)
 
 @Serializable
 data class DetailsRoute(val raceId: String)
@@ -136,8 +150,9 @@ private const val NAV_ANIM = 300
 private enum class TopTab(val icon: ImageVector) {
     Schedule(IconCalendarOutline),
     Tracks(IconFlag),
-    Drivers(IconPersonOutline),
-    Profile(IconPersonOutline),
+    Cars(IconCar),
+    Drivers(IconGroupOutline),
+    Profile(IconPerson),
 }
 
 @Composable
@@ -148,14 +163,16 @@ fun MainShell(
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val currentDest = backStack?.destination
+    var selectedCar by remember { mutableStateOf<CarDetailedDto?>(null) }
 
     val onTopLevel = currentDest?.hierarchy?.any {
         it.hasRoute(HomeRoute::class) || it.hasRoute(PublicUsersRoute::class) ||
-            it.hasRoute(TracksRoute::class) || it.hasRoute(ProfileRoute::class)
+            it.hasRoute(TracksRoute::class) || it.hasRoute(CarsRoute::class) || it.hasRoute(ProfileRoute::class)
     } == true
     val selectedTab = when {
         currentDest?.hierarchy?.any { it.hasRoute(ProfileRoute::class) } == true -> TopTab.Profile
         currentDest?.hierarchy?.any { it.hasRoute(PublicUsersRoute::class) } == true -> TopTab.Drivers
+        currentDest?.hierarchy?.any { it.hasRoute(CarsRoute::class) } == true -> TopTab.Cars
         currentDest?.hierarchy?.any { it.hasRoute(TracksRoute::class) } == true -> TopTab.Tracks
         else -> TopTab.Schedule
     }
@@ -180,11 +197,13 @@ fun MainShell(
         bottomBar = {
             if (onTopLevel) {
                 BottomBar(
+
                     selected = selectedTab,
                     onSelect = { tab ->
                         val route: Any = when (tab) {
                             TopTab.Profile -> ProfileRoute
                             TopTab.Drivers -> PublicUsersRoute
+                            TopTab.Cars -> CarsRoute
                             TopTab.Tracks -> TracksRoute
                             TopTab.Schedule -> HomeRoute
                         }
@@ -238,6 +257,10 @@ fun MainShell(
                         nav.navigate(PrivacyRoute)
                     },
                     onOpenTracks = { nav.navigate(TrackBreakdownRoute) },
+                    onOpenCar = { car ->
+                        selectedCar = car
+                        nav.navigate(CarDetailRoute(car.displayId()))
+                    },
                 )
             }
             composable<PublicUsersRoute> {
@@ -270,6 +293,10 @@ fun MainShell(
                         val uid = entry.toRoute<PublicUserDetailRoute>().uid
                         Telemetry.log(AnalyticsEvent.RaceDetailOpened(eventId, source = "public_profile_recent"))
                         nav.navigate(PublicUserRaceDetailRoute(uid, eventId, split ?: -1))
+                    },
+                    onOpenCar = { car ->
+                        selectedCar = car
+                        nav.navigate(CarDetailRoute(car.displayId()))
                     },
                 )
             }
@@ -334,6 +361,25 @@ fun MainShell(
                 TracksScreen(
                     insets = insets,
                     onOpenTrack = { trackId -> nav.navigate(TrackDetailRoute(trackId)) },
+                )
+            }
+            composable<CarsRoute> {
+                CarsScreen(
+                    insets = insets,
+                    onOpenCar = { car ->
+                        selectedCar = car
+                        nav.navigate(CarDetailRoute(car.displayId()))
+                    },
+                )
+            }
+            composable<CarDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+                val route = entry.toRoute<CarDetailRoute>()
+                val initial = selectedCar?.takeIf { it.id == route.carId || it.slug == route.carId || it.displayId() == route.carId }
+                CarDetailScreen(
+                    carId = route.carId,
+                    initialCar = initial,
+                    insets = insets,
+                    onBack = { nav.popBackStack() },
                 )
             }
             composable<TrackDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
@@ -480,6 +526,8 @@ private fun screenNameOf(dest: NavDestination): String = when {
     dest.hasRoute(PublicUserRaceDetailRoute::class) -> "public_race_detail"
     dest.hasRoute(TracksRoute::class) -> "tracks"
     dest.hasRoute(TrackDetailRoute::class) -> "track_detail"
+    dest.hasRoute(CarsRoute::class) -> "cars"
+    dest.hasRoute(CarDetailRoute::class) -> "car_detail"
     dest.hasRoute(ProfileRoute::class) -> "profile"
     dest.hasRoute(DetailsRoute::class) -> "race_details"
     dest.hasRoute(LeaderboardRoute::class) -> "full_leaderboard"
@@ -492,15 +540,19 @@ private fun screenNameOf(dest: NavDestination): String = when {
 
 @Composable
 private fun BottomBar(selected: TopTab, onSelect: (TopTab) -> Unit) {
-    NavigationBar(containerColor = Surface1) {
+    NavigationBar(
+        containerColor = Surface1
+    ) {
         TopTab.entries.forEach { tab ->
             val label = when (tab) {
                 TopTab.Schedule -> stringResource(Res.string.nav_schedule)
                 TopTab.Drivers -> stringResource(Res.string.nav_drivers)
+                TopTab.Cars -> stringResource(Res.string.nav_cars)
                 TopTab.Tracks -> stringResource(Res.string.nav_tracks)
                 TopTab.Profile -> stringResource(Res.string.nav_profile)
             }
             NavigationBarItem(
+                alwaysShowLabel = false,
                 selected = selected == tab,
                 onClick = { onSelect(tab) },
                 icon = { Icon(tab.icon, contentDescription = label) },

@@ -67,6 +67,10 @@ class BackendApi(private val client: HttpClient) {
     suspend fun cars(): CarsResponse =
         AppJson.decodeFromString(client.get("$API_BASE/cars").bodyAsText())
 
+    /** Full car catalogue with artwork, specs and liveries (public/static). */
+    suspend fun carsDetailed(): CarsDetailedResponse =
+        AppJson.decodeFromString(client.get("$API_BASE/cars/detailed").bodyAsText())
+
     /** The full track roster (v2 reference data — static, cache aggressively; public). */
     suspend fun tracks(): TracksResponse =
         AppJson.decodeFromString(client.get("$API_BASE/tracks").bodyAsText())
