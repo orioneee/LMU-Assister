@@ -95,6 +95,7 @@ import org.koin.compose.viewmodel.koinViewModel
 
 private val PosGreen = Color(0xFF53D769)
 private val NegRed = Color(0xFFE5484D)
+private val BestPurple = Color(0xFFC792EA)
 
 // Rows shown above/below your own position in the collapsed classification (1 → me ±1).
 private const val WINDOW = 1
@@ -309,8 +310,9 @@ private fun DetailContent(
                     if (session.classification.isEmpty() && session.teamClassification.isEmpty()) continue
                     item(key = "$selected-$key") {
                         SessionCard(
-                            sessionLabel(key),
-                            session,
+                            label = sessionLabel(key),
+                            sessionKey = key,
+                            session = session,
                             showRatingDeltas = key == "race",
                             showSectors = d.features?.sectors != false,
                         )
@@ -653,7 +655,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
     val laps = sessionLaps(d, sessionKey)
     val bestMs = laps.mapNotNull { it.lapTimeMs?.takeIf { t -> t > 0L } }.minOrNull()
         ?: sessionRow?.bestLapMs?.takeIf { it > 0L }
-    // Fastest time per sector across all laps — used to green-highlight the best sector each lap.
+    // Fastest time per sector across all laps, used to highlight each best sector.
     val lapBestSectors = bestSectorsByIndex(laps)
     val bestSectors = lapBestSectors.takeIf { it.any { s -> (s ?: 0L) > 0L } }
         ?: sessionRow?.bestSectorsMs?.takeIf { it.any { s -> (s ?: 0L) > 0L } }
@@ -689,7 +691,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
                 pace?.let { Stat("Avg", formatLap(it.avgMs)) }
                 finishStatus?.takeIf { it.isNotBlank() }?.let { Stat("Result", it) }
             }
-            if (showSectors) theoreticalBestMs?.let { TheoreticalBestLap(it, bestSectors) }
+            if (showSectors) theoreticalBestMs?.let { TheoreticalBestLap(it, bestSectors, highlightTotal = sessionKey == "race") }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -700,7 +702,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
                     LapRow(
                         lap,
                         alt = i % 2 == 1,
-                        isBest = bestMs != null && lap.lapTimeMs == bestMs,
+                        isBest = sessionKey == "race" && bestMs != null && lap.lapTimeMs == bestMs,
                         bestSectors = bestSectors,
                         lengthKm = lengthKm,
                         showSectors = showSectors,
@@ -712,7 +714,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
 }
 
 @Composable
-private fun TheoreticalBestLap(totalMs: Long, bestSectors: List<Long?>) {
+private fun TheoreticalBestLap(totalMs: Long, bestSectors: List<Long?>, highlightTotal: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -728,8 +730,8 @@ private fun TheoreticalBestLap(totalMs: Long, bestSectors: List<Long?>) {
             Text(
                 formatLap(totalMs),
                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                color = PosGreen,
-                fontWeight = FontWeight.Bold,
+                color = if (highlightTotal) BestPurple else TextMed,
+                fontWeight = if (highlightTotal) FontWeight.Bold else FontWeight.SemiBold,
             )
         }
         Text(
@@ -771,19 +773,19 @@ private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List
             Text(
                 lap.lapTimeMs?.let { formatLap(it) } ?: "—",
                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                color = if (isBest) PosGreen else TextHigh,
+                color = if (isBest) BestPurple else TextHigh,
                 fontWeight = if (isBest) FontWeight.Bold else FontWeight.Normal,
             )
         }
         if (showSectors && lap.sectorsMs.any { (it ?: 0L) > 0L }) {
-            // Each sector green when it's the fastest of that sector across the whole race.
+            // Each sector is highlighted when it's the fastest of that sector in the session.
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 lap.sectorsMs.forEachIndexed { i, s ->
                     val isBestSector = s != null && s > 0L && bestSectors.getOrNull(i) == s
                     Text(
                         s?.takeIf { it > 0L }?.let { sectorFmt(it) } ?: "—",
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                        color = if (isBestSector) PosGreen else TextLow,
+                        color = if (isBestSector) BestPurple else TextLow,
                         fontWeight = if (isBestSector) FontWeight.Bold else FontWeight.Normal,
                     )
                 }
@@ -1076,6 +1078,7 @@ private fun DeltaStat(label: String, delta: Double?) {
 @Composable
 private fun SessionCard(
     label: String,
+    sessionKey: String,
     session: RaceSessionDetailDto,
     showRatingDeltas: Boolean,
     showSectors: Boolean,
@@ -1092,6 +1095,13 @@ private fun SessionCard(
         else -> rows.take(FOREIGN_PREVIEW)
     }
     val canToggle = expanded || shown.size < rows.size
+    val allRows = teamRows + rows
+    val bestSectors = bestClassificationSectors(allRows)
+    val bestRaceLapMs = if (sessionKey == "race") {
+        allRows.mapNotNull { it.bestLapMs?.takeIf { ms -> ms > 0L } }.minOrNull()
+    } else {
+        null
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label.uppercase(), style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.Bold)
@@ -1108,6 +1118,8 @@ private fun SessionCard(
                     alt = i % 2 == 1,
                     showRatingDeltas = showRatingDeltas,
                     showSectors = showSectors,
+                    bestSectors = bestSectors,
+                    bestRaceLapMs = bestRaceLapMs,
                 )
             }
             if (teamRows.isNotEmpty() && shown.isNotEmpty()) {
@@ -1125,6 +1137,8 @@ private fun SessionCard(
                     alt = (i + teamRows.size) % 2 == 1,
                     showRatingDeltas = showRatingDeltas,
                     showSectors = showSectors,
+                    bestSectors = bestSectors,
+                    bestRaceLapMs = bestRaceLapMs,
                 )
             }
             if (canToggle) {
@@ -1156,6 +1170,8 @@ private fun ClassificationLine(
     alt: Boolean,
     showRatingDeltas: Boolean,
     showSectors: Boolean,
+    bestSectors: List<Long?>,
+    bestRaceLapMs: Long?,
 ) {
     // Zebra striping like the race leaderboards; the player's own row always wins with an amber tint.
     val bg = when {
@@ -1231,22 +1247,33 @@ private fun ClassificationLine(
                 if (showRatingDeltas) RatingDeltaColumn(r.drChange, r.srChange)
             }
             // Best-lap sector splits, when the backend provides them.
-            val sectors = r.bestLapSectorsMs.filterNotNull().filter { it > 0L }
+            val sectors = classificationSectors(r)
             if (showSectors && sectors.isNotEmpty()) {
-                Text(
-                    sectors.mapIndexed { i, s -> "S${i + 1} ${sectorFmt(s)}" }.joinToString("  "),
-                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                    color = TextLow,
-                    maxLines = 1,
-                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    sectors.forEachIndexed { i, s ->
+                        val isBestSector = bestSectors.getOrNull(i) == s
+                        Text(
+                            "S${i + 1} ${sectorFmt(s)}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                            color = if (isBestSector) BestPurple else TextLow,
+                            fontWeight = if (isBestSector) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
         }
         (r.bestLapMs ?: r.finishTimeMs)?.let {
+            val isBestRaceLap = bestRaceLapMs != null && r.bestLapMs == bestRaceLapMs
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     formatLap(it),
                     style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                    color = TextMed,
+                    color = if (isBestRaceLap) BestPurple else TextMed,
+                    fontWeight = if (isBestRaceLap) FontWeight.Bold else FontWeight.Normal,
                     maxLines = 1,
                 )
                 // Class-relative gap to the leader (race: finish gap / quali: best-lap delta).
@@ -1269,6 +1296,17 @@ private fun gapToLeaderLabel(r: ClassificationRowDto): String? = when {
     r.gapLaps > 0 -> "+${r.gapLaps} " + if (r.gapLaps == 1) "LAP" else "LAPS"
     (r.gapMs ?: 0L) > 0L -> deltaSeconds(r.gapMs!!)
     else -> null
+}
+
+private fun classificationSectors(r: ClassificationRowDto): List<Long> {
+    val bestLap = r.bestLapSectorsMs.filterNotNull().filter { it > 0L }
+    return bestLap.ifEmpty { r.bestSectorsMs.filterNotNull().filter { it > 0L } }
+}
+
+private fun bestClassificationSectors(rows: List<ClassificationRowDto>): List<Long?> {
+    val sectorRows = rows.map { classificationSectors(it) }
+    val width = sectorRows.maxOfOrNull { it.size } ?: 0
+    return (0 until width).map { i -> sectorRows.mapNotNull { it.getOrNull(i) }.minOrNull() }
 }
 
 /** Compact class chip (colored like the schedule badges) for a single classification line. */
