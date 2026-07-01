@@ -12,6 +12,7 @@
 		845638E22FE734FF00AAD32F /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 845638E12FE734FF00AAD32F /* FirebaseCore */; };
 		845638E42FE734FF00AAD32F /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 845638E32FE734FF00AAD32F /* FirebaseCrashlytics */; };
 		845638E62FE734FF00AAD32F /* FirebasePerformance in Frameworks */ = {isa = PBXBuildFile; productRef = 845638E52FE734FF00AAD32F /* FirebasePerformance */; };
+		845638EA2FE734FF00AAD32F /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 845638E92FE734FF00AAD32F /* FirebaseRemoteConfig */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -52,6 +53,7 @@
 				845638DE2FE734FF00AAD32F /* FirebaseAnalytics in Frameworks */,
 				845638E42FE734FF00AAD32F /* FirebaseCrashlytics in Frameworks */,
 				845638E62FE734FF00AAD32F /* FirebasePerformance in Frameworks */,
+				845638EA2FE734FF00AAD32F /* FirebaseRemoteConfig in Frameworks */,
 				845638E22FE734FF00AAD32F /* FirebaseCore in Frameworks */,
 				845638E02FE734FF00AAD32F /* FirebaseAnalyticsCore in Frameworks */,
 			);
@@ -103,6 +105,7 @@
 				845638E12FE734FF00AAD32F /* FirebaseCore */,
 				845638E32FE734FF00AAD32F /* FirebaseCrashlytics */,
 				845638E52FE734FF00AAD32F /* FirebasePerformance */,
+				845638E92FE734FF00AAD32F /* FirebaseRemoteConfig */,
 			);
 			productName = iosApp;
 			productReference = F06762B58571586B3CABB3EB /* Lmu assister.app */;
@@ -430,6 +433,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 845638DC2FE734FF00AAD32F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebasePerformance;
+		};
+		845638E92FE734FF00AAD32F /* FirebaseRemoteConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 845638DC2FE734FF00AAD32F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseRemoteConfig;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

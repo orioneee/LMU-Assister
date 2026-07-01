@@ -7,6 +7,8 @@ import com.orioooneee.lmuasister.data.remote.AppTokenHolder
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import com.orioooneee.lmuasister.analytics.installPerformanceMonitoring
+import com.orioooneee.lmuasister.featureflags.FeatureFlagsRepository
+import com.orioooneee.lmuasister.featureflags.platformFeatureFlagRemoteSource
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
 import com.orioooneee.lmuasister.ui.profile.SteamAuthRunner
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
@@ -33,6 +35,8 @@ val appModule = module {
     single { SteamBackendApi(get()) }
     single { AppTokenHolder() }
     single { RaceRepository(get(), get()) }
+    single { platformFeatureFlagRemoteSource() }
+    single { FeatureFlagsRepository(get()) }
     single { SteamAuthRunner(get()) }
     viewModelOf(::ScheduleViewModel)
     viewModelOf(::PublicUsersViewModel)

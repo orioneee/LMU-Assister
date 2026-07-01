@@ -63,6 +63,7 @@ fun ScheduleScreen(
     selectedWeek: String,
     onSelectWeek: (String) -> Unit,
     onOpenRace: (Race) -> Unit,
+    showTimerInScheduleCard: Boolean = false,
 ) {
     var category by remember { mutableStateOf(RaceType.DAILY) }
     val now = rememberNow()
@@ -116,7 +117,9 @@ fun ScheduleScreen(
 
         groups.forEach { (tier, list) ->
             item { TierHeader(tier, list.size) }
-            items(list.chunked(cols)) { row -> EqualHeightRaceRow(row, cols, onOpenRace) }
+            items(list.chunked(cols)) { row ->
+                EqualHeightRaceRow(row, cols, onOpenRace, showTimer = showTimerInScheduleCard)
+            }
         }
 
         if (races.isEmpty()) {

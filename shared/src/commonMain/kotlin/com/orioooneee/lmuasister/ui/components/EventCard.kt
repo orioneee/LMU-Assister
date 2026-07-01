@@ -75,6 +75,7 @@ fun RaceCard(
     race: Race,
     modifier: Modifier = Modifier,
     showCountdown: Boolean = true,
+    showTimer: Boolean = true,
     timeColumns: Int = 3,
     onClick: () -> Unit = {},
 ) {
@@ -143,7 +144,12 @@ fun RaceCard(
         }
         if (race.times.isNotEmpty()) {
             Column(Modifier.padding(12.dp)) {
-                TimesGrid(race.times, columns = timeColumns, showCountdown = showCountdown)
+                TimesGrid(
+                    race.times,
+                    columns = timeColumns,
+                    showCountdown = showCountdown,
+                    showChrome = showTimer,
+                )
             }
         }
     }
@@ -253,6 +259,7 @@ fun HeroRaceTimesCard(
     race: Race,
     heroHeight: Dp,
     showCountdown: Boolean = true,
+    showTimer: Boolean = true,
     onClick: () -> Unit = {},
 ) {
     val accent = race.accentColor()
@@ -267,13 +274,18 @@ fun HeroRaceTimesCard(
         HeroContent(
             race = race,
             showLabel = false,
-            showCountdown = showCountdown,
+            showCountdown = showCountdown && showTimer,
             modifier = Modifier.fillMaxWidth().height(heroHeight),
         )
         if (race.times.isNotEmpty()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
                 // No countdown here — the hero above already shows it.
-                TimesGrid(race.times, showCountdown = false, centered = true)
+                TimesGrid(
+                    race.times,
+                    showCountdown = false,
+                    showChrome = showTimer,
+                    centered = true,
+                )
             }
         }
     }

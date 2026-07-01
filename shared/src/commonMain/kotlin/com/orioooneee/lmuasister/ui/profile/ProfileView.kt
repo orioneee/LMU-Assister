@@ -114,6 +114,7 @@ fun ProfileView(
     enableCategoryClicks: Boolean = !readOnly,
     enableRaceClicks: Boolean = !readOnly,
     isRefreshingProfile: Boolean = false,
+    canRefreshProfile: Boolean = true,
     onRefreshProfile: (() -> Unit)? = null,
     onSeeAllRaces: () -> Unit = {},
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
@@ -125,7 +126,11 @@ fun ProfileView(
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         ProfileHeader(profile, accountName, readOnly, enableTrackBreakdown, onOpenSuspensions, onOpenTracks)
         if (!readOnly && onRefreshProfile != null) {
-            UpdateProfileButton(isRefreshingProfile, onRefreshProfile)
+            UpdateProfileButton(
+                loading = isRefreshingProfile,
+                enabled = canRefreshProfile && !isRefreshingProfile,
+                onClick = onRefreshProfile,
+            )
         }
         RatingsRow(profile.driverRating, profile.safetyRating)
 
@@ -168,8 +173,8 @@ fun ProfileView(
 }
 
 @Composable
-private fun UpdateProfileButton(loading: Boolean, onClick: () -> Unit) {
-    val alpha = if (loading) 0.68f else 1f
+private fun UpdateProfileButton(loading: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val alpha = if (enabled) 1f else 0.68f
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -177,7 +182,7 @@ private fun UpdateProfileButton(loading: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(12.dp))
             .background(Surface1.copy(alpha = alpha))
             .border(1.dp, Amber.copy(alpha = 0.46f * alpha), RoundedCornerShape(12.dp))
-            .clickable(enabled = !loading, onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,

@@ -509,6 +509,7 @@ private fun ScheduleTab(viewModel: ScheduleViewModel, insets: PaddingValues, onO
                     onOpenRace = onOpenRace,
                     onRefresh = viewModel::refresh,
                     cars = cars,
+                    showTimerInScheduleCard = data.featureFlags.showTimerInScheduleCard,
                 )
             }
         }

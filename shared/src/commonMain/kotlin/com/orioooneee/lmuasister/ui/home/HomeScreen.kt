@@ -95,6 +95,7 @@ fun HomeScreen(
     onOpenRace: (Race) -> Unit,
     onRefresh: () -> Unit = {},
     cars: List<CarModel> = emptyList(),
+    showTimerInScheduleCard: Boolean = false,
 ) {
     val topInset = insets.calculateTopPadding()
     val bottomInset = insets.calculateBottomPadding()
@@ -144,7 +145,17 @@ fun HomeScreen(
     Box(Modifier.fillMaxSize().clipToBounds().background(Carbon).nestedScroll(connection)) {
         Box(Modifier.fillMaxSize().offset { IntOffset(0, (headerHeight.value + headerOffset.value).roundToInt()) }) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                TabContent(tabs[page], schedule, heroHeight, isCurrentWeek, now, bottomInset, onOpenRace, onRefresh)
+                TabContent(
+                    tabs[page],
+                    schedule,
+                    heroHeight,
+                    isCurrentWeek,
+                    now,
+                    bottomInset,
+                    onOpenRace,
+                    onRefresh,
+                    showTimerInScheduleCard,
+                )
             }
         }
         Column(
@@ -279,6 +290,7 @@ private fun TabContent(
     bottomInset: Dp,
     onOpenRace: (Race) -> Unit,
     onRefresh: () -> Unit,
+    showTimerInScheduleCard: Boolean,
 ) {
     val sections: List<Section> = when (tab) {
         MainTab -> listOf(
@@ -305,7 +317,12 @@ private fun TabContent(
             all.size == 1 -> {
                 val race = all.first()
                 item {
-                    HeroRaceTimesCard(race, heroHeight = heroHeight, showCountdown = isCurrentWeek) {
+                    HeroRaceTimesCard(
+                        race,
+                        heroHeight = heroHeight,
+                        showCountdown = isCurrentWeek,
+                        showTimer = showTimerInScheduleCard,
+                    ) {
                         onOpenRace(race)
                     }
                 }
@@ -318,7 +335,13 @@ private fun TabContent(
                     )
                     sec.label?.let { lbl -> item { SectionHeader(lbl) } }
                     items(sorted.chunked(cols)) { row ->
-                        EqualHeightRaceRow(row, cols, onOpenRace, showCountdown = isCurrentWeek)
+                        EqualHeightRaceRow(
+                            row,
+                            cols,
+                            onOpenRace,
+                            showCountdown = isCurrentWeek,
+                            showTimer = showTimerInScheduleCard,
+                        )
                     }
                 }
             }

@@ -154,6 +154,7 @@ fun ProfileScreen(
 
     if (signedIn != null) {
         val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+        val updatingProfile by viewModel.updatingProfile.collectAsStateWithLifecycle()
         val exiting by viewModel.exiting.collectAsStateWithLifecycle()
         var showClearConfirm by remember { mutableStateOf(false) }
 
@@ -169,8 +170,9 @@ fun ProfileScreen(
                 Spacer(Modifier.height(topInset + 24.dp))
                 ProfileContent(
                     signedIn.backend,
-                    refreshing,
-                    viewModel::refresh,
+                    updatingProfile,
+                    !refreshing && !updatingProfile,
+                    viewModel::updateProfile,
                     onSeeAllRaces,
                     onOpenRace,
                     onOpenSuspensions,
@@ -466,8 +468,9 @@ private fun ClearDataDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 @Composable
 private fun ProfileContent(
     backend: BackendState,
-    refreshing: Boolean,
-    onRefresh: () -> Unit,
+    updatingProfile: Boolean,
+    canUpdateProfile: Boolean,
+    onUpdateProfile: () -> Unit,
     onSeeAllRaces: () -> Unit,
     onOpenRace: (eventId: String, split: Int?) -> Unit,
     onOpenSuspensions: (active: Boolean) -> Unit,
@@ -479,8 +482,9 @@ private fun ProfileContent(
         is BackendState.Ok -> ProfileView(
             backend.profile,
             accountName = "",
-            isRefreshingProfile = refreshing,
-            onRefreshProfile = onRefresh,
+            isRefreshingProfile = updatingProfile,
+            canRefreshProfile = canUpdateProfile,
+            onRefreshProfile = onUpdateProfile,
             onSeeAllRaces = onSeeAllRaces,
             onOpenRace = onOpenRace,
             onOpenSuspensions = onOpenSuspensions,

@@ -61,6 +61,7 @@ kotlin {
                 // on its runtime classpath. The BoM pins the module versions.
                 api(project.dependencies.platform(libs.firebase.bom))
                 api(libs.firebase.analytics)
+                api(libs.firebase.config)
                 api(libs.firebase.crashlytics)
                 api(libs.firebase.performance)
             }

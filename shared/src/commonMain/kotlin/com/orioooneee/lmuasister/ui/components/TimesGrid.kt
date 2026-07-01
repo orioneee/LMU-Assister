@@ -41,6 +41,8 @@ import org.jetbrains.compose.resources.stringResource
  *
  * @param showCountdown live "STARTS IN …" badge — hide it for non-current weeks,
  *   where a relative countdown from `now` would be misleading.
+ * @param showChrome show the TIMES label, countdown badge and divider above the
+ *   start-time list.
  * @param centered center the header and time cells (single-event layout).
  */
 @Composable
@@ -48,6 +50,7 @@ fun TimesGrid(
     times: List<Instant>,
     columns: Int? = null,
     showCountdown: Boolean = true,
+    showChrome: Boolean = true,
     centered: Boolean = false,
 ) {
     val now = rememberNow()
@@ -61,12 +64,12 @@ fun TimesGrid(
     if (columns != null) {
         // Explicit column count (e.g. inside an IntrinsicSize row, where BoxWithConstraints
         // would crash). The caller has already sized it to the available width.
-        TimesContent(upcoming, next, now, header, columns, showCountdown, centered)
+        TimesContent(upcoming, next, now, header, columns, showCountdown, showChrome, centered)
     } else {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val perCol = if (centered) 60.dp else 36.dp
             val cols = (maxWidth / perCol).toInt().coerceIn(3, 7)
-            TimesContent(upcoming, next, now, header, cols, showCountdown, centered)
+            TimesContent(upcoming, next, now, header, cols, showCountdown, showChrome, centered)
         }
     }
 }
@@ -79,32 +82,35 @@ private fun TimesContent(
     header: String,
     cols: Int,
     showCountdown: Boolean,
+    showChrome: Boolean,
     centered: Boolean,
 ) {
     val cellAlign = if (centered) TextAlign.Center else TextAlign.Start
     Column(Modifier.fillMaxWidth()) {
-        if (showCountdown) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(header, style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.SemiBold)
-                CountdownBadge(next, now)
+        if (showChrome) {
+            if (showCountdown) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(header, style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.SemiBold)
+                    CountdownBadge(next, now)
+                }
+            } else {
+                Text(
+                    header,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = cellAlign,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextMed,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
-        } else {
-            Text(
-                header,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = cellAlign,
-                style = MaterialTheme.typography.labelMedium,
-                color = TextMed,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = Outline)
+            Spacer(Modifier.height(8.dp))
         }
-        Spacer(Modifier.height(8.dp))
-        HorizontalDivider(color = Outline)
-        Spacer(Modifier.height(8.dp))
 
         upcoming.chunked(cols).forEach { rowTimes ->
             Row(
@@ -116,7 +122,7 @@ private fun TimesContent(
                 },
             ) {
                 rowTimes.forEach { t ->
-                    val isNext = showCountdown && t == next
+                    val isNext = showChrome && showCountdown && t == next
                     Text(
                         text = t.hhmm(),
                         modifier = if (centered) Modifier.width(46.dp) else Modifier.weight(1f),

@@ -3,6 +3,7 @@ import Shared
 import FirebaseAnalytics
 import FirebaseCrashlytics
 import FirebasePerformance
+import FirebaseRemoteConfig
 
 // Note: `Analytics` exists in BOTH Shared (our Kotlin protocol) and FirebaseAnalytics
 // (Firebase's class), so every reference is module-qualified to avoid ambiguity.
@@ -13,6 +14,43 @@ enum TelemetryBridge {
         Telemetry.shared.crashReporter = FirebaseCrashSink()
         Telemetry.shared.performanceMonitor = FirebasePerformanceSink()
         Telemetry.shared.userProperty(key: UserProperties.shared.PLATFORM, value: "ios")
+    }
+}
+
+enum FeatureFlagsBridge {
+    static func install() {
+        RemoteFeatureFlags.shared.remoteSource = FirebaseFeatureFlagRemoteSource()
+    }
+}
+
+private final class FirebaseFeatureFlagRemoteSource: FeatureFlagRemoteSource {
+    private let remoteConfig = RemoteConfig.remoteConfig()
+
+    init() {
+        let settings = RemoteConfigSettings()
+        settings.minimumFetchInterval = 0
+        remoteConfig.configSettings = settings
+    }
+
+    func fetch(keys: [FeatureFlagKey], onComplete: @escaping ([String: KotlinBoolean]) -> Void) {
+        var defaults: [String: NSObject] = [:]
+        for key in keys {
+            defaults[key.remoteName] = NSNumber(value: key.defaultValue)
+        }
+        remoteConfig.setDefaults(defaults)
+
+        remoteConfig.fetchAndActivate { [remoteConfig] _, error in
+            guard error == nil else {
+                onComplete([:])
+                return
+            }
+
+            var values: [String: KotlinBoolean] = [:]
+            for key in keys {
+                values[key.remoteName] = KotlinBoolean(bool: remoteConfig.configValue(forKey: key.remoteName).boolValue)
+            }
+            onComplete(values)
+        }
     }
 }
 

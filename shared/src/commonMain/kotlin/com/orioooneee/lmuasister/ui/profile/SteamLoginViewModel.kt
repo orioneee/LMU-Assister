@@ -101,6 +101,9 @@ class SteamLoginViewModel(
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
+    private val _updatingProfile = MutableStateFlow(false)
+    val updatingProfile: StateFlow<Boolean> = _updatingProfile.asStateFlow()
+
     private val _exiting = MutableStateFlow(ExitAction.NONE)
     val exiting: StateFlow<ExitAction> = _exiting.asStateFlow()
 
@@ -350,17 +353,39 @@ class SteamLoginViewModel(
     }
 
     fun refresh() {
-        if (appToken == null || _refreshing.value) return
+        if (!canStartProfileUpdate()) return
+        _refreshing.value = true
         viewModelScope.launch {
-            _refreshing.value = true
-            runCatching { fetchProfileWithReauth() }
-                .onSuccess { p ->
-                    saveCachedProfile(p)
-                    _state.value = SteamLoginUiState.SignedIn(BackendState.Ok(p, fromCache = false))
-                }
-                .onFailure { SteamLog.e("vm: refresh failed", it) }
-            _refreshing.value = false
+            try {
+                updateProfileFromBackend()
+            } finally {
+                _refreshing.value = false
+            }
         }
+    }
+
+    fun updateProfile() {
+        if (!canStartProfileUpdate()) return
+        _updatingProfile.value = true
+        viewModelScope.launch {
+            try {
+                updateProfileFromBackend()
+            } finally {
+                _updatingProfile.value = false
+            }
+        }
+    }
+
+    private fun canStartProfileUpdate(): Boolean =
+        appToken != null && !_refreshing.value && !_updatingProfile.value
+
+    private suspend fun updateProfileFromBackend() {
+        runCatching { fetchProfileWithReauth() }
+            .onSuccess { p ->
+                saveCachedProfile(p)
+                _state.value = SteamLoginUiState.SignedIn(BackendState.Ok(p, fromCache = false))
+            }
+            .onFailure { SteamLog.e("vm: profile update failed", it) }
     }
 
     fun signOut() = exit(ExitAction.SIGNING_OUT, AnalyticsEvent.ProfileSignedOut)

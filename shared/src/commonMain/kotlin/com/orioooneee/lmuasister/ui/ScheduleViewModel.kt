@@ -8,9 +8,12 @@ import com.orioooneee.lmuasister.analytics.TelemetryError
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.Schedule
+import com.orioooneee.lmuasister.featureflags.FeatureFlags
+import com.orioooneee.lmuasister.featureflags.FeatureFlagsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class WeekTab(val key: String, val label: String)
@@ -19,6 +22,7 @@ data class ScheduleData(
     val schedule: Schedule,
     val weeks: List<WeekTab>,
     val selected: String,
+    val featureFlags: FeatureFlags,
 )
 
 sealed interface ScheduleUiState {
@@ -31,6 +35,7 @@ private const val CURRENT = "__current__"
 
 class ScheduleViewModel(
     private val repository: RaceRepository,
+    private val featureFlagsRepository: FeatureFlagsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<ScheduleUiState>(ScheduleUiState.Loading)
@@ -47,6 +52,15 @@ class ScheduleViewModel(
     private var selected: String? = null
 
     init {
+        viewModelScope.launch {
+            featureFlagsRepository.flags.collectLatest { flags ->
+                val current = _state.value as? ScheduleUiState.Success ?: return@collectLatest
+                _state.value = current.copy(data = current.data.copy(featureFlags = flags))
+            }
+        }
+        viewModelScope.launch {
+            featureFlagsRepository.refresh()
+        }
         viewModelScope.launch {
             repository.cachedCars()?.let { _cars.value = it }
             repository.cars().getOrNull()?.let { _cars.value = it }
@@ -130,6 +144,7 @@ class ScheduleViewModel(
                 schedule = schedule,
                 weeks = weeks,
                 selected = sel,
+                featureFlags = featureFlagsRepository.flags.value,
             ),
         )
     }
