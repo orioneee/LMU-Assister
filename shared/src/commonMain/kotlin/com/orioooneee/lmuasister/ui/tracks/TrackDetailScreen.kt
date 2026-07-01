@@ -1,5 +1,6 @@
 package com.orioooneee.lmuasister.ui.tracks
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -12,12 +13,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,7 +33,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.TrackAttemptDto
@@ -246,29 +250,29 @@ private fun TrackContent(
         contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp + bottomInset),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { TrackCard(d.track) }
+        item(key = "track-card:${d.track.id}") { TrackCard(d.track) }
         detailedSchemeUrl(d.track)?.let { url ->
-            item { DetailedSchemeCard(url) }
+            item(key = "track-detailed-scheme:$url") { DetailedSchemeCard(url) }
         }
         when (val personalState = d.personal) {
-            PersonalRecordsState.Loading -> item { PersonalRecordsSkeleton() }
-            PersonalRecordsState.SignedOut -> item { Hint("Sign in to see your records on this track.") }
-            is PersonalRecordsState.Error -> item {
+            PersonalRecordsState.Loading -> item(key = "personal-loading") { PersonalRecordsSkeleton() }
+            PersonalRecordsState.SignedOut -> item(key = "personal-signed-out") { Hint("Sign in to see your records on this track.") }
+            is PersonalRecordsState.Error -> item(key = "personal-error") {
                 Hint(personalState.message.takeIf { it.isNotBlank() } ?: "Couldn't load your records right now.")
             }
             is PersonalRecordsState.Ready -> {
                 val personal = personalState.personal
                 if (personal == null || personal.races <= 0) {
-                    item { Hint("No lap times recorded on this track yet.") }
+                    item(key = "personal-empty") { Hint("No lap times recorded on this track yet.") }
                 } else {
-                    item { RacesHeader(personal.races, personal.laps, personal.distanceKm) }
+                    item(key = "personal-summary") { RacesHeader(personal.races, personal.laps, personal.distanceKm) }
                     val bestEver = personal.bestLapEver ?: personal.bestLap
                     val bestCurrentPatch = personal.bestLapCurrentPatch
                     val currentIsEver = bestCurrentPatch != null && bestEver != null && sameAttempt(bestCurrentPatch, bestEver)
                     if (!currentIsEver) {
                         bestCurrentPatch?.takeIf { it.bestLapMs != null }?.let { current ->
-                            item { SectionLabel("BEST CURRENT PATCH") }
-                            item {
+                            item(key = "best-current-label") { SectionLabel("BEST CURRENT PATCH") }
+                            item(key = attemptKey("best-current", current)) {
                                 BestLapCard(
                                     best = current,
                                     byClass = personal.bestByClass,
@@ -280,8 +284,8 @@ private fun TrackContent(
                         }
                     }
                     bestEver?.takeIf { it.bestLapMs != null }?.let { ever ->
-                        item { SectionLabel("BEST EVER") }
-                        item {
+                        item(key = "best-ever-label") { SectionLabel("BEST EVER") }
+                        item(key = attemptKey("best-ever", ever)) {
                             BestLapCard(
                                 best = ever,
                                 byClass = personal.bestByClass,
@@ -292,12 +296,12 @@ private fun TrackContent(
                         }
                     }
                     if (personal.bestByClass.isNotEmpty()) {
-                        item { SectionLabel("BEST BY CLASS") }
-                        item { ByClassCard(personal.bestByClass, onOpenRace, allowRaceLinks) }
+                        item(key = "best-by-class-label") { SectionLabel("BEST BY CLASS") }
+                        item(key = "best-by-class-card") { ByClassCard(personal.bestByClass, onOpenRace, allowRaceLinks) }
                     }
                     if (personal.recent.isNotEmpty()) {
-                        item { SectionLabel("RECENT") }
-                        item { RecentCard(personal.recent, onOpenRace, allowRaceLinks) }
+                        item(key = "recent-label") { SectionLabel("RECENT") }
+                        item(key = "recent-card") { RecentCard(personal.recent, onOpenRace, allowRaceLinks) }
                     }
                 }
             }
@@ -319,6 +323,10 @@ private fun sameAttempt(a: TrackAttemptDto, b: TrackAttemptDto): Boolean =
 private fun detailedSchemeUrl(t: TrackFullDto): String? =
     t.detailedScheme?.takeIf { it.isNotBlank() }
         ?: t.assets?.detailedScheme?.takeIf { it.isNotBlank() }
+
+private fun attemptKey(prefix: String, a: TrackAttemptDto): String =
+    listOf(prefix, a.eventId, a.split, a.session, a.carClass, a.bestLapMs, a.date)
+        .joinToString(":") { it?.toString().orEmpty() }
 
 @Composable
 private fun TrackCard(t: TrackFullDto) {
@@ -349,16 +357,20 @@ private fun TrackCard(t: TrackFullDto) {
 
 @Composable
 private fun DetailedSchemeCard(url: String) {
+    val painter = rememberAsyncImagePainter(model = url)
+    val state by painter.state.collectAsState()
+    if (state !is AsyncImagePainter.State.Success) return
+
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         SectionLabel("DETAILED SCHEME")
-        AsyncImage(
-            model = url,
+        Image(
+            painter = painter,
             contentDescription = null,
             contentScale = ContentScale.FillWidth,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp).clip(RoundedCornerShape(12.dp)),
         )
     }
 }

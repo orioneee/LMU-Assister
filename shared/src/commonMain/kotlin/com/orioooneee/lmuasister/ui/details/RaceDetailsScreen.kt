@@ -93,12 +93,12 @@ import com.orioooneee.lmuasister.ui.theme.ClassLmp3
 import com.orioooneee.lmuasister.ui.theme.ClassMixed
 import com.orioooneee.lmuasister.ui.util.formatLap
 import com.orioooneee.lmuasister.ui.util.formatSector
+import com.orioooneee.lmuasister.ui.util.rememberNow
 import com.orioooneee.lmuasister.ui.util.skyColor
 import com.orioooneee.lmuasister.ui.util.skyEmoji
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
-import kotlin.time.Clock
 import coil3.compose.AsyncImage
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.cars_section
@@ -149,8 +149,8 @@ fun RaceDetailsScreen(
     onBack: () -> Unit,
     onOpenLeaderboard: (leaderboardId: String, title: String) -> Unit = { _, _ -> },
 ) {
-    val now = remember { Clock.System.now() }
-    val upcoming = remember(race) { race.times.filter { it >= now } }
+    val now = rememberNow()
+    val upcoming = remember(race, now) { race.times.filter { it >= now } }
 
     val repo = koinInject<RaceRepository>()
     // Leaderboard (fast) and hot-laps (async build) load in parallel — each resolves
@@ -719,7 +719,7 @@ private fun LeaderboardCard(
     // One tab per class when the backend splits the board; otherwise the single overall board.
     val tabs = remember(lbs) {
         (lbs.byClass.takeIf { it.isNotEmpty() } ?: listOfNotNull(lbs.overall))
-            .filter { it.entries.isNotEmpty() }
+            .filter { it.entries.isNotEmpty() || it.leaderboardId != null }
     }
     Card(stringResource(Res.string.fastest_laps)) {
         if (tabs.isEmpty()) {
@@ -776,7 +776,11 @@ private fun LeaderboardCard(
                     Spacer(Modifier.height(10.dp))
                 }
             }
-            board.entries.take(LB_PREVIEW).forEach { e -> LeaderboardRow(e, leader, liveryToModel = liveryToModel) }
+            if (board.entries.isEmpty()) {
+                Text(stringResource(Res.string.no_lap_times), style = MaterialTheme.typography.bodyMedium, color = TextLow)
+            } else {
+                board.entries.take(LB_PREVIEW).forEach { e -> LeaderboardRow(e, leader, liveryToModel = liveryToModel) }
+            }
             board.leaderboardId?.let { id ->
                 Spacer(Modifier.height(10.dp))
                 FullLeaderboardButton {

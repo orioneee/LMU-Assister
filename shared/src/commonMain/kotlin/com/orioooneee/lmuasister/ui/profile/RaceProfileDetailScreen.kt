@@ -96,6 +96,7 @@ import org.koin.compose.viewmodel.koinViewModel
 private val PosGreen = Color(0xFF53D769)
 private val NegRed = Color(0xFFE5484D)
 private val BestPurple = Color(0xFFC792EA)
+private val PersonalBestGreen = Color(0xFF53D769)
 
 // Rows shown above/below your own position in the collapsed classification (1 → me ±1).
 private const val WINDOW = 1
@@ -655,6 +656,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
     val laps = sessionLaps(d, sessionKey)
     val bestMs = laps.mapNotNull { it.lapTimeMs?.takeIf { t -> t > 0L } }.minOrNull()
         ?: sessionRow?.bestLapMs?.takeIf { it > 0L }
+    val globalBestMs = globalSessionBestLapMs(d, sessionKey)
     // Fastest time per sector across all laps, used to highlight each best sector.
     val lapBestSectors = bestSectorsByIndex(laps)
     val bestSectors = lapBestSectors.takeIf { it.any { s -> (s ?: 0L) > 0L } }
@@ -687,11 +689,11 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
             Text("${sessionLabel(sessionKey)} lap times", style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Stat("Laps", laps.size.toString())
-                bestMs?.let { Stat("Best", formatLap(it)) }
+                bestMs?.let { StatColored("Best", formatLap(it), if (it == globalBestMs) BestPurple else TextHigh) }
                 pace?.let { Stat("Avg", formatLap(it.avgMs)) }
                 finishStatus?.takeIf { it.isNotBlank() }?.let { Stat("Result", it) }
             }
-            if (showSectors) theoreticalBestMs?.let { TheoreticalBestLap(it, bestSectors, highlightTotal = sessionKey == "race") }
+            if (showSectors) theoreticalBestMs?.let { TheoreticalBestLap(it, bestSectors) }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -702,7 +704,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
                     LapRow(
                         lap,
                         alt = i % 2 == 1,
-                        isBest = sessionKey == "race" && bestMs != null && lap.lapTimeMs == bestMs,
+                        isGlobalBest = globalBestMs != null && lap.lapTimeMs == globalBestMs,
                         bestSectors = bestSectors,
                         lengthKm = lengthKm,
                         showSectors = showSectors,
@@ -714,7 +716,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
 }
 
 @Composable
-private fun TheoreticalBestLap(totalMs: Long, bestSectors: List<Long?>, highlightTotal: Boolean) {
+private fun TheoreticalBestLap(totalMs: Long, bestSectors: List<Long?>) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -730,8 +732,8 @@ private fun TheoreticalBestLap(totalMs: Long, bestSectors: List<Long?>, highligh
             Text(
                 formatLap(totalMs),
                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                color = if (highlightTotal) BestPurple else TextMed,
-                fontWeight = if (highlightTotal) FontWeight.Bold else FontWeight.SemiBold,
+                color = TextMed,
+                fontWeight = FontWeight.SemiBold,
             )
         }
         Text(
@@ -745,7 +747,7 @@ private fun TheoreticalBestLap(totalMs: Long, bestSectors: List<Long?>, highligh
 }
 
 @Composable
-private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List<Long?>, lengthKm: Double?, showSectors: Boolean) {
+private fun LapRow(lap: LapDto, alt: Boolean, isGlobalBest: Boolean, bestSectors: List<Long?>, lengthKm: Double?, showSectors: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -773,19 +775,19 @@ private fun LapRow(lap: LapDto, alt: Boolean, isBest: Boolean, bestSectors: List
             Text(
                 lap.lapTimeMs?.let { formatLap(it) } ?: "—",
                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                color = if (isBest) BestPurple else TextHigh,
-                fontWeight = if (isBest) FontWeight.Bold else FontWeight.Normal,
+                color = if (isGlobalBest) BestPurple else TextHigh,
+                fontWeight = if (isGlobalBest) FontWeight.Bold else FontWeight.Normal,
             )
         }
         if (showSectors && lap.sectorsMs.any { (it ?: 0L) > 0L }) {
-            // Each sector is highlighted when it's the fastest of that sector in the session.
+            // Personal best sectors in the lap breakdown stay separate from global bests.
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 lap.sectorsMs.forEachIndexed { i, s ->
                     val isBestSector = s != null && s > 0L && bestSectors.getOrNull(i) == s
                     Text(
                         s?.takeIf { it > 0L }?.let { sectorFmt(it) } ?: "—",
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                        color = if (isBestSector) BestPurple else TextLow,
+                        color = if (isBestSector) PersonalBestGreen else TextLow,
                         fontWeight = if (isBestSector) FontWeight.Bold else FontWeight.Normal,
                     )
                 }
@@ -800,6 +802,13 @@ private fun bestSectorsByIndex(laps: List<LapDto>): List<Long?> {
     return (0 until width).map { i ->
         laps.mapNotNull { it.sectorsMs.getOrNull(i)?.takeIf { v -> v > 0L } }.minOrNull()
     }
+}
+
+private fun globalSessionBestLapMs(d: RaceDetailDto, sessionKey: String): Long? {
+    val session = d.sessions[sessionKey] ?: return null
+    return (session.teamClassification + session.classification)
+        .mapNotNull { it.bestLapMs?.takeIf { ms -> ms > 0L } }
+        .minOrNull()
 }
 
 private fun theoreticalBestLapMs(bestSectors: List<Long?>): Long? {

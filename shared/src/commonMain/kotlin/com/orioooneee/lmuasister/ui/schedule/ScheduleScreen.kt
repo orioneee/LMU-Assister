@@ -45,7 +45,7 @@ import com.orioooneee.lmuasister.ui.theme.Surface1
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
-import kotlin.time.Clock
+import com.orioooneee.lmuasister.ui.util.rememberNow
 
 private fun tierRank(difficulty: String): Int = when {
     "rookie" in difficulty.lowercase() -> 0
@@ -65,7 +65,7 @@ fun ScheduleScreen(
     onOpenRace: (Race) -> Unit,
 ) {
     var category by remember { mutableStateOf(RaceType.DAILY) }
-    val now = remember { Clock.System.now() }
+    val now = rememberNow()
 
     val races = when (category) {
         RaceType.DAILY -> schedule.daily

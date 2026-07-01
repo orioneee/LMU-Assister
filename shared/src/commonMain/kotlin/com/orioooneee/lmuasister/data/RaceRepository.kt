@@ -373,7 +373,7 @@ private fun SessionWeatherDto.toModel() = SessionWeather(
 )
 
 private fun ClassLeaderboardDto.toModel() = ClassLeaderboard(
-    carClass = carClass ?: "—",
+    carClass = carClass ?: classId ?: "—",
     leaderboardId = leaderboardId,
     entries = entries.map { it.toModel() },
 )

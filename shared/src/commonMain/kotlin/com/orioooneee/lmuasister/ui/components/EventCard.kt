@@ -54,9 +54,7 @@ import com.orioooneee.lmuasister.ui.util.formatStart
 import com.orioooneee.lmuasister.ui.util.hhmm
 import com.orioooneee.lmuasister.ui.util.rememberNow
 import com.orioooneee.lmuasister.ui.util.startsInLabel
-import kotlin.time.Clock
 import lmuassister.shared.generated.resources.Res
-import lmuassister.shared.generated.resources.badge_next
 import lmuassister.shared.generated.resources.next_up
 import org.jetbrains.compose.resources.stringResource
 
@@ -67,7 +65,7 @@ private val CARD_TEXT_SHADOW = Shadow(color = Color.Black.copy(alpha = 0.7f), of
 
 @Composable
 private fun Race.nextLabel(): String {
-    val now = remember { Clock.System.now() }
+    val now = rememberNow()
     return nextStart(now)?.formatStart().orEmpty()
 }
 
@@ -77,7 +75,6 @@ fun RaceCard(
     race: Race,
     modifier: Modifier = Modifier,
     showCountdown: Boolean = true,
-    isNext: Boolean = false,
     timeColumns: Int = 3,
     onClick: () -> Unit = {},
 ) {
@@ -111,7 +108,6 @@ fun RaceCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        if (isNext) NextBadge()
                         race.classInfos.take(4).forEach { ClassChip(it) }
                     }
                     race.track?.logoUrl?.let {
@@ -163,24 +159,6 @@ private fun CardTrackEmblem(url: String) {
             contentDescription = null,
             contentScale = ContentScale.Fit,
             modifier = Modifier.height(24.dp).widthIn(max = 68.dp),
-        )
-    }
-}
-
-@Composable
-private fun NextBadge() {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(7.dp))
-            .background(MaterialTheme.colorScheme.primary)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Text(
-            stringResource(Res.string.badge_next),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = Carbon,
-            maxLines = 1,
         )
     }
 }

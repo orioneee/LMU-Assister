@@ -68,7 +68,7 @@ import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.TextMed
-import kotlin.time.Clock
+import com.orioooneee.lmuasister.ui.util.rememberNow
 import kotlin.time.Instant
 import kotlinx.coroutines.launch
 import lmuassister.shared.generated.resources.Res
@@ -98,8 +98,8 @@ fun HomeScreen(
 ) {
     val topInset = insets.calculateTopPadding()
     val bottomInset = insets.calculateBottomPadding()
-    val now = remember { Clock.System.now() }
-    val tabs = remember(schedule) { buildTabs(schedule, now) }
+    val now = rememberNow()
+    val tabs = remember(schedule) { buildTabs(schedule) }
 
     val density = LocalDensity.current
     val windowInfo = LocalWindowInfo.current
@@ -250,7 +250,7 @@ private fun HomeTab.label(): String = when (this) {
     ChampTab -> stringResource(Res.string.tab_championship)
 }
 
-private fun buildTabs(schedule: Schedule, now: Instant): List<HomeTab> = buildList {
+private fun buildTabs(schedule: Schedule): List<HomeTab> = buildList {
     val hasMain = schedule.races.any {
         it.type == RaceType.DAILY || it.type == RaceType.WEEKLY
     }
@@ -312,26 +312,13 @@ private fun TabContent(
             }
 
             else -> {
-                // Each schedule runs independently (Beginner/Intermediate/Advanced daily,
-                // and weekly), so "NEXT" is the soonest race PER (type + difficulty) group.
-                val nextRaceIds: Set<String> = if (isCurrentWeek) {
-                    all.groupBy { it.type to it.difficulty.lowercase() }
-                        .values.mapNotNull { g ->
-                            g.filter { it.nextStart(now) != null }
-                                .minByOrNull { nextKey(it) }
-                                ?.id
-                        }
-                        .toSet()
-                } else {
-                    emptySet()
-                }
                 sections.forEach { sec ->
                     val sorted = sec.races.sortedWith(
                         compareBy({ srRank(it.settings.safetyRank) }, { nextKey(it) }),
                     )
                     sec.label?.let { lbl -> item { SectionHeader(lbl) } }
                     items(sorted.chunked(cols)) { row ->
-                        EqualHeightRaceRow(row, cols, onOpenRace, showCountdown = isCurrentWeek, nextRaceIds = nextRaceIds)
+                        EqualHeightRaceRow(row, cols, onOpenRace, showCountdown = isCurrentWeek)
                     }
                 }
             }
