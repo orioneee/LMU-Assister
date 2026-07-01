@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -112,6 +113,8 @@ fun ProfileView(
     enableAllRaces: Boolean = !readOnly,
     enableCategoryClicks: Boolean = !readOnly,
     enableRaceClicks: Boolean = !readOnly,
+    isRefreshingProfile: Boolean = false,
+    onRefreshProfile: (() -> Unit)? = null,
     onSeeAllRaces: () -> Unit = {},
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
     onOpenSuspensions: (active: Boolean) -> Unit = {},
@@ -121,6 +124,9 @@ fun ProfileView(
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         ProfileHeader(profile, accountName, readOnly, enableTrackBreakdown, onOpenSuspensions, onOpenTracks)
+        if (!readOnly && onRefreshProfile != null) {
+            UpdateProfileButton(isRefreshingProfile, onRefreshProfile)
+        }
         RatingsRow(profile.driverRating, profile.safetyRating)
 
         profile.ratingHistory?.takeIf { it.dr.isNotEmpty() || it.sr.isNotEmpty() }?.let {
@@ -157,6 +163,43 @@ fun ProfileView(
                     SeeMoreButton(onSeeAllRaces)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun UpdateProfileButton(loading: Boolean, onClick: () -> Unit) {
+    val alpha = if (loading) 0.68f else 1f
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface1.copy(alpha = alpha))
+            .border(1.dp, Amber.copy(alpha = 0.46f * alpha), RoundedCornerShape(12.dp))
+            .clickable(enabled = !loading, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(color = Amber, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "Updating profile",
+                style = MaterialTheme.typography.labelLarge,
+                color = Amber,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        } else {
+            Text(
+                "Update my profile",
+                style = MaterialTheme.typography.labelLarge,
+                color = Amber,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
         }
     }
 }

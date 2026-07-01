@@ -167,7 +167,17 @@ fun ProfileScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Spacer(Modifier.height(topInset + 24.dp))
-                ProfileContent(signedIn.backend, onSeeAllRaces, onOpenRace, onOpenSuspensions, onOpenCategory, onOpenTracks, onOpenCar)
+                ProfileContent(
+                    signedIn.backend,
+                    refreshing,
+                    viewModel::refresh,
+                    onSeeAllRaces,
+                    onOpenRace,
+                    onOpenSuspensions,
+                    onOpenCategory,
+                    onOpenTracks,
+                    onOpenCar,
+                )
                 Spacer(Modifier.height(24.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -456,6 +466,8 @@ private fun ClearDataDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 @Composable
 private fun ProfileContent(
     backend: BackendState,
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
     onSeeAllRaces: () -> Unit,
     onOpenRace: (eventId: String, split: Int?) -> Unit,
     onOpenSuspensions: (active: Boolean) -> Unit,
@@ -467,6 +479,8 @@ private fun ProfileContent(
         is BackendState.Ok -> ProfileView(
             backend.profile,
             accountName = "",
+            isRefreshingProfile = refreshing,
+            onRefreshProfile = onRefresh,
             onSeeAllRaces = onSeeAllRaces,
             onOpenRace = onOpenRace,
             onOpenSuspensions = onOpenSuspensions,

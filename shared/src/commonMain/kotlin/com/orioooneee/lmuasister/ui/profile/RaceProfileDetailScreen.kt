@@ -689,7 +689,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
             Text("${sessionLabel(sessionKey)} lap times", style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Stat("Laps", laps.size.toString())
-                bestMs?.let { StatColored("Best", formatLap(it), if (it == globalBestMs) BestPurple else TextHigh) }
+                bestMs?.let { StatColored("Best", formatLap(it), if (it == globalBestMs) BestPurple else PersonalBestGreen) }
                 pace?.let { Stat("Avg", formatLap(it.avgMs)) }
                 finishStatus?.takeIf { it.isNotBlank() }?.let { Stat("Result", it) }
             }
@@ -704,6 +704,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
                     LapRow(
                         lap,
                         alt = i % 2 == 1,
+                        isPersonalBest = bestMs != null && lap.lapTimeMs == bestMs,
                         isGlobalBest = globalBestMs != null && lap.lapTimeMs == globalBestMs,
                         bestSectors = bestSectors,
                         lengthKm = lengthKm,
@@ -747,7 +748,15 @@ private fun TheoreticalBestLap(totalMs: Long, bestSectors: List<Long?>) {
 }
 
 @Composable
-private fun LapRow(lap: LapDto, alt: Boolean, isGlobalBest: Boolean, bestSectors: List<Long?>, lengthKm: Double?, showSectors: Boolean) {
+private fun LapRow(
+    lap: LapDto,
+    alt: Boolean,
+    isPersonalBest: Boolean,
+    isGlobalBest: Boolean,
+    bestSectors: List<Long?>,
+    lengthKm: Double?,
+    showSectors: Boolean,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -775,8 +784,12 @@ private fun LapRow(lap: LapDto, alt: Boolean, isGlobalBest: Boolean, bestSectors
             Text(
                 lap.lapTimeMs?.let { formatLap(it) } ?: "—",
                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                color = if (isGlobalBest) BestPurple else TextHigh,
-                fontWeight = if (isGlobalBest) FontWeight.Bold else FontWeight.Normal,
+                color = when {
+                    isGlobalBest -> BestPurple
+                    isPersonalBest -> PersonalBestGreen
+                    else -> TextHigh
+                },
+                fontWeight = if (isGlobalBest || isPersonalBest) FontWeight.Bold else FontWeight.Normal,
             )
         }
         if (showSectors && lap.sectorsMs.any { (it ?: 0L) > 0L }) {
