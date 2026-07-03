@@ -146,7 +146,7 @@ data class RatingHistoryDto(
 )
 
 /** One chart point: the rank snapshot after a race plus the per-race delta. `score` is a
- *  continuous value (Bronze-1=0 … Platinum-3=1100) so the line plots across rank borders. */
+ *  continuous value (B0=-100 … P3=1200) so the line plots across rank borders. */
 @Serializable
 data class RatingPointDto(
     val date: String? = null,

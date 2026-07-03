@@ -63,13 +63,21 @@ private val MON = listOf(
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 )
 
-/** Continuous score → rank/tier label, e.g. 466 → "S2" (Silver tier 2). Inverse of the
- *  backend's `score` packing: 100 pts per tier, 3 tiers per rank (Bronze→Platinum). */
-private fun scoreLabel(score: Double): String {
-    val step = floor(score / 100.0).toInt()           // 0 = Bronze-1
-    val rankIdx = step.floorDiv(3).coerceIn(0, 3)
-    val tier = step.mod(3) + 1
-    return "${listOf("B", "S", "G", "P")[rankIdx]}$tier"
+private const val MinRatingScore = -100.0
+private const val MaxRatingScore = 1200.0
+private const val RatingTierWidth = 100.0
+
+/** Continuous score → rank/tier label. Inverse of the backend's rating-history packing:
+ *  B0=-100..-1, B1=0..99, then 100 pts per tier up to P3=1100..1200. */
+internal fun scoreLabel(score: Double): String {
+    val step = floor(score.coerceIn(MinRatingScore, MaxRatingScore) / RatingTierWidth).toInt()
+    return when {
+        step < 0 -> "B0"
+        step <= 2 -> "B${step + 1}"
+        step <= 5 -> "S${step - 2}"
+        step <= 8 -> "G${step - 5}"
+        else -> "P${(step - 8).coerceAtMost(3)}"
+    }
 }
 
 private fun shortDate(iso: String): String? = runCatching {
@@ -183,8 +191,8 @@ private fun RatingChart(points: List<RatingPointDto>, accent: Color) {
     val values = points.map { it.score ?: 0.0 }
     val sMin = values.min()
     val sMax = values.max()
-    val lo = floor((sMin - 30.0) / 100.0) * 100.0
-    val hi = ceil((sMax + 30.0) / 100.0) * 100.0
+    val lo = (floor((sMin - 30.0) / RatingTierWidth) * RatingTierWidth).coerceAtLeast(MinRatingScore)
+    val hi = (ceil((sMax + 30.0) / RatingTierWidth) * RatingTierWidth).coerceAtMost(MaxRatingScore)
     val span = (hi - lo).coerceAtLeast(1.0)
     val gridStep = when {
         span <= 600.0 -> 100.0
