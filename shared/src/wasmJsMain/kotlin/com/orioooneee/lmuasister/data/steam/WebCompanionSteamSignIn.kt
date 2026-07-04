@@ -4,11 +4,17 @@ import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.cache.LocalCache
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import io.ktor.client.HttpClient
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import kotlin.js.ExperimentalWasmJsInterop
+import kotlin.js.JsAny
+import kotlin.js.Promise
+import kotlin.js.js
+import kotlinx.coroutines.await
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -16,6 +22,7 @@ import kotlinx.serialization.json.Json
 
 private const val WEB_APP_TOKEN_KEY = "web_companion_app_token"
 private const val WEB_STEAM_SESSION_KEY = "web_companion_steam_session"
+private const val WEB_LOCAL_NETWORK_ACCESS_KEY = "web_companion_local_network_access"
 private const val APPROVAL_WAIT_SECONDS = 15
 
 private val CompanionJson = Json {
@@ -34,6 +41,37 @@ internal class WebCompanionSteamSignIn(
 ) : SteamSignIn {
     private val baseUrl = BuildConfig.COMPANION_URL.trimEnd('/')
     private var activeFlowId: String? = null
+
+    override val requiresAuthEnvironmentCheck: Boolean = true
+
+    override suspend fun checkAuthEnvironment(): SteamAuthEnvironment {
+        val permission = queryLocalNetworkPermission()
+        return when (permission) {
+            "granted" -> checkCompanionHealth()
+            "denied" -> SteamAuthEnvironment.LocalNetworkPermissionRequired(denied = true)
+            "unsupported" -> {
+                if (LocalCache.read(WEB_LOCAL_NETWORK_ACCESS_KEY) == "1") checkCompanionHealth()
+                else SteamAuthEnvironment.LocalNetworkPermissionRequired()
+            }
+            else -> SteamAuthEnvironment.LocalNetworkPermissionRequired()
+        }
+    }
+
+    override suspend fun requestAuthEnvironmentAccess(): SteamAuthEnvironment {
+        val permission = requestLocalNetworkPermission()
+        return when (permission) {
+            "granted", "unsupported" -> checkCompanionHealth().also { environment ->
+                if (environment == SteamAuthEnvironment.Ready) {
+                    LocalCache.write(WEB_LOCAL_NETWORK_ACCESS_KEY, "1")
+                }
+            }
+            "denied" -> {
+                LocalCache.remove(WEB_LOCAL_NETWORK_ACCESS_KEY)
+                SteamAuthEnvironment.LocalNetworkPermissionRequired(denied = true)
+            }
+            else -> SteamAuthEnvironment.LocalNetworkPermissionRequired()
+        }
+    }
 
     override suspend fun signIn(username: String, password: String, guardCode: String?): SignInOutcome {
         val code = guardCode?.trim().orEmpty()
@@ -81,6 +119,9 @@ internal class WebCompanionSteamSignIn(
                 steamSession = session,
             ),
         )
+        if (response.status == "companion_unavailable") {
+            throw SteamAuthEnvironmentUnavailable(response.message ?: companionUnavailableMessage())
+        }
         if (response.status == "session_invalid") {
             LocalCache.remove(WEB_STEAM_SESSION_KEY)
             return null
@@ -102,10 +143,27 @@ internal class WebCompanionSteamSignIn(
             }.bodyAsText().let(CompanionJson::decodeFromString)
         } catch (t: Throwable) {
             CompanionResponse(
-                status = "error",
-                message = "Couldn't reach JVM companion at $baseUrl. Start :jvm-minter first.",
+                status = "companion_unavailable",
+                message = companionUnavailableMessage(),
             )
         }
+
+    private suspend fun checkCompanionHealth(): SteamAuthEnvironment =
+        try {
+            val response = client.get("$baseUrl/api/health")
+                .bodyAsText()
+                .let { CompanionJson.decodeFromString<CompanionResponse>(it) }
+            if (response.status == "ok") {
+                SteamAuthEnvironment.Ready
+            } else {
+                SteamAuthEnvironment.CompanionUnavailable(response.message ?: companionUnavailableMessage())
+            }
+        } catch (t: Throwable) {
+            SteamAuthEnvironment.CompanionUnavailable(companionUnavailableMessage())
+        }
+
+    private fun companionUnavailableMessage(): String =
+        "Couldn't reach JVM companion at $baseUrl. Start jvm-minter first."
 
     private suspend fun CompanionResponse.toOutcome(): SignInOutcome =
         when (status) {
@@ -176,7 +234,60 @@ internal class WebCompanionSteamSignIn(
             "email" -> SteamGuardKind.EMAIL
             else -> SteamGuardKind.DEVICE
         }
+
+    @OptIn(ExperimentalWasmJsInterop::class)
+    private suspend fun queryLocalNetworkPermission(): String =
+        jsToString(queryLocalNetworkPermissionJs().await())
+
+    @OptIn(ExperimentalWasmJsInterop::class)
+    private suspend fun requestLocalNetworkPermission(): String =
+        jsToString(requestLocalNetworkPermissionJs().await())
 }
+
+@OptIn(ExperimentalWasmJsInterop::class)
+@Suppress("UNUSED_PARAMETER")
+private fun jsToString(value: JsAny?): String =
+    js("String(value)")
+
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun queryLocalNetworkPermissionJs(): Promise<JsAny?> =
+    js(
+        """
+        (async () => {
+          const permissions = globalThis.navigator && globalThis.navigator.permissions;
+          if (!permissions || typeof permissions.query !== "function") return "unsupported";
+          const names = ["local-network-access", "private-network-access"];
+          for (const name of names) {
+            try {
+              const status = await permissions.query({ name });
+              return status && status.state ? status.state : "prompt";
+            } catch (_) {
+            }
+          }
+          return "unsupported";
+        })()
+        """,
+    )
+
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun requestLocalNetworkPermissionJs(): Promise<JsAny?> =
+    js(
+        """
+        (async () => {
+          const permissions = globalThis.navigator && globalThis.navigator.permissions;
+          if (!permissions || typeof permissions.request !== "function") return "unsupported";
+          const names = ["local-network-access", "private-network-access"];
+          for (const name of names) {
+            try {
+              const status = await permissions.request({ name });
+              return status && status.state ? status.state : "prompt";
+            } catch (_) {
+            }
+          }
+          return "unsupported";
+        })()
+        """,
+    )
 
 @Serializable
 private data class LoginRequest(

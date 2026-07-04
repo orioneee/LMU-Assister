@@ -22,6 +22,20 @@ sealed interface SignInOutcome {
      */
 }
 
+sealed interface SteamAuthEnvironment {
+    data object Ready : SteamAuthEnvironment
+
+    data class LocalNetworkPermissionRequired(
+        val denied: Boolean = false,
+    ) : SteamAuthEnvironment
+
+    data class CompanionUnavailable(
+        val message: String,
+    ) : SteamAuthEnvironment
+}
+
+class SteamAuthEnvironmentUnavailable(message: String) : RuntimeException(message)
+
 /**
  * Steam sign-in strategy. The active production implementation is kSteam on-device
  * auth for Android, iOS and desktop: it signs into Steam locally, mints a Steam ticket,
@@ -30,6 +44,15 @@ sealed interface SignInOutcome {
  * It ends with our backend app token, which [SteamBackendApi] uses for profile calls.
  */
 interface SteamSignIn {
+    val requiresAuthEnvironmentCheck: Boolean
+        get() = false
+
+    suspend fun checkAuthEnvironment(): SteamAuthEnvironment =
+        SteamAuthEnvironment.Ready
+
+    suspend fun requestAuthEnvironmentAccess(): SteamAuthEnvironment =
+        checkAuthEnvironment()
+
     suspend fun signIn(username: String, password: String, guardCode: String?): SignInOutcome
 
     suspend fun continueDeviceConfirmation(challengeId: String): SignInOutcome =

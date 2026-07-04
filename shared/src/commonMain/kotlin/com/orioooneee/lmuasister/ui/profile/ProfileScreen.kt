@@ -124,14 +124,25 @@ fun ProfileScreen(
     val pendingApproval = state as? SteamLoginUiState.DeviceConfirmationPending
     val pendingQr = state as? SteamLoginUiState.QrCodePending
     val startingQr = state is SteamLoginUiState.QrCodeStarting
-    val loading = state is SteamLoginUiState.Loading || startingQr || pendingApproval != null || pendingQr != null
+    val checkingAuthEnvironment = state is SteamLoginUiState.CheckingAuthEnvironment
+    val permissionRequired = state as? SteamLoginUiState.LocalNetworkPermissionRequired
+    val requestingLocalNetworkPermission = state is SteamLoginUiState.RequestingLocalNetworkPermission
+    val minterUnavailable = state as? SteamLoginUiState.MinterUnavailable
+    val authEnvironmentBlocked =
+        checkingAuthEnvironment || permissionRequired != null || requestingLocalNetworkPermission || minterUnavailable != null
+    val loading = state is SteamLoginUiState.Loading ||
+        startingQr ||
+        pendingApproval != null ||
+        pendingQr != null ||
+        checkingAuthEnvironment ||
+        requestingLocalNetworkPermission
     val guardRequired = state is SteamLoginUiState.GuardRequired
     val restoring = state is SteamLoginUiState.Restoring
     val signedIn = state as? SteamLoginUiState.SignedIn
     val waitingForGuardApproval = pendingApproval != null
     val waitingForQr = pendingQr != null
     val canSubmitGuardCodeDuringApproval = pendingApproval != null && code.isNotBlank()
-    val credentialFieldsVisible = pendingQr == null && !startingQr
+    val credentialFieldsVisible = !authEnvironmentBlocked && pendingQr == null && !startingQr
     val cancellableCredentialFlow = pendingApproval != null || guardRequired
     val qrNoticeText = when {
         pendingQr != null || startingQr -> null
@@ -294,102 +305,113 @@ fun ProfileScreen(
                 .border(1.dp, Outline, RoundedCornerShape(18.dp))
                 .padding(16.dp),
         ) {
-            if (credentialFieldsVisible) {
-                PrivacyConsent(
-                    accepted = privacyAccepted,
-                    onAcceptedChange = {
-                        privacyAccepted = it
-                        if (it) qrPrivacyNotice = false
-                    },
-                    enabled = !loading,
-                    onOpenPrivacy = onOpenPrivacy,
+            if (authEnvironmentBlocked) {
+                AuthEnvironmentGate(
+                    checking = checkingAuthEnvironment,
+                    requestingPermission = requestingLocalNetworkPermission,
+                    permissionRequired = permissionRequired,
+                    minterUnavailable = minterUnavailable,
+                    onGrantPermission = viewModel::grantLocalNetworkPermission,
+                    onRetryMinter = viewModel::retryAuthEnvironmentCheck,
                 )
-
-                if (!cancellableCredentialFlow) {
-                    Spacer(Modifier.height(16.dp))
-                    SignInMethodLabel()
-                    Spacer(Modifier.height(8.dp))
-                    QrSignInButton(
-                        active = false,
-                        starting = false,
-                        checking = false,
+            } else {
+                if (credentialFieldsVisible) {
+                    PrivacyConsent(
+                        accepted = privacyAccepted,
+                        onAcceptedChange = {
+                            privacyAccepted = it
+                            if (it) qrPrivacyNotice = false
+                        },
                         enabled = !loading,
-                        onClick = onQrSignInClick,
+                        onOpenPrivacy = onOpenPrivacy,
                     )
-                    if (qrNoticeText != null) {
+
+                    if (!cancellableCredentialFlow) {
+                        Spacer(Modifier.height(16.dp))
+                        SignInMethodLabel()
                         Spacer(Modifier.height(8.dp))
-                        AuthNotice(qrNoticeText)
+                        QrSignInButton(
+                            active = false,
+                            starting = false,
+                            checking = false,
+                            enabled = !loading,
+                            onClick = onQrSignInClick,
+                        )
+                        if (qrNoticeText != null) {
+                            Spacer(Modifier.height(8.dp))
+                            AuthNotice(qrNoticeText)
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        OrDivider()
+                        Spacer(Modifier.height(16.dp))
+                    } else {
+                        Spacer(Modifier.height(16.dp))
                     }
-                    Spacer(Modifier.height(16.dp))
-                    OrDivider()
-                    Spacer(Modifier.height(16.dp))
-                } else {
-                    Spacer(Modifier.height(16.dp))
                 }
-            }
 
-            if (credentialFieldsVisible) {
-                Field(
-                    value = login,
-                    onValueChange = { login = it },
-                    label = stringResource(Res.string.profile_field_login),
-                    keyboardType = KeyboardType.Text,
-                    enabled = !loading,
-                )
-                Spacer(Modifier.height(14.dp))
-                Field(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = stringResource(Res.string.profile_field_password),
-                    keyboardType = KeyboardType.Password,
-                    isPassword = true,
-                    passwordVisible = passwordVisible,
-                    onPasswordVisibilityChange = { passwordVisible = it },
-                    enabled = !loading,
-                )
-                Spacer(Modifier.height(14.dp))
-                Field(
-                    value = code,
-                    onValueChange = { code = it },
-                    label = stringResource(Res.string.profile_field_2fa),
-                    keyboardType = KeyboardType.Number,
-                    enabled = guardRequired || pendingApproval != null,
-                )
-            }
+                if (credentialFieldsVisible) {
+                    Field(
+                        value = login,
+                        onValueChange = { login = it },
+                        label = stringResource(Res.string.profile_field_login),
+                        keyboardType = KeyboardType.Text,
+                        enabled = !loading,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Field(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = stringResource(Res.string.profile_field_password),
+                        keyboardType = KeyboardType.Password,
+                        isPassword = true,
+                        passwordVisible = passwordVisible,
+                        onPasswordVisibilityChange = { passwordVisible = it },
+                        enabled = !loading,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Field(
+                        value = code,
+                        onValueChange = { code = it },
+                        label = stringResource(Res.string.profile_field_2fa),
+                        keyboardType = KeyboardType.Number,
+                        enabled = guardRequired || pendingApproval != null,
+                    )
+                }
 
-            StatusLine(
-                state = state,
-                waitingForGuardApproval = waitingForGuardApproval,
-                guardApprovalSecondsLeft = guardApprovalSecondsLeft,
-                waitingForQr = waitingForQr,
-                qrSecondsLeft = qrSecondsLeft,
-                supportsGuardApproval = supportsSteamGuardMobileApproval,
-            )
-
-            if (pendingQr != null) {
-                Spacer(Modifier.height(14.dp))
-                QrCodePanel(pendingQr)
-            }
-
-            if (credentialFieldsVisible) {
-                Spacer(Modifier.height(16.dp))
-                SignInButton(
-                    loading = (state is SteamLoginUiState.Loading || pendingApproval != null) &&
-                        !canSubmitGuardCodeDuringApproval,
-                    enabled = privacyAccepted && (!loading || canSubmitGuardCodeDuringApproval),
+                StatusLine(
+                    state = state,
                     waitingForGuardApproval = waitingForGuardApproval,
-                    onClick = { viewModel.login(login, password, code) },
+                    guardApprovalSecondsLeft = guardApprovalSecondsLeft,
+                    waitingForQr = waitingForQr,
+                    qrSecondsLeft = qrSecondsLeft,
+                    supportsGuardApproval = supportsSteamGuardMobileApproval,
                 )
-            }
 
-            if (cancellableCredentialFlow) {
-                Spacer(Modifier.height(10.dp))
-                CancelAuthButton(onClick = viewModel::cancelAuthFlow)
-            }
+                if (pendingQr != null) {
+                    Spacer(Modifier.height(14.dp))
+                    QrCodePanel(pendingQr)
+                }
 
-            if (!credentialFieldsVisible) {
-                Spacer(Modifier.height(10.dp))
-                CancelAuthButton(onClick = viewModel::cancelAuthFlow)
+                if (credentialFieldsVisible) {
+                    Spacer(Modifier.height(16.dp))
+                    SignInButton(
+                        loading = (state is SteamLoginUiState.Loading || pendingApproval != null) &&
+                            !canSubmitGuardCodeDuringApproval,
+                        enabled = privacyAccepted && (!loading || canSubmitGuardCodeDuringApproval),
+                        waitingForGuardApproval = waitingForGuardApproval,
+                        onClick = { viewModel.login(login, password, code) },
+                    )
+                }
+
+                if (cancellableCredentialFlow) {
+                    Spacer(Modifier.height(10.dp))
+                    CancelAuthButton(onClick = viewModel::cancelAuthFlow)
+                }
+
+                if (!credentialFieldsVisible) {
+                    Spacer(Modifier.height(10.dp))
+                    CancelAuthButton(onClick = viewModel::cancelAuthFlow)
+                }
             }
         }
 
@@ -525,6 +547,146 @@ private fun OrDivider() {
                 .weight(1f)
                 .height(1.dp)
                 .background(Outline.copy(alpha = 0.7f)),
+        )
+    }
+}
+
+@Composable
+private fun AuthEnvironmentGate(
+    checking: Boolean,
+    requestingPermission: Boolean,
+    permissionRequired: SteamLoginUiState.LocalNetworkPermissionRequired?,
+    minterUnavailable: SteamLoginUiState.MinterUnavailable?,
+    onGrantPermission: () -> Unit,
+    onRetryMinter: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        when {
+            checking -> {
+                AuthGateProgress("Checking browser access")
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Before sign-in, LMU Assister checks whether this browser can reach the local JVM minter.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMed,
+                )
+            }
+            requestingPermission -> {
+                AuthGateProgress("Waiting for browser permission")
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Confirm the Chrome permission prompt, then we'll check that the JVM minter is running.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMed,
+                )
+            }
+            permissionRequired != null -> {
+                Text(
+                    if (permissionRequired.denied) "Local device access is blocked" else "Local device access required",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextHigh,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "LMU Assister needs browser permission to access apps and services on this device. " +
+                        "It uses that permission only to talk to the local JVM minter on 127.0.0.1.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMed,
+                )
+                if (permissionRequired.denied) {
+                    Spacer(Modifier.height(10.dp))
+                    AuthNotice("If no prompt appears, allow local device access in this site's browser settings and try again.")
+                }
+                Spacer(Modifier.height(16.dp))
+                AuthGateButton(
+                    text = "Grant permission",
+                    loading = false,
+                    enabled = true,
+                    onClick = onGrantPermission,
+                )
+            }
+            minterUnavailable != null -> {
+                Text(
+                    "JVM minter is not running",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextHigh,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Start the JVM minter, then check again. Installation instructions will be linked here soon.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMed,
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    minterUnavailable.message,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DangerRed,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(16.dp))
+                AuthGateButton(
+                    text = "Check again",
+                    loading = false,
+                    enabled = true,
+                    onClick = onRetryMinter,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuthGateProgress(text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        CircularProgressIndicator(color = AuthAccent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.titleSmall,
+            color = TextHigh,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun AuthGateButton(
+    text: String,
+    loading: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val alpha = if (enabled && !loading) 1f else 0.48f
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(AuthAccent.copy(alpha = 0.92f * alpha))
+            .border(1.dp, AuthAccent.copy(alpha = 0.62f * alpha), RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled && !loading, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(color = Carbon, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(
+            text,
+            style = MaterialTheme.typography.titleSmall,
+            color = Carbon.copy(alpha = alpha),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
         )
     }
 }

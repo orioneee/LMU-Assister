@@ -20,6 +20,8 @@ import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import com.orioooneee.lmuasister.data.remote.SteamProfile
 import com.orioooneee.lmuasister.data.steam.SignInOutcome
+import com.orioooneee.lmuasister.data.steam.SteamAuthEnvironment
+import com.orioooneee.lmuasister.data.steam.SteamAuthEnvironmentUnavailable
 import com.orioooneee.lmuasister.data.steam.SteamGuardKind
 import com.orioooneee.lmuasister.data.steam.SteamLog
 import com.orioooneee.lmuasister.data.steam.SteamRestoreTimedOut
@@ -41,6 +43,10 @@ sealed interface SteamLoginUiState {
     data object Idle : SteamLoginUiState
 
     data object Restoring : SteamLoginUiState
+    data object CheckingAuthEnvironment : SteamLoginUiState
+    data class LocalNetworkPermissionRequired(val denied: Boolean = false) : SteamLoginUiState
+    data object RequestingLocalNetworkPermission : SteamLoginUiState
+    data class MinterUnavailable(val message: String) : SteamLoginUiState
     data object Loading : SteamLoginUiState
     data object QrCodeStarting : SteamLoginUiState
 
@@ -100,6 +106,8 @@ private sealed interface AutoContinuation {
     data class DeviceApproval(val challengeId: String) : AutoContinuation
     data class QrCode(val flowId: String) : AutoContinuation
 }
+
+private class ReauthLoginRequired(message: String) : RuntimeException(message)
 
 class SteamLoginViewModel(
     private val signIn: SteamSignIn,
@@ -188,6 +196,26 @@ class SteamLoginViewModel(
             } finally {
                 restoreFinished = true
             }
+        }
+    }
+
+    fun grantLocalNetworkPermission() {
+        if (_state.value is SteamLoginUiState.RequestingLocalNetworkPermission) return
+        _state.value = SteamLoginUiState.RequestingLocalNetworkPermission
+        viewModelScope.launch {
+            applyAuthEnvironment(
+                runCatching { signIn.requestAuthEnvironmentAccess() }
+                    .getOrElse { SteamAuthEnvironment.CompanionUnavailable(it.message ?: "Couldn't check JVM minter.") },
+            )
+        }
+    }
+
+    fun retryAuthEnvironmentCheck() {
+        if (_state.value is SteamLoginUiState.CheckingAuthEnvironment ||
+            _state.value is SteamLoginUiState.RequestingLocalNetworkPermission
+        ) return
+        viewModelScope.launch {
+            showLoginAfterPreflight()
         }
     }
 
@@ -523,19 +551,46 @@ class SteamLoginViewModel(
             appToken = null
             clearLocalAuthAndProfileData()
             _exiting.value = ExitAction.NONE
-            _state.value = SteamLoginUiState.Idle
+            showLoginAfterPreflight()
         }
     }
 
-    private fun forceLoginAfterMissingSession(clearSteamSession: Boolean) {
+    private suspend fun forceLoginAfterMissingSession(clearSteamSession: Boolean) {
         SteamLog.d("vm: clearing cached signed-in profile because auth session is missing clearSteamSession=$clearSteamSession")
         Telemetry.setUserId(null)
         Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "false")
         appToken = null
         if (clearSteamSession) signIn.signOut()
         clearLocalAuthAndProfileData()
-        _state.value = SteamLoginUiState.Idle
-        Telemetry.log(AnalyticsEvent.LoginFormShown)
+        showLoginAfterPreflight()
+    }
+
+    private suspend fun showLoginAfterPreflight() {
+        if (!signIn.requiresAuthEnvironmentCheck) {
+            _state.value = SteamLoginUiState.Idle
+            Telemetry.log(AnalyticsEvent.LoginFormShown)
+            return
+        }
+        _state.value = SteamLoginUiState.CheckingAuthEnvironment
+        applyAuthEnvironment(
+            runCatching { signIn.checkAuthEnvironment() }
+                .getOrElse { SteamAuthEnvironment.CompanionUnavailable(it.message ?: "Couldn't check JVM minter.") },
+        )
+    }
+
+    private fun applyAuthEnvironment(environment: SteamAuthEnvironment) {
+        when (environment) {
+            SteamAuthEnvironment.Ready -> {
+                _state.value = SteamLoginUiState.Idle
+                Telemetry.log(AnalyticsEvent.LoginFormShown)
+            }
+            is SteamAuthEnvironment.LocalNetworkPermissionRequired -> {
+                _state.value = SteamLoginUiState.LocalNetworkPermissionRequired(environment.denied)
+            }
+            is SteamAuthEnvironment.CompanionUnavailable -> {
+                _state.value = SteamLoginUiState.MinterUnavailable(environment.message)
+            }
+        }
     }
 
     private fun clearLocalAuthAndProfileData() {
@@ -627,6 +682,7 @@ class SteamLoginViewModel(
         }.onFailure { e ->
             SteamLog.e("vm: profile load failed (cached=${cached != null})", e)
             Telemetry.recordError(e, "stage" to "profile_load", "had_cache" to (cached != null))
+            if (e is ReauthLoginRequired) return
             if (cached == null) {
                 _state.value = SteamLoginUiState.SignedIn(
                     if (e is BackendAuthFailed) BackendState.AuthFailed(e.message ?: "auth_failed")
@@ -682,7 +738,18 @@ class SteamLoginViewModel(
             block(token)
         } catch (e: BackendReauthRequired) {
             Telemetry.log(AnalyticsEvent.ProfileReauthTriggered)
-            val fresh = reauthToken() ?: throw e
+            val fresh = try {
+                reauthToken()
+            } catch (reauthError: SteamAuthEnvironmentUnavailable) {
+                SteamLog.e("vm: reauth environment unavailable, forcing full login", reauthError)
+                forceLoginAfterMissingSession(clearSteamSession = true)
+                throw ReauthLoginRequired(reauthError.message ?: "Session expired. Sign in again.")
+            }
+            if (fresh == null) {
+                SteamLog.d("vm: reauth returned no token, forcing full login")
+                forceLoginAfterMissingSession(clearSteamSession = true)
+                throw ReauthLoginRequired("Session expired. Sign in again.")
+            }
             appToken = fresh
             block(fresh)
         }

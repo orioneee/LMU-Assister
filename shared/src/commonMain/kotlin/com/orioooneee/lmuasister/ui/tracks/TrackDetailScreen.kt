@@ -214,10 +214,14 @@ private enum class AuthAvailability { Pending, SignedIn, SignedOut }
 
 private fun SteamLoginUiState.authAvailability(): AuthAvailability = when (this) {
     SteamLoginUiState.Restoring,
+    SteamLoginUiState.CheckingAuthEnvironment,
+    SteamLoginUiState.RequestingLocalNetworkPermission,
     SteamLoginUiState.Loading,
     SteamLoginUiState.QrCodeStarting -> AuthAvailability.Pending
     is SteamLoginUiState.SignedIn -> AuthAvailability.SignedIn
     SteamLoginUiState.Idle,
+    is SteamLoginUiState.LocalNetworkPermissionRequired,
+    is SteamLoginUiState.MinterUnavailable,
     is SteamLoginUiState.Error,
     is SteamLoginUiState.GuardRequired,
     is SteamLoginUiState.DeviceConfirmationPending,
