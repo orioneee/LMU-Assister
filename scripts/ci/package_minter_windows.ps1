@@ -14,6 +14,7 @@ $MainClass = "com.orioooneee.lmuasister.minter.MainKt"
 $ArtifactName = "lmu-minter-$Platform"
 $ReleaseDir = "build\minter-release"
 $WorkDir = Join-Path $ReleaseDir $ArtifactName
+$FallbackModules = "java.base,java.instrument,java.management,java.naming,java.sql,jdk.httpserver,jdk.unsupported"
 
 if (-not $env:JAVA_HOME) {
     $JavaCommand = Get-Command java -ErrorAction SilentlyContinue
@@ -21,29 +22,46 @@ if (-not $env:JAVA_HOME) {
         throw "JAVA_HOME is not set and java was not found on PATH"
     }
     $JavaHomeLine = (& $JavaCommand.Source -XshowSettings:properties -version 2>&1 | Select-String "java.home =").Line
-    $env:JAVA_HOME = ($JavaHomeLine -split "=", 2)[1].Trim()
+    if (-not $JavaHomeLine) {
+        throw "Could not resolve java.home from java on PATH"
+    }
+    $JavaHomeParts = $JavaHomeLine -split "=", 2
+    if ($JavaHomeParts.Count -lt 2 -or -not $JavaHomeParts[1]) {
+        throw "Could not parse java.home from java on PATH"
+    }
+    $env:JAVA_HOME = $JavaHomeParts[1].Trim()
 }
 
 if (Test-Path $WorkDir) {
     Remove-Item $WorkDir -Recurse -Force
 }
 
+New-Item -ItemType Directory -Force -Path $ReleaseDir | Out-Null
 New-Item -ItemType Directory -Force -Path "$WorkDir\bin" | Out-Null
 New-Item -ItemType Directory -Force -Path "$WorkDir\lib" | Out-Null
 Copy-Item "$DistDir\lib\*" "$WorkDir\lib" -Recurse -Force
 
-$Jars = Get-ChildItem "$WorkDir\lib" -Filter "*.jar" | ForEach-Object { $_.FullName }
-$JdepsOutput = & "$env:JAVA_HOME\bin\jdeps.exe" `
+$Jars = @(Get-ChildItem "$WorkDir\lib" -Filter "*.jar" | ForEach-Object { $_.FullName })
+if ($Jars.Count -eq 0) {
+    throw "No jars found in $WorkDir\lib"
+}
+
+$JdepsOutput = @(& "$env:JAVA_HOME\bin\jdeps.exe" `
     --multi-release 21 `
     --ignore-missing-deps `
     --recursive `
     --print-module-deps `
     --class-path "$WorkDir\lib\*" `
-    @Jars 2>$null
+    @Jars 2>$null)
 
-$Modules = ($JdepsOutput | Select-Object -Last 1).Trim()
+$ModulesLine = @(
+    $JdepsOutput |
+        ForEach-Object { if ($null -ne $_) { $_.ToString().Trim() } } |
+        Where-Object { $_ }
+) | Select-Object -Last 1
+$Modules = if ($ModulesLine) { $ModulesLine.ToString().Trim() -replace "\s", "" } else { "" }
 if (-not $Modules -or $Modules.StartsWith("Warning:")) {
-    $Modules = "java.base,java.instrument,java.management,java.naming,java.sql,jdk.httpserver,jdk.unsupported"
+    $Modules = $FallbackModules
 }
 
 foreach ($Module in @("jdk.crypto.ec", "java.security.jgss")) {
