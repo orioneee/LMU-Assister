@@ -5,6 +5,12 @@ sealed interface SignInOutcome {
     data class Success(val appToken: String, val uid: String) : SignInOutcome
     data class GuardRequired(val kind: SteamGuardKind) : SignInOutcome
     data class DeviceConfirmationPending(val challengeId: String, val expiresIn: Int) : SignInOutcome
+    data class QrCodePending(
+        val flowId: String,
+        val challengeUrl: String,
+        val displayCode: String?,
+        val expiresIn: Int,
+    ) : SignInOutcome
     data class Failure(val reason: String) : SignInOutcome
 
     /*
@@ -28,6 +34,12 @@ interface SteamSignIn {
 
     suspend fun continueDeviceConfirmation(challengeId: String): SignInOutcome =
         SignInOutcome.Failure("Steam Guard approval is not available on this platform.")
+
+    suspend fun startQrSignIn(): SignInOutcome =
+        SignInOutcome.Failure("Steam QR sign-in is not available on this platform.")
+
+    suspend fun continueQrSignIn(flowId: String): SignInOutcome =
+        SignInOutcome.Failure("Steam QR sign-in is not available on this platform.")
 
     /** Silent session restore (no password) → app token, or null if a full login is needed. */
     suspend fun restore(): String?

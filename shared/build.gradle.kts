@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import java.util.Properties
 
 plugins {
@@ -9,6 +10,7 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
+@OptIn(ExperimentalWasmDsl::class)
 kotlin {
     compilerOptions {
         // kotlin.time.Instant / Clock (used since kotlinx-datetime 0.7) are still experimental on 2.4
@@ -32,6 +34,10 @@ kotlin {
     
     jvm()
 
+    wasmJs {
+        browser()
+    }
+
     android {
        namespace = "com.orioooneee.lmuasister.shared"
        compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -49,7 +55,16 @@ kotlin {
     }
     
     sourceSets {
+        val commonMain by getting
+        val nativeSteamMain by creating {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(libs.ksteam.core)
+            }
+        }
+
         androidMain {
+            dependsOn(nativeSteamMain)
             dependencies {
                 implementation(libs.compose.uiToolingPreview)
                 implementation(libs.ktor.client.okhttp)
@@ -66,49 +81,58 @@ kotlin {
                 api(libs.firebase.performance)
             }
         }
-        commonMain.dependencies {
-            implementation(libs.compose.runtime)
-            implementation(libs.compose.foundation)
-            implementation(libs.compose.material3)
-            implementation(libs.compose.materialIconsCore)
-            implementation(libs.compose.materialIconsExtended)
-            implementation(libs.compose.ui)
-            implementation(libs.compose.components.resources)
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(libs.kotlinx.coroutinesCore)
+        commonMain {
+            dependencies {
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.material3)
+                implementation(libs.compose.materialIconsCore)
+                implementation(libs.compose.materialIconsExtended)
+                implementation(libs.compose.ui)
+                implementation(libs.compose.components.resources)
+                implementation(libs.compose.uiToolingPreview)
+                implementation(libs.androidx.lifecycle.viewmodelCompose)
+                implementation(libs.androidx.lifecycle.runtimeCompose)
+                implementation(libs.kotlinx.coroutinesCore)
 
-            // Networking + DI + HTML parsing + images
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.logging)
-            implementation(libs.ktor.client.mock)
-            implementation(libs.koin.core)
-            implementation(libs.koin.compose)
-            implementation(libs.koin.composeViewmodel)
-            implementation(libs.ksoup)
-            implementation(libs.coil.compose)
-            implementation(libs.coil.networkKtor)
-            implementation(libs.coil.svg)
-            implementation(libs.kotlinx.serializationJson)
-            implementation(libs.kotlinx.datetime)
-            implementation(libs.navigation.compose)
-            implementation(libs.paging.common)
-            implementation(libs.paging.compose)
-            implementation(libs.ksteam.core)
+                // Networking + DI + HTML parsing + images
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.logging)
+                implementation(libs.ktor.client.mock)
+                implementation(libs.koin.core)
+                implementation(libs.koin.compose)
+                implementation(libs.koin.composeViewmodel)
+                implementation(libs.ksoup)
+                implementation(libs.coil.compose)
+                implementation(libs.coil.networkKtor)
+                implementation(libs.coil.svg)
+                implementation(libs.kotlinx.serializationJson)
+                implementation(libs.kotlinx.datetime)
+                implementation(libs.navigation.compose)
+                implementation(libs.paging.common)
+                implementation(libs.paging.compose)
+            }
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
         jvmMain {
+            dependsOn(nativeSteamMain)
             dependencies {
                 implementation(libs.ktor.client.cio)
                 implementation(libs.bouncycastle.prov)
             }
         }
         iosMain {
+            dependsOn(nativeSteamMain)
             dependencies {
                 implementation(libs.ktor.client.darwin)
+            }
+        }
+        wasmJsMain {
+            dependencies {
+                implementation(libs.ktor.client.js)
+                implementation(libs.kotlinx.browser)
             }
         }
     }
@@ -145,6 +169,8 @@ val generateBuildConfig by tasks.registering {
         // when unset the creds are empty and the demo path simply never triggers.
         val demoUser = props.getProperty("demo.username")?.trim().orEmpty()
         val demoPass = props.getProperty("demo.password")?.trim().orEmpty()
+        val companionUrl = props.getProperty("companion.url")?.trim()?.trimEnd('/')
+            ?: "http://127.0.0.1:8787"
         val pkgDir = outDir.get().asFile.resolve("com/orioooneee/lmuasister/config")
         pkgDir.mkdirs()
         pkgDir.resolve("BuildConfig.kt").writeText(
@@ -157,6 +183,7 @@ val generateBuildConfig by tasks.registering {
             |    const val USE_MOCK: Boolean = $useMock
             |    const val DEMO_USERNAME: String = "$demoUser"
             |    const val DEMO_PASSWORD: String = "$demoPass"
+            |    const val COMPANION_URL: String = "$companionUrl"
             |}
             |
             """.trimMargin(),

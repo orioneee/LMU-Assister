@@ -42,12 +42,20 @@ sealed interface SteamLoginUiState {
 
     data object Restoring : SteamLoginUiState
     data object Loading : SteamLoginUiState
+    data object QrCodeStarting : SteamLoginUiState
 
     data class GuardRequired(val kind: SteamGuardKind) : SteamLoginUiState
     data class DeviceConfirmationPending(
         val challengeId: String,
         val expiresIn: Int,
         val continuing: Boolean = false,
+    ) : SteamLoginUiState
+    data class QrCodePending(
+        val flowId: String,
+        val challengeUrl: String,
+        val displayCode: String?,
+        val expiresIn: Int,
+        val checking: Boolean = false,
     ) : SteamLoginUiState
 
     data class SignedIn(val backend: BackendState = BackendState.Loading) : SteamLoginUiState
@@ -87,6 +95,11 @@ private val DEMO_PASSWORD = BuildConfig.DEMO_PASSWORD
 private const val DEMO_FLAG_KEY = "auth_demo_session"
 
 private const val AUTH_WAIT_MS = 10_000L
+
+private sealed interface AutoContinuation {
+    data class DeviceApproval(val challengeId: String) : AutoContinuation
+    data class QrCode(val flowId: String) : AutoContinuation
+}
 
 class SteamLoginViewModel(
     private val signIn: SteamSignIn,
@@ -188,7 +201,10 @@ class SteamLoginViewModel(
             authRunner.startSignIn(username, password, code)
             return
         }
-        if (currentState is SteamLoginUiState.Loading || authRunner.state.value is SteamAuthRunnerState.Running) return
+        if (currentState is SteamLoginUiState.Loading ||
+            currentState is SteamLoginUiState.QrCodeStarting ||
+            authRunner.state.value is SteamAuthRunnerState.Running
+        ) return
         if (username.isBlank() || password.isBlank()) {
             _state.value = SteamLoginUiState.Error("Enter your login and password.")
             return
@@ -201,6 +217,21 @@ class SteamLoginViewModel(
         _state.value = SteamLoginUiState.Loading
         Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = code.isNotBlank()))
         authRunner.startSignIn(username, password, code)
+    }
+
+    fun loginWithQr() {
+        val currentState = _state.value
+        if (currentState is SteamLoginUiState.Loading ||
+            currentState is SteamLoginUiState.QrCodeStarting ||
+            authRunner.state.value is SteamAuthRunnerState.Running
+        ) return
+        SteamLog.d("vm: QR login submitted")
+        _state.value = SteamLoginUiState.QrCodeStarting
+        Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = false))
+        val started = authRunner.startQrSignIn()
+        if (!started && authRunner.state.value !is SteamAuthRunnerState.Running) {
+            _state.value = SteamLoginUiState.Error("Steam QR sign-in could not be started. Try again.")
+        }
     }
 
     fun expireDeviceConfirmation() {
@@ -229,6 +260,37 @@ class SteamLoginViewModel(
         }
     }
 
+    fun cancelAuthFlow() {
+        SteamLog.d("vm: auth flow cancelled by user")
+        authRunner.cancelRunning("user_cancelled_auth")
+        _state.value = SteamLoginUiState.Idle
+    }
+
+    fun expireQrSignIn() {
+        val pending = _state.value as? SteamLoginUiState.QrCodePending ?: return
+        SteamLog.d("vm: QR timer expired flow=${SteamLog.short(pending.flowId)}")
+        authRunner.cancelRunning("qr_timer_expired")
+        _state.value = SteamLoginUiState.Error("Steam QR sign-in timed out. Generate a new code and try again.")
+    }
+
+    fun continueQrSignIn() {
+        val pending = _state.value as? SteamLoginUiState.QrCodePending ?: return
+        if (pending.checking) {
+            SteamLog.d("vm: QR continue ignored, already checking flow=${SteamLog.short(pending.flowId)}")
+            return
+        }
+        SteamLog.d("vm: QR continue requested flow=${SteamLog.short(pending.flowId)}")
+        _state.value = pending.copy(checking = true)
+        val started = authRunner.continueQrSignIn(pending.flowId)
+        SteamLog.d("vm: QR continue start result=$started")
+        if (!started && authRunner.state.value !is SteamAuthRunnerState.Running) {
+            val latest = _state.value as? SteamLoginUiState.QrCodePending
+            if (latest?.flowId == pending.flowId) {
+                _state.value = latest.copy(checking = false)
+            }
+        }
+    }
+
     private fun observeAuthRunner() {
         viewModelScope.launch {
             authRunner.state.collect { auth ->
@@ -239,25 +301,54 @@ class SteamLoginViewModel(
                             SteamLog.d("vm: runner idle while approval continuing, making prompt retryable")
                             _state.value = pending.copy(continuing = false)
                         }
+                        val qrPending = _state.value as? SteamLoginUiState.QrCodePending
+                        if (qrPending?.checking == true) {
+                            SteamLog.d("vm: runner idle while QR checking, making prompt retryable")
+                            _state.value = qrPending.copy(checking = false)
+                        }
                     }
                     is SteamAuthRunnerState.Running -> {
                         SteamLog.d("vm: runner running stage=${auth.stage}")
-                        if (auth.stage == "login_continue") {
-                            val pending = _state.value as? SteamLoginUiState.DeviceConfirmationPending
-                            _state.value = pending?.copy(continuing = true) ?: SteamLoginUiState.Loading
-                        } else if (_state.value !is SteamLoginUiState.SignedIn) {
-                            _state.value = SteamLoginUiState.Loading
+                        when (auth.stage) {
+                            "login_continue" -> {
+                                val pending = _state.value as? SteamLoginUiState.DeviceConfirmationPending
+                                _state.value = pending?.copy(continuing = true) ?: SteamLoginUiState.Loading
+                            }
+                            "login_qr" -> {
+                                if (_state.value !is SteamLoginUiState.SignedIn) {
+                                    _state.value = SteamLoginUiState.QrCodeStarting
+                                }
+                            }
+                            "login_qr_continue" -> {
+                                val pending = _state.value as? SteamLoginUiState.QrCodePending
+                                _state.value = pending?.copy(checking = true) ?: SteamLoginUiState.QrCodeStarting
+                            }
+                            else -> if (_state.value !is SteamLoginUiState.SignedIn) {
+                                _state.value = SteamLoginUiState.Loading
+                            }
                         }
                     }
                     is SteamAuthRunnerState.Finished -> {
                         if (handledAuthResultId == auth.id) return@collect
                         handledAuthResultId = auth.id
                         SteamLog.d("vm: runner finished id=${auth.id} stage=${auth.stage}")
-                        val autoContinueChallenge = handleSignInOutcome(auth.outcome, auth.stage)
+                        if (_state.value is SteamLoginUiState.Idle) {
+                            SteamLog.d("vm: ignoring finished auth result after user cancel stage=${auth.stage}")
+                            authRunner.resetFinished(auth.id)
+                            return@collect
+                        }
+                        val autoContinue = handleSignInOutcome(auth.outcome, auth.stage)
                         authRunner.resetFinished(auth.id)
-                        if (autoContinueChallenge != null) {
-                            SteamLog.d("vm: auto-continuing approval challenge=${SteamLog.short(autoContinueChallenge)}")
-                            continueDeviceConfirmation()
+                        when (autoContinue) {
+                            is AutoContinuation.DeviceApproval -> {
+                                SteamLog.d("vm: auto-continuing approval challenge=${SteamLog.short(autoContinue.challengeId)}")
+                                continueDeviceConfirmation()
+                            }
+                            is AutoContinuation.QrCode -> {
+                                SteamLog.d("vm: auto-continuing QR flow=${SteamLog.short(autoContinue.flowId)}")
+                                continueQrSignIn()
+                            }
+                            null -> Unit
                         }
                     }
                 }
@@ -265,7 +356,7 @@ class SteamLoginViewModel(
         }
     }
 
-    private suspend fun handleSignInOutcome(r: SignInOutcome, stage: String): String? {
+    private suspend fun handleSignInOutcome(r: SignInOutcome, stage: String): AutoContinuation? {
         when (r) {
             is SignInOutcome.Success -> {
                 SteamLog.d("vm: login success uid=${r.uid}")
@@ -292,7 +383,23 @@ class SteamLoginViewModel(
                     continuing = false,
                 )
                 _state.value = pending
-                return r.challengeId.takeIf { stage == "login" }
+                return r.challengeId.takeIf { stage == "login" }?.let(AutoContinuation::DeviceApproval)
+            }
+            is SignInOutcome.QrCodePending -> {
+                SteamLog.d(
+                    "vm: QR pending stage=$stage flow=${SteamLog.short(r.flowId)} " +
+                        "code=${r.displayCode.orEmpty()} expiresIn=${r.expiresIn}",
+                )
+                val pending = SteamLoginUiState.QrCodePending(
+                    flowId = r.flowId,
+                    challengeUrl = r.challengeUrl,
+                    displayCode = r.displayCode,
+                    expiresIn = r.expiresIn,
+                    checking = false,
+                )
+                _state.value = pending
+                return r.flowId.takeIf { stage == "login_qr" || stage == "login_qr_continue" }
+                    ?.let(AutoContinuation::QrCode)
             }
             /*
              * TUNNEL_DISABLED:

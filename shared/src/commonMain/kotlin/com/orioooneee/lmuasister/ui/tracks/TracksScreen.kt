@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -61,19 +62,26 @@ fun TracksScreen(insets: PaddingValues, onOpenTrack: (String) -> Unit) {
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 16.dp, top = 16.dp + insets.calculateTopPadding(), bottom = 12.dp),
         )
-        LazyVerticalGrid(
-            // ~150dp min → 2 per row on a phone, more on wider screens.
-            columns = GridCells.Adaptive(minSize = 150.dp),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp + insets.calculateBottomPadding()),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            val list = tracks
-            if (list == null) {
-                items(6) { TrackCardSkeleton() }
-            } else {
-                items(list, key = { it.id }) { t -> TrackGridCard(t) { onOpenTrack(t.id) } }
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val columns = when {
+                maxWidth < 340.dp -> 1
+                maxWidth < 700.dp -> 2
+                maxWidth < 1060.dp -> 3
+                else -> 4
+            }
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(columns),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp + insets.calculateBottomPadding()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                val list = tracks
+                if (list == null) {
+                    items(8) { TrackCardSkeleton() }
+                } else {
+                    items(list, key = { it.id }) { t -> TrackGridCard(t) { onOpenTrack(t.id) } }
+                }
             }
         }
     }

@@ -10,7 +10,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -18,6 +20,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -192,40 +198,45 @@ fun MainShell(
     val popExitDown: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
         { slideOutVertically(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(NAV_ANIM)) }
 
-    Scaffold(
-        containerColor = Carbon,
-        bottomBar = {
-            if (onTopLevel) {
-                BottomBar(
-
-                    selected = selectedTab,
-                    onSelect = { tab ->
-                        val route: Any = when (tab) {
-                            TopTab.Profile -> ProfileRoute
-                            TopTab.Drivers -> PublicUsersRoute
-                            TopTab.Cars -> CarsRoute
-                            TopTab.Tracks -> TracksRoute
-                            TopTab.Schedule -> HomeRoute
-                        }
-                        nav.navigate(route) {
-                            popUpTo(HomeRoute) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                )
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val useNavigationRail = maxWidth >= 840.dp
+        val onSelectTab: (TopTab) -> Unit = { tab ->
+            val route: Any = when (tab) {
+                TopTab.Profile -> ProfileRoute
+                TopTab.Drivers -> PublicUsersRoute
+                TopTab.Cars -> CarsRoute
+                TopTab.Tracks -> TracksRoute
+                TopTab.Schedule -> HomeRoute
             }
-        },
-    ) { insets ->
-        NavHost(
-            navController = nav,
-            startDestination = HomeRoute,
-            modifier = Modifier.fillMaxSize(),
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None },
-        ) {
+            nav.navigate(route) {
+                popUpTo(HomeRoute) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+
+        Scaffold(
+            containerColor = Carbon,
+            bottomBar = {
+                if (onTopLevel && !useNavigationRail) {
+                    BottomBar(selected = selectedTab, onSelect = onSelectTab)
+                }
+            },
+        ) { insets ->
+            Row(Modifier.fillMaxSize()) {
+                if (onTopLevel && useNavigationRail) {
+                    SideRail(selected = selectedTab, onSelect = onSelectTab)
+                }
+
+                NavHost(
+                    navController = nav,
+                    startDestination = HomeRoute,
+                    modifier = Modifier.weight(1f).fillMaxSize(),
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
+                ) {
             composable<HomeRoute> {
                 ScheduleTab(viewModel, insets, onOpenRace = {
                     Telemetry.log(AnalyticsEvent.RaceDetailOpened(it.id, source = "home_grid"))
@@ -473,6 +484,8 @@ fun MainShell(
                     onBack = { nav.popBackStack() },
                 )
             }
+                }
+            }
         }
     }
 }
@@ -559,6 +572,35 @@ private fun BottomBar(selected: TopTab, onSelect: (TopTab) -> Unit) {
                 icon = { Icon(tab.icon, contentDescription = label) },
                 label = { Text(label) },
                 colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = TextMed,
+                    unselectedTextColor = TextMed,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SideRail(selected: TopTab, onSelect: (TopTab) -> Unit) {
+    NavigationRail(containerColor = Surface1) {
+        TopTab.entries.forEach { tab ->
+            val label = when (tab) {
+                TopTab.Schedule -> stringResource(Res.string.nav_schedule)
+                TopTab.Drivers -> stringResource(Res.string.nav_drivers)
+                TopTab.Cars -> stringResource(Res.string.nav_cars)
+                TopTab.Tracks -> stringResource(Res.string.nav_tracks)
+                TopTab.Profile -> stringResource(Res.string.nav_profile)
+            }
+            NavigationRailItem(
+                selected = selected == tab,
+                onClick = { onSelect(tab) },
+                icon = { Icon(tab.icon, contentDescription = label) },
+                label = { Text(label) },
+                alwaysShowLabel = false,
+                colors = NavigationRailItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.onPrimary,
                     selectedTextColor = MaterialTheme.colorScheme.primary,
                     indicatorColor = MaterialTheme.colorScheme.primary,

@@ -1,11 +1,13 @@
 package com.orioooneee.lmuasister.ui.profile
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,7 +18,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,6 +51,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -84,8 +91,10 @@ import org.koin.compose.viewmodel.koinViewModel
 
 private val SteamLogoBg = Color(0xFF223044)
 private val AuthAccent = Color(0xFFE7B84E)
+private val QrPaper = Color(0xFFFAF8F1)
 private val DangerRed = Color(0xFFE5484D)
 private const val STEAM_GUARD_APPROVAL_SECONDS = 120
+private const val STEAM_QR_SECONDS = 120
 
 @Composable
 fun ProfileScreen(
@@ -108,17 +117,43 @@ fun ProfileScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var code by remember { mutableStateOf("") }
     var privacyAccepted by remember { mutableStateOf(false) }
+    var qrPrivacyNotice by remember { mutableStateOf(false) }
     var guardApprovalSecondsLeft by remember { mutableStateOf(STEAM_GUARD_APPROVAL_SECONDS) }
+    var qrSecondsLeft by remember { mutableStateOf(STEAM_QR_SECONDS) }
 
     val pendingApproval = state as? SteamLoginUiState.DeviceConfirmationPending
-    val loading = state is SteamLoginUiState.Loading || pendingApproval != null
+    val pendingQr = state as? SteamLoginUiState.QrCodePending
+    val startingQr = state is SteamLoginUiState.QrCodeStarting
+    val loading = state is SteamLoginUiState.Loading || startingQr || pendingApproval != null || pendingQr != null
     val guardRequired = state is SteamLoginUiState.GuardRequired
     val restoring = state is SteamLoginUiState.Restoring
     val signedIn = state as? SteamLoginUiState.SignedIn
     val waitingForGuardApproval = pendingApproval != null
+    val waitingForQr = pendingQr != null
     val canSubmitGuardCodeDuringApproval = pendingApproval != null && code.isNotBlank()
+    val credentialFieldsVisible = pendingQr == null && !startingQr
+    val cancellableCredentialFlow = pendingApproval != null || guardRequired
+    val qrNoticeText = when {
+        pendingQr != null || startingQr -> null
+        qrPrivacyNotice && !privacyAccepted -> "Accept the Privacy Policy to continue with QR sign-in."
+        loading -> "Finish the current sign-in first."
+        else -> null
+    }
     val approvalTimerStart = pendingApproval?.expiresIn?.takeIf { it > 0 } ?: STEAM_GUARD_APPROVAL_SECONDS
+    val qrTimerStart = pendingQr?.expiresIn?.takeIf { it > 0 } ?: STEAM_QR_SECONDS
     val lifecycleOwner = LocalLifecycleOwner.current
+    val onQrSignInClick = {
+        if (privacyAccepted) {
+            qrPrivacyNotice = false
+            viewModel.loginWithQr()
+        } else {
+            qrPrivacyNotice = true
+        }
+    }
+
+    LaunchedEffect(privacyAccepted) {
+        if (privacyAccepted) qrPrivacyNotice = false
+    }
 
     LaunchedEffect(waitingForGuardApproval, pendingApproval?.challengeId, approvalTimerStart) {
         guardApprovalSecondsLeft = approvalTimerStart
@@ -128,6 +163,16 @@ fun ProfileScreen(
             guardApprovalSecondsLeft -= 1
         }
         viewModel.expireDeviceConfirmation()
+    }
+
+    LaunchedEffect(waitingForQr, pendingQr?.flowId, qrTimerStart) {
+        qrSecondsLeft = qrTimerStart
+        if (!waitingForQr) return@LaunchedEffect
+        while (qrSecondsLeft > 0) {
+            delay(1_000L)
+            qrSecondsLeft -= 1
+        }
+        viewModel.expireQrSignIn()
     }
 
     DisposableEffect(lifecycleOwner, pendingApproval?.challengeId) {
@@ -237,66 +282,115 @@ fun ProfileScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(topInset + 30.dp))
-        AuthIntro()
+        AuthIntro(Modifier.widthIn(max = 460.dp).fillMaxWidth())
         Spacer(Modifier.height(18.dp))
 
         Column(
             modifier = Modifier
+                .widthIn(max = 460.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(18.dp))
                 .background(Surface1)
                 .border(1.dp, Outline, RoundedCornerShape(18.dp))
                 .padding(16.dp),
         ) {
-            Field(
-                value = login,
-                onValueChange = { login = it },
-                label = stringResource(Res.string.profile_field_login),
-                keyboardType = KeyboardType.Text,
-                enabled = !loading,
-            )
-            Spacer(Modifier.height(14.dp))
-            Field(
-                value = password,
-                onValueChange = { password = it },
-                label = stringResource(Res.string.profile_field_password),
-                keyboardType = KeyboardType.Password,
-                isPassword = true,
-                passwordVisible = passwordVisible,
-                onPasswordVisibilityChange = { passwordVisible = it },
-                enabled = !loading,
-            )
-            Spacer(Modifier.height(14.dp))
-            Field(
-                value = code,
-                onValueChange = { code = it },
-                label = stringResource(Res.string.profile_field_2fa),
-                keyboardType = KeyboardType.Number,
-                enabled = guardRequired || pendingApproval != null,
-            )
+            if (credentialFieldsVisible) {
+                PrivacyConsent(
+                    accepted = privacyAccepted,
+                    onAcceptedChange = {
+                        privacyAccepted = it
+                        if (it) qrPrivacyNotice = false
+                    },
+                    enabled = !loading,
+                    onOpenPrivacy = onOpenPrivacy,
+                )
+
+                if (!cancellableCredentialFlow) {
+                    Spacer(Modifier.height(16.dp))
+                    SignInMethodLabel()
+                    Spacer(Modifier.height(8.dp))
+                    QrSignInButton(
+                        active = false,
+                        starting = false,
+                        checking = false,
+                        enabled = !loading,
+                        onClick = onQrSignInClick,
+                    )
+                    if (qrNoticeText != null) {
+                        Spacer(Modifier.height(8.dp))
+                        AuthNotice(qrNoticeText)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    OrDivider()
+                    Spacer(Modifier.height(16.dp))
+                } else {
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+
+            if (credentialFieldsVisible) {
+                Field(
+                    value = login,
+                    onValueChange = { login = it },
+                    label = stringResource(Res.string.profile_field_login),
+                    keyboardType = KeyboardType.Text,
+                    enabled = !loading,
+                )
+                Spacer(Modifier.height(14.dp))
+                Field(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = stringResource(Res.string.profile_field_password),
+                    keyboardType = KeyboardType.Password,
+                    isPassword = true,
+                    passwordVisible = passwordVisible,
+                    onPasswordVisibilityChange = { passwordVisible = it },
+                    enabled = !loading,
+                )
+                Spacer(Modifier.height(14.dp))
+                Field(
+                    value = code,
+                    onValueChange = { code = it },
+                    label = stringResource(Res.string.profile_field_2fa),
+                    keyboardType = KeyboardType.Number,
+                    enabled = guardRequired || pendingApproval != null,
+                )
+            }
 
             StatusLine(
                 state = state,
                 waitingForGuardApproval = waitingForGuardApproval,
                 guardApprovalSecondsLeft = guardApprovalSecondsLeft,
+                waitingForQr = waitingForQr,
+                qrSecondsLeft = qrSecondsLeft,
                 supportsGuardApproval = supportsSteamGuardMobileApproval,
             )
 
-            Spacer(Modifier.height(16.dp))
-            PrivacyConsent(
-                accepted = privacyAccepted,
-                onAcceptedChange = { privacyAccepted = it },
-                enabled = !loading,
-                onOpenPrivacy = onOpenPrivacy,
-            )
+            if (pendingQr != null) {
+                Spacer(Modifier.height(14.dp))
+                QrCodePanel(pendingQr)
+            }
 
-            Spacer(Modifier.height(18.dp))
-            SignInButton(
-                loading = loading && !canSubmitGuardCodeDuringApproval,
-                enabled = privacyAccepted && (!loading || canSubmitGuardCodeDuringApproval),
-                waitingForGuardApproval = waitingForGuardApproval,
-                onClick = { viewModel.login(login, password, code) },
-            )
+            if (credentialFieldsVisible) {
+                Spacer(Modifier.height(16.dp))
+                SignInButton(
+                    loading = (state is SteamLoginUiState.Loading || pendingApproval != null) &&
+                        !canSubmitGuardCodeDuringApproval,
+                    enabled = privacyAccepted && (!loading || canSubmitGuardCodeDuringApproval),
+                    waitingForGuardApproval = waitingForGuardApproval,
+                    onClick = { viewModel.login(login, password, code) },
+                )
+            }
+
+            if (cancellableCredentialFlow) {
+                Spacer(Modifier.height(10.dp))
+                CancelAuthButton(onClick = viewModel::cancelAuthFlow)
+            }
+
+            if (!credentialFieldsVisible) {
+                Spacer(Modifier.height(10.dp))
+                CancelAuthButton(onClick = viewModel::cancelAuthFlow)
+            }
         }
 
         Spacer(Modifier.height(32.dp + bottomInset))
@@ -304,9 +398,9 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun AuthIntro() {
+private fun AuthIntro(modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -393,6 +487,45 @@ private fun PrivacyConsent(
                 modifier = Modifier.clickable(onClick = onOpenPrivacy),
             )
         }
+    }
+}
+
+@Composable
+private fun SignInMethodLabel() {
+    Text(
+        "Sign-in method",
+        style = MaterialTheme.typography.labelMedium,
+        color = TextMed,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun OrDivider() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(Outline.copy(alpha = 0.7f)),
+        )
+        Text(
+            "or",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextLow,
+            fontWeight = FontWeight.Bold,
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(Outline.copy(alpha = 0.7f)),
+        )
     }
 }
 
@@ -512,6 +645,8 @@ private fun StatusLine(
     state: SteamLoginUiState,
     waitingForGuardApproval: Boolean,
     guardApprovalSecondsLeft: Int,
+    waitingForQr: Boolean,
+    qrSecondsLeft: Int,
     supportsGuardApproval: Boolean,
 ) {
     val (text, color) = when (state) {
@@ -521,14 +656,27 @@ private fun StatusLine(
                 val seconds = guardApprovalSecondsLeft % 60
                 "Approve the sign-in request in the Steam app, then return here. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
                     MaterialTheme.colorScheme.primary
+            } else if (waitingForQr) {
+                val minutes = qrSecondsLeft / 60
+                val seconds = qrSecondsLeft % 60
+                "Scan the Steam code, then keep this page open. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
+                    MaterialTheme.colorScheme.primary
             } else {
                 "Checking Steam Guard..." to MaterialTheme.colorScheme.primary
             }
         }
+        SteamLoginUiState.QrCodeStarting ->
+            "Generating a Steam QR code..." to MaterialTheme.colorScheme.primary
         is SteamLoginUiState.DeviceConfirmationPending -> {
             val minutes = guardApprovalSecondsLeft / 60
             val seconds = guardApprovalSecondsLeft % 60
             "Approve the sign-in request in the Steam app, or enter the Steam Guard code here. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
+                MaterialTheme.colorScheme.primary
+        }
+        is SteamLoginUiState.QrCodePending -> {
+            val minutes = qrSecondsLeft / 60
+            val seconds = qrSecondsLeft % 60
+            "Scan this code in the Steam mobile app. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
                 MaterialTheme.colorScheme.primary
         }
         is SteamLoginUiState.GuardRequired -> {
@@ -550,6 +698,120 @@ private fun StatusLine(
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth(),
     )
+}
+
+@Composable
+private fun QrCodePanel(state: SteamLoginUiState.QrCodePending) {
+    val matrix = remember(state.challengeUrl) { QrCodeMatrix.encode(state.challengeUrl) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Carbon.copy(alpha = 0.62f))
+            .border(1.dp, AuthAccent.copy(alpha = 0.24f), RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (matrix != null) {
+            QrMatrix(matrix)
+            Spacer(Modifier.height(14.dp))
+        }
+        state.displayCode?.let { displayCode ->
+            QrDisplayCode(displayCode)
+            Spacer(Modifier.height(10.dp))
+        }
+        SelectionContainer {
+            Text(
+                state.challengeUrl,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextLow,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (state.checking) {
+            Spacer(Modifier.height(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                CircularProgressIndicator(color = AuthAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Checking code",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = AuthAccent,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QrDisplayCode(code: String) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(AuthAccent.copy(alpha = 0.12f))
+            .border(1.dp, AuthAccent.copy(alpha = 0.34f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            "Steam code",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextLow,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            code.chunked(4).joinToString(" "),
+            style = MaterialTheme.typography.titleMedium,
+            color = TextHigh,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun QrMatrix(matrix: QrCodeMatrix) {
+    Canvas(
+        modifier = Modifier
+            .sizeIn(maxWidth = 260.dp)
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(18.dp))
+            .background(QrPaper)
+            .border(1.dp, Color.Black.copy(alpha = 0.12f), RoundedCornerShape(18.dp))
+            .padding(14.dp),
+    ) {
+        val quietZone = 4
+        val cells = matrix.size + quietZone * 2
+        val cellSize = size.minDimension / cells
+        val left = (size.width - cellSize * cells) / 2f
+        val top = (size.height - cellSize * cells) / 2f
+        val inset = (cellSize * 0.08f).coerceAtMost(1.2f)
+        val moduleSize = (cellSize - inset * 2f).coerceAtLeast(1f)
+        val radius = CornerRadius(cellSize * 0.18f, cellSize * 0.18f)
+        for (y in 0 until matrix.size) {
+            for (x in 0 until matrix.size) {
+                if (matrix[x, y]) {
+                    drawRoundRect(
+                        color = Color.Black,
+                        topLeft = Offset(
+                            left + (x + quietZone) * cellSize + inset,
+                            top + (y + quietZone) * cellSize + inset,
+                        ),
+                        size = Size(moduleSize, moduleSize),
+                        cornerRadius = radius,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -608,6 +870,88 @@ private fun Field(
 }
 
 @Composable
+private fun QrSignInButton(
+    active: Boolean,
+    starting: Boolean,
+    checking: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val busy = active || starting || checking
+    val alpha = if (enabled || busy) 1f else 0.48f
+    val bg = if (busy) SteamLogoBg else AuthAccent.copy(alpha = 0.92f)
+    val border = if (busy) Outline else AuthAccent.copy(alpha = 0.62f)
+    val primaryText = if (busy) TextHigh else Carbon
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(bg.copy(alpha = bg.alpha * alpha))
+            .border(1.dp, border.copy(alpha = border.alpha * alpha), RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled && !active, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (checking || starting) {
+            CircularProgressIndicator(color = primaryText, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(
+            when {
+                starting -> "Generating QR code"
+                checking -> "Checking QR code"
+                active -> "Waiting for QR scan"
+                else -> "Sign in with Steam QR"
+            },
+            style = MaterialTheme.typography.titleMedium,
+            color = primaryText.copy(alpha = alpha),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun AuthNotice(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = AuthAccent,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(AuthAccent.copy(alpha = 0.10f))
+            .border(1.dp, AuthAccent.copy(alpha = 0.22f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun CancelAuthButton(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Carbon.copy(alpha = 0.58f))
+            .border(1.dp, Outline, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            "Cancel sign-in",
+            style = MaterialTheme.typography.titleSmall,
+            color = TextMed,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
 private fun SignInButton(
     loading: Boolean,
     enabled: Boolean,
@@ -619,10 +963,10 @@ private fun SignInButton(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(AuthAccent.copy(alpha = 0.18f * alpha))
-            .border(1.dp, AuthAccent.copy(alpha = 0.56f * alpha), RoundedCornerShape(14.dp))
+            .background(Carbon.copy(alpha = 0.58f * alpha))
+            .border(1.dp, Outline.copy(alpha = 0.92f * alpha), RoundedCornerShape(14.dp))
             .clickable(enabled = enabled && !loading, onClick = onClick)
-            .padding(vertical = 16.dp),
+            .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -632,8 +976,8 @@ private fun SignInButton(
                 Spacer(Modifier.width(10.dp))
                 Text(
                     "Waiting for approval",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = AuthAccent,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TextHigh,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                 )
@@ -641,8 +985,8 @@ private fun SignInButton(
         } else {
             Text(
                 stringResource(Res.string.profile_sign_in),
-                style = MaterialTheme.typography.titleMedium,
-                color = AuthAccent.copy(alpha = alpha),
+                style = MaterialTheme.typography.titleSmall,
+                color = TextHigh.copy(alpha = alpha),
                 fontWeight = FontWeight.Bold,
             )
         }

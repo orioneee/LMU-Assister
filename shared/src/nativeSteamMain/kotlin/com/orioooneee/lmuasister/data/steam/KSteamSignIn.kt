@@ -20,9 +20,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.TimeSource
 
 private const val APPROVAL_WAIT_SECONDS = 120
+private const val QR_WAIT_SECONDS = 120
 private const val LOGIN_WAIT_MS = 45_000L
 private const val RESTORE_WAIT_MS = 10_000L
 private const val APPROVAL_WAIT_MS = APPROVAL_WAIT_SECONDS * 1_000L
+private const val QR_STATUS_WAIT_MS = 15_000L
 private const val PROMPT_STATE_WAIT_MS = 2_000L
 
 /**
@@ -38,11 +40,13 @@ internal class KSteamSignIn(
     private val mutex = Mutex()
     private var client: SteamClient? = null
     private var started = false
+    private var activeQrFlow: QrFlow? = null
 
     override suspend fun signIn(username: String, password: String, guardCode: String?): SignInOutcome =
         mutex.withLock {
             val steam = startedClient()
             val code = guardCode?.trim().orEmpty()
+            activeQrFlow = null
 
             if (code.isNotBlank() && steam.account.clientAuthState.value is AuthorizationState.AwaitingTwoFactor) {
                 SteamLog.d("ksteam: login has typed guard code while auth state=${steam.account.clientAuthState.value.describe()}")
@@ -99,6 +103,65 @@ internal class KSteamSignIn(
                     SteamLog.d("ksteam: unknown guard prompt, waiting for Steam to finish")
                     waitForSignedInAndExchange(steam, LOGIN_WAIT_MS)
                 }
+            }
+        }
+
+    override suspend fun startQrSignIn(): SignInOutcome =
+        mutex.withLock {
+            val steam = startedClient()
+            if (steam.account.clientAuthState.value is AuthorizationState.AwaitingTwoFactor || activeQrFlow != null) {
+                SteamLog.d("ksteam: cancelling stale auth session before QR login")
+                steam.account.cancelSignInAttempt()
+            }
+
+            SteamLog.d("ksteam: QR login start state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}")
+            val qr = runCatching { steam.account.getSignInQrCode() }
+                .onFailure { SteamLog.e("ksteam: QR login start failed", it) }
+                .getOrNull()
+                ?: return@withLock SignInOutcome.Failure("Steam QR sign-in could not be started. Try again.")
+
+            val flow = QrFlow(
+                flowId = qr.data,
+                challengeUrl = qr.data,
+                displayCode = qr.data.toSteamQrDisplayCode(),
+            )
+            activeQrFlow = flow
+            SteamLog.d(
+                "ksteam: QR login pending flow=${SteamLog.short(flow.flowId)} " +
+                    "code=${flow.displayCode.orEmpty()} version=${qr.version}",
+            )
+            flow.toPending()
+        }
+
+    override suspend fun continueQrSignIn(flowId: String): SignInOutcome =
+        mutex.withLock {
+            val steam = startedClient()
+            val flow = activeQrFlow
+                ?: return@withLock if (steam.account.clientAuthState.value is AuthorizationState.Success) {
+                    finishSignedIn(steam)
+                } else {
+                    SignInOutcome.Failure("Steam QR sign-in expired. Start again.")
+                }
+            if (flow.flowId != flowId) {
+                SteamLog.d(
+                    "ksteam: QR flow mismatch expected=${SteamLog.short(flow.flowId)} " +
+                        "actual=${SteamLog.short(flowId)}",
+                )
+                return@withLock SignInOutcome.Failure("Steam QR sign-in expired. Start again.")
+            }
+            if (steam.account.clientAuthState.value is AuthorizationState.Success) {
+                return@withLock finishSignedIn(steam)
+            }
+
+            SteamLog.d("ksteam: waiting for QR scan flow=${SteamLog.short(flow.flowId)} up to ${QR_STATUS_WAIT_MS / 1000}s")
+            val signedIn = withTimeoutOrNull(QR_STATUS_WAIT_MS) {
+                steam.account.clientAuthState.filterIsInstance<AuthorizationState.Success>().first()
+            }
+            if (signedIn != null) {
+                finishSignedIn(steam)
+            } else {
+                SteamLog.d("ksteam: QR still pending flow=${SteamLog.short(flow.flowId)} state=${steam.account.clientAuthState.value.describe()}")
+                flow.toPending()
             }
         }
 
@@ -260,6 +323,7 @@ internal class KSteamSignIn(
         val auth = exchangeTicket(steam)
         SteamLog.d("ksteam: backend token received uid=${auth.uid}")
         saveCurrentSession(steam)
+        activeQrFlow = null
         return SignInOutcome.Success(auth.token, auth.uid)
     }
 
@@ -417,4 +481,25 @@ internal class KSteamSignIn(
             is AuthorizationState.AwaitingTwoFactor ->
                 "AwaitingTwoFactor(steamId=${SteamLog.short(steamId.toString())}, methods=$supportedConfirmationMethods)"
         }
+
+    private data class QrFlow(
+        val flowId: String,
+        val challengeUrl: String,
+        val displayCode: String?,
+    ) {
+        fun toPending(): SignInOutcome.QrCodePending =
+            SignInOutcome.QrCodePending(
+                flowId = flowId,
+                challengeUrl = challengeUrl,
+                displayCode = displayCode,
+                expiresIn = QR_WAIT_SECONDS,
+            )
+    }
 }
+
+private fun String.toSteamQrDisplayCode(): String? =
+    trim()
+        .trimEnd('/')
+        .substringAfterLast('/')
+        .takeIf { it.length in 3..24 && it.all { ch -> ch.isLetterOrDigit() } }
+        ?.uppercase()

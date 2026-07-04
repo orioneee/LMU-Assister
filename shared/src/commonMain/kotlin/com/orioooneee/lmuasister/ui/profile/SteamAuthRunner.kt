@@ -45,6 +45,12 @@ class SteamAuthRunner(
     fun continueDeviceConfirmation(challengeId: String): Boolean =
         run("login_continue") { steamSignIn.continueDeviceConfirmation(challengeId) }
 
+    fun startQrSignIn(): Boolean =
+        run("login_qr") { steamSignIn.startQrSignIn() }
+
+    fun continueQrSignIn(flowId: String): Boolean =
+        run("login_qr_continue") { steamSignIn.continueQrSignIn(flowId) }
+
     fun resetFinished(id: Long) {
         if ((_state.value as? SteamAuthRunnerState.Finished)?.id == id) {
             _state.value = SteamAuthRunnerState.Idle
@@ -105,6 +111,8 @@ class SteamAuthRunner(
             is SignInOutcome.GuardRequired -> "GuardRequired(kind=$kind)"
             is SignInOutcome.DeviceConfirmationPending ->
                 "DeviceConfirmationPending(challenge=${SteamLog.short(challengeId)}, expiresIn=$expiresIn)"
+            is SignInOutcome.QrCodePending ->
+                "QrCodePending(flow=${SteamLog.short(flowId)}, code=${displayCode.orEmpty()}, expiresIn=$expiresIn)"
             is SignInOutcome.Failure -> "Failure(reason=$reason)"
             /*
              * TUNNEL_DISABLED:

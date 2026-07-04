@@ -1,5 +1,6 @@
 *.iml
 .kotlin
+kotlin-js-store/
 .gradle
 **/build/
 xcuserdata

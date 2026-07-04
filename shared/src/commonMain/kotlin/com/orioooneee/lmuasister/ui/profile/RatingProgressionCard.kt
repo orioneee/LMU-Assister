@@ -7,7 +7,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -171,17 +173,83 @@ fun RatingProgressionCard(history: RatingHistoryDto, modifier: Modifier = Modifi
             color = TextMed,
         )
 
-        if (points.size < 2) {
-            Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                Text(
-                    "Not enough races in this range",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextLow,
-                )
+        RatingSeriesBody(points, accent)
+    }
+}
+
+@Composable
+fun RatingProgressionGrid(history: RatingHistoryDto, modifier: Modifier = Modifier) {
+    var range by remember { mutableStateOf(RangeOpt.ALL) }
+    val drPoints = remember(range, history) { filterRange(history.dr, range).filter { it.score != null } }
+    val srPoints = remember(range, history) { filterRange(history.sr, range).filter { it.score != null } }
+
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "RATING PROGRESSION",
+                style = MaterialTheme.typography.titleSmall,
+                color = TextHigh,
+                fontWeight = FontWeight.Bold,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                RangeOpt.entries.forEach { opt ->
+                    RangeChip(opt.label, range == opt) { range = opt }
+                }
             }
-        } else {
-            RatingChart(points, accent)
         }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            RatingSeriesCard("DR change", drPoints, DrAccent, Modifier.weight(1f).fillMaxHeight())
+            RatingSeriesCard("SR change", srPoints, SrAccent, Modifier.weight(1f).fillMaxHeight())
+        }
+    }
+}
+
+@Composable
+private fun RatingSeriesCard(title: String, points: List<RatingPointDto>, accent: Color, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Surface1)
+            .border(1.dp, Outline, RoundedCornerShape(16.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            title.uppercase(),
+            style = MaterialTheme.typography.labelLarge,
+            color = accent,
+            fontWeight = FontWeight.Black,
+        )
+        Text(
+            "${points.size} online races",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextMed,
+        )
+        RatingSeriesBody(points, accent)
+    }
+}
+
+@Composable
+private fun RatingSeriesBody(points: List<RatingPointDto>, accent: Color) {
+    if (points.size < 2) {
+        Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+            Text(
+                "Not enough races in this range",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextLow,
+            )
+        }
+    } else {
+        RatingChart(points, accent)
     }
 }
 

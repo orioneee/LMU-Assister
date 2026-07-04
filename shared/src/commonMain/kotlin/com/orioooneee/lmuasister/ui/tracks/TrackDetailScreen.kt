@@ -7,9 +7,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -211,12 +214,14 @@ private enum class AuthAvailability { Pending, SignedIn, SignedOut }
 
 private fun SteamLoginUiState.authAvailability(): AuthAvailability = when (this) {
     SteamLoginUiState.Restoring,
-    SteamLoginUiState.Loading -> AuthAvailability.Pending
+    SteamLoginUiState.Loading,
+    SteamLoginUiState.QrCodeStarting -> AuthAvailability.Pending
     is SteamLoginUiState.SignedIn -> AuthAvailability.SignedIn
     SteamLoginUiState.Idle,
     is SteamLoginUiState.Error,
     is SteamLoginUiState.GuardRequired,
-    is SteamLoginUiState.DeviceConfirmationPending -> AuthAvailability.SignedOut
+    is SteamLoginUiState.DeviceConfirmationPending,
+    is SteamLoginUiState.QrCodePending -> AuthAvailability.SignedOut
 }
 
 private data class TrackDetailData(
@@ -245,63 +250,129 @@ private fun TrackContent(
     onOpenRace: (String, Int?) -> Unit,
     allowRaceLinks: Boolean = true,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp + bottomInset),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item(key = "track-card:${d.track.id}") { TrackCard(d.track) }
-        detailedSchemeUrl(d.track)?.let { url ->
-            item(key = "track-detailed-scheme:$url") { DetailedSchemeCard(url) }
-        }
-        when (val personalState = d.personal) {
-            PersonalRecordsState.Loading -> item(key = "personal-loading") { PersonalRecordsSkeleton() }
-            PersonalRecordsState.SignedOut -> item(key = "personal-signed-out") { Hint("Sign in to see your records on this track.") }
-            is PersonalRecordsState.Error -> item(key = "personal-error") {
-                Hint(personalState.message.takeIf { it.isNotBlank() } ?: "Couldn't load your records right now.")
-            }
-            is PersonalRecordsState.Ready -> {
-                val personal = personalState.personal
-                if (personal == null || personal.races <= 0) {
-                    item(key = "personal-empty") { Hint("No lap times recorded on this track yet.") }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth >= 900.dp
+        val schemeUrl = detailedSchemeUrl(d.track)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp + bottomInset),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item(key = "track-card:${d.track.id}") {
+                if (wide && schemeUrl != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        TrackCard(d.track, Modifier.weight(1f).fillMaxHeight())
+                        DetailedSchemeCard(schemeUrl, Modifier.weight(1f).fillMaxHeight())
+                    }
                 } else {
-                    item(key = "personal-summary") { RacesHeader(personal.races, personal.laps, personal.distanceKm) }
-                    val bestEver = personal.bestLapEver ?: personal.bestLap
-                    val bestCurrentPatch = personal.bestLapCurrentPatch
-                    val currentIsEver = bestCurrentPatch != null && bestEver != null && sameAttempt(bestCurrentPatch, bestEver)
-                    if (!currentIsEver) {
-                        bestCurrentPatch?.takeIf { it.bestLapMs != null }?.let { current ->
-                            item(key = "best-current-label") { SectionLabel("BEST CURRENT PATCH") }
-                            item(key = attemptKey("best-current", current)) {
-                                BestLapCard(
-                                    best = current,
-                                    byClass = personal.bestByClass,
-                                    versionLabel = (versionFullLabel(current.gameVersion) ?: versionFullLabel(personal.currentPatch))?.let { "v$it" },
-                                    onOpenRace = onOpenRace,
-                                    allowRaceLinks = allowRaceLinks,
-                                )
+                    TrackCard(d.track)
+                }
+            }
+            if (!wide) {
+                schemeUrl?.let { url ->
+                    item(key = "track-detailed-scheme:$url") { DetailedSchemeCard(url) }
+                }
+            }
+            when (val personalState = d.personal) {
+                PersonalRecordsState.Loading -> item(key = "personal-loading") { PersonalRecordsSkeleton() }
+                PersonalRecordsState.SignedOut -> item(key = "personal-signed-out") { Hint("Sign in to see your records on this track.") }
+                is PersonalRecordsState.Error -> item(key = "personal-error") {
+                    Hint(personalState.message.takeIf { it.isNotBlank() } ?: "Couldn't load your records right now.")
+                }
+                is PersonalRecordsState.Ready -> {
+                    val personal = personalState.personal
+                    if (personal == null || personal.races <= 0) {
+                        item(key = "personal-empty") { Hint("No lap times recorded on this track yet.") }
+                    } else {
+                        item(key = "personal-summary") { RacesHeader(personal.races, personal.laps, personal.distanceKm) }
+                        val bestEver = personal.bestLapEver ?: personal.bestLap
+                        val bestCurrentPatch = personal.bestLapCurrentPatch
+                        val currentIsEver = bestCurrentPatch != null && bestEver != null && sameAttempt(bestCurrentPatch, bestEver)
+                        val current = if (!currentIsEver) bestCurrentPatch?.takeIf { it.bestLapMs != null } else null
+                        val ever = bestEver?.takeIf { it.bestLapMs != null }
+
+                        if (wide && current != null && ever != null) {
+                            item(key = "best-laps-row:${attemptKey("current", current)}:${attemptKey("ever", ever)}") {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    LabeledTrackBlock("BEST CURRENT PATCH", Modifier.weight(1f).fillMaxHeight()) {
+                                        BestLapCard(
+                                            best = current,
+                                            byClass = personal.bestByClass,
+                                            versionLabel = (versionFullLabel(current.gameVersion) ?: versionFullLabel(personal.currentPatch))?.let { "v$it" },
+                                            onOpenRace = onOpenRace,
+                                            allowRaceLinks = allowRaceLinks,
+                                        )
+                                    }
+                                    LabeledTrackBlock("BEST EVER", Modifier.weight(1f).fillMaxHeight()) {
+                                        BestLapCard(
+                                            best = ever,
+                                            byClass = personal.bestByClass,
+                                            versionLabel = versionPatchWildcardLabel(ever.gameVersion),
+                                            onOpenRace = onOpenRace,
+                                            allowRaceLinks = allowRaceLinks,
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            current?.let { best ->
+                                item(key = "best-current-label") { SectionLabel("BEST CURRENT PATCH") }
+                                item(key = attemptKey("best-current", best)) {
+                                    BestLapCard(
+                                        best = best,
+                                        byClass = personal.bestByClass,
+                                        versionLabel = (versionFullLabel(best.gameVersion) ?: versionFullLabel(personal.currentPatch))?.let { "v$it" },
+                                        onOpenRace = onOpenRace,
+                                        allowRaceLinks = allowRaceLinks,
+                                    )
+                                }
+                            }
+                            ever?.let { best ->
+                                item(key = "best-ever-label") { SectionLabel("BEST EVER") }
+                                item(key = attemptKey("best-ever", best)) {
+                                    BestLapCard(
+                                        best = best,
+                                        byClass = personal.bestByClass,
+                                        versionLabel = versionPatchWildcardLabel(best.gameVersion),
+                                        onOpenRace = onOpenRace,
+                                        allowRaceLinks = allowRaceLinks,
+                                    )
+                                }
                             }
                         }
-                    }
-                    bestEver?.takeIf { it.bestLapMs != null }?.let { ever ->
-                        item(key = "best-ever-label") { SectionLabel("BEST EVER") }
-                        item(key = attemptKey("best-ever", ever)) {
-                            BestLapCard(
-                                best = ever,
-                                byClass = personal.bestByClass,
-                                versionLabel = versionPatchWildcardLabel(ever.gameVersion),
-                                onOpenRace = onOpenRace,
-                                allowRaceLinks = allowRaceLinks,
-                            )
+
+                        val hasByClass = personal.bestByClass.isNotEmpty()
+                        val hasRecent = personal.recent.isNotEmpty()
+                        if (wide && hasByClass && hasRecent) {
+                            item(key = "personal-tables-row") {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    LabeledTrackBlock("BEST BY CLASS", Modifier.weight(1f).fillMaxHeight()) {
+                                        ByClassCard(personal.bestByClass, onOpenRace, allowRaceLinks)
+                                    }
+                                    LabeledTrackBlock("RECENT", Modifier.weight(1f).fillMaxHeight()) {
+                                        RecentCard(personal.recent, onOpenRace, allowRaceLinks)
+                                    }
+                                }
+                            }
+                        } else {
+                            if (hasByClass) {
+                                item(key = "best-by-class-label") { SectionLabel("BEST BY CLASS") }
+                                item(key = "best-by-class-card") { ByClassCard(personal.bestByClass, onOpenRace, allowRaceLinks) }
+                            }
+                            if (hasRecent) {
+                                item(key = "recent-label") { SectionLabel("RECENT") }
+                                item(key = "recent-card") { RecentCard(personal.recent, onOpenRace, allowRaceLinks) }
+                            }
                         }
-                    }
-                    if (personal.bestByClass.isNotEmpty()) {
-                        item(key = "best-by-class-label") { SectionLabel("BEST BY CLASS") }
-                        item(key = "best-by-class-card") { ByClassCard(personal.bestByClass, onOpenRace, allowRaceLinks) }
-                    }
-                    if (personal.recent.isNotEmpty()) {
-                        item(key = "recent-label") { SectionLabel("RECENT") }
-                        item(key = "recent-card") { RecentCard(personal.recent, onOpenRace, allowRaceLinks) }
                     }
                 }
             }
@@ -329,13 +400,21 @@ private fun attemptKey(prefix: String, a: TrackAttemptDto): String =
         .joinToString(":") { it?.toString().orEmpty() }
 
 @Composable
-private fun TrackCard(t: TrackFullDto) {
+private fun LabeledTrackBlock(label: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(label)
+        content()
+    }
+}
+
+@Composable
+private fun TrackCard(t: TrackFullDto, modifier: Modifier = Modifier) {
     val logo = trackAsset(t, "logo.svg")
     val map = trackAsset(t, "map.svg")
     val bg = trackAsset(t, "background.webp")
     val flag = trackFlagUrl(t.countryCode)
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).padding(14.dp),
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         TrackPreview(
@@ -356,22 +435,25 @@ private fun TrackCard(t: TrackFullDto) {
 }
 
 @Composable
-private fun DetailedSchemeCard(url: String) {
+private fun DetailedSchemeCard(url: String, modifier: Modifier = Modifier) {
     val painter = rememberAsyncImagePainter(model = url)
     val state by painter.state.collectAsState()
-    if (state !is AsyncImagePainter.State.Success) return
 
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).padding(14.dp),
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         SectionLabel("DETAILED SCHEME")
-        Image(
-            painter = painter,
-            contentDescription = null,
-            contentScale = ContentScale.FillWidth,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp).clip(RoundedCornerShape(12.dp)),
-        )
+        if (state is AsyncImagePainter.State.Success) {
+            Image(
+                painter = painter,
+                contentDescription = null,
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp).clip(RoundedCornerShape(12.dp)),
+            )
+        } else {
+            BlockSkeleton(shimmerBrush(), 160.dp)
+        }
     }
 }
 

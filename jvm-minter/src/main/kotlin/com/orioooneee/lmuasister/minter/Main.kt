@@ -61,8 +61,11 @@ fun main(args: Array<String>) {
     server.createContext("/ui/") { exchange ->
         exchange.respondHtml(uiHtml(port))
     }
+    server.createContext("/health") { exchange ->
+        exchange.respondJson(healthResponse())
+    }
     server.createContext("/api/health") { exchange ->
-        exchange.respondJson(ApiResponse(status = "ok", message = "jvm-minter is running"))
+        exchange.respondJson(healthResponse())
     }
     server.createContext("/api/login") { exchange ->
         exchange.requirePost {
@@ -80,6 +83,18 @@ fun main(args: Array<String>) {
         exchange.requirePost {
             val req = exchange.readJson<ApprovalRequest>()
             service.waitForApproval(req).respond(exchange)
+        }
+    }
+    server.createContext("/api/qr/start") { exchange ->
+        exchange.requirePost {
+            val req = exchange.readJson<QrStartRequest>()
+            service.startQr(req).respond(exchange)
+        }
+    }
+    server.createContext("/api/qr/status") { exchange ->
+        exchange.requirePost {
+            val req = exchange.readJson<QrStatusRequest>()
+            service.waitForQr(req).respond(exchange)
         }
     }
     server.createContext("/api/status") { exchange ->
@@ -101,8 +116,11 @@ fun main(args: Array<String>) {
     server.start()
 
     println("jvm-minter listening on http://127.0.0.1:$port/ui/")
-    println("API: POST /api/login, /api/guard, /api/approval, GET /api/status?flowId=...")
+    println("API: POST /api/login, /api/guard, /api/approval, /api/qr/start, /api/qr/status; GET /api/status?flowId=...")
 }
+
+private fun healthResponse(): ApiResponse =
+    ApiResponse(status = "ok", message = "jvm-minter is running")
 
 private class TicketMinterService {
     private val flows = ConcurrentHashMap<String, AuthFlow>()
@@ -122,6 +140,17 @@ private class TicketMinterService {
         flow.start(req.username, req.password, req.guardCode)
     }
 
+    fun startQr(req: QrStartRequest): ApiResponse = runBlocking {
+        cleanup()
+        val flow = AuthFlow(
+            id = UUID.randomUUID().toString(),
+            appId = req.appId ?: DEFAULT_APP_ID,
+            rootDir = minterRoot().resolve(UUID.randomUUID().toString()),
+        )
+        flows[flow.id] = flow
+        flow.startQr()
+    }
+
     fun submitGuard(req: GuardRequest): ApiResponse = runBlocking {
         flow(req.flowId)?.submitGuard(req.code)
             ?: ApiResponse(status = "error", message = "flow not found")
@@ -130,6 +159,12 @@ private class TicketMinterService {
     fun waitForApproval(req: ApprovalRequest): ApiResponse = runBlocking {
         val waitSeconds = (req.waitSeconds ?: 15).coerceIn(1, APPROVAL_WAIT_SECONDS)
         flow(req.flowId)?.waitForApproval(waitSeconds)
+            ?: ApiResponse(status = "error", message = "flow not found")
+    }
+
+    fun waitForQr(req: QrStatusRequest): ApiResponse = runBlocking {
+        val waitSeconds = (req.waitSeconds ?: 15).coerceIn(1, APPROVAL_WAIT_SECONDS)
+        flow(req.flowId)?.waitForQr(waitSeconds)
             ?: ApiResponse(status = "error", message = "flow not found")
     }
 
@@ -174,9 +209,13 @@ private class AuthFlow(
     private var steam: SteamClient? = null
     private var completed: ApiResponse? = null
     private var lastMessage: String = "created"
+    private var qrUrl: String? = null
+    private var qrCode: String? = null
 
     suspend fun start(username: String, password: String, guardCode: String?): ApiResponse = mutex.withLock {
         val client = startedClient()
+        qrUrl = null
+        qrCode = null
         lastMessage = "signing in"
         val authResult = runCatching {
             client.account.signIn(username.trim(), password, rememberSession = false)
@@ -206,6 +245,21 @@ private class AuthFlow(
         guardResponse(awaiting)
     }
 
+    suspend fun startQr(): ApiResponse = mutex.withLock {
+        val client = startedClient()
+        qrUrl = null
+        qrCode = null
+        lastMessage = "starting Steam QR sign-in"
+        val qr = runCatching { client.account.getSignInQrCode() }.getOrElse {
+            closeClient()
+            return@withLock ApiResponse(status = "error", flowId = id, message = it.message ?: "Steam QR sign-in failed")
+        } ?: return@withLock ApiResponse(status = "error", flowId = id, message = "Steam QR sign-in is unavailable")
+
+        qrUrl = qr.data
+        qrCode = qr.data.toSteamQrDisplayCode()
+        qrResponse()
+    }
+
     suspend fun submitGuard(code: String): ApiResponse = mutex.withLock {
         val client = steam ?: return@withLock ApiResponse(status = "error", flowId = id, message = "flow is closed")
         if (code.isBlank()) return@withLock ApiResponse(status = "error", flowId = id, message = "code is required")
@@ -228,12 +282,32 @@ private class AuthFlow(
         if (signedIn != null) mintTicket(client) else guardResponse(state)
     }
 
+    suspend fun waitForQr(waitSeconds: Int): ApiResponse = mutex.withLock {
+        val client = steam ?: return@withLock completed ?: ApiResponse(status = "error", flowId = id, message = "flow is closed")
+        completed?.let { return@withLock it }
+        if (qrUrl == null) {
+            return@withLock when (val state = client.account.clientAuthState.value) {
+                AuthorizationState.Success -> mintTicket(client)
+                AuthorizationState.Unauthorized -> ApiResponse(status = "pending", flowId = id, appId = appId, message = lastMessage)
+                is AuthorizationState.AwaitingTwoFactor -> guardResponse(state)
+            }
+        }
+        if (client.account.clientAuthState.value is AuthorizationState.Success) {
+            return@withLock mintTicket(client)
+        }
+        lastMessage = "waiting for Steam QR scan"
+        val signedIn = withTimeoutOrNull(waitSeconds.seconds) {
+            client.account.clientAuthState.filterIsInstance<AuthorizationState.Success>().first()
+        }
+        if (signedIn != null) mintTicket(client) else qrResponse()
+    }
+
     suspend fun status(): ApiResponse = mutex.withLock {
         completed?.let { return@withLock it }
         val client = steam ?: return@withLock ApiResponse(status = "closed", flowId = id, message = lastMessage)
         when (val state = client.account.clientAuthState.value) {
             AuthorizationState.Success -> mintTicket(client)
-            AuthorizationState.Unauthorized -> ApiResponse(status = "pending", flowId = id, appId = appId, message = lastMessage)
+            AuthorizationState.Unauthorized -> qrResponseOrPending()
             is AuthorizationState.AwaitingTwoFactor -> guardResponse(state)
         }
     }
@@ -309,6 +383,24 @@ private class AuthFlow(
         return response
     }
 
+    private fun qrResponseOrPending(): ApiResponse =
+        if (qrUrl != null) qrResponse()
+        else ApiResponse(status = "pending", flowId = id, appId = appId, message = lastMessage)
+
+    private fun qrResponse(): ApiResponse {
+        val url = qrUrl.orEmpty()
+        lastMessage = "waiting for Steam QR scan"
+        return ApiResponse(
+            status = "qr_required",
+            flowId = id,
+            appId = appId,
+            qrUrl = url,
+            qrCode = qrCode,
+            expiresIn = APPROVAL_WAIT_SECONDS,
+            message = "Scan the QR code in Steam mobile app",
+        )
+    }
+
     private fun guardResponse(state: AuthorizationState.AwaitingTwoFactor): ApiResponse {
         val hasApproval = state.supportedConfirmationMethods.any { it.isApprovalBased() }
         val codeKind = state.supportedConfirmationMethods.firstNotNullOfOrNull { it.codeKindOrNull() }
@@ -334,6 +426,8 @@ private class AuthFlow(
             runCatching { it.stop() }
         }
         steam = null
+        qrUrl = null
+        qrCode = null
     }
 }
 
@@ -358,6 +452,17 @@ private data class ApprovalRequest(
 )
 
 @Serializable
+private data class QrStartRequest(
+    val appId: Int? = null,
+)
+
+@Serializable
+private data class QrStatusRequest(
+    val flowId: String = "",
+    val waitSeconds: Int? = null,
+)
+
+@Serializable
 private data class FlowRequest(val flowId: String = "")
 
 @Serializable
@@ -368,6 +473,8 @@ private data class ApiResponse(
     val guardKind: String? = null,
     val challengeId: String? = null,
     val expiresIn: Int? = null,
+    val qrUrl: String? = null,
+    val qrCode: String? = null,
     val appId: Int? = null,
     val ticketHex: String? = null,
     val ticketBytes: Int? = null,
@@ -378,6 +485,10 @@ private fun ApiResponse.respond(exchange: HttpExchange) {
 }
 
 private inline fun HttpExchange.requirePost(block: () -> Unit) {
+    if (requestMethod == "OPTIONS") {
+        respondNoContent(204)
+        return
+    }
     if (requestMethod != "POST") {
         respondJson(ApiResponse(status = "error", message = "POST required"), 405)
         return
@@ -412,6 +523,7 @@ private fun decode(value: String): String =
 
 private fun HttpExchange.redirect(location: String) {
     responseHeaders.add("Location", location)
+    addCorsHeaders()
     sendResponseHeaders(302, -1)
     close()
 }
@@ -429,12 +541,32 @@ private fun HttpExchange.respond(body: String, status: Int, contentType: String)
     val bytes = body.toByteArray()
     responseHeaders.add("Content-Type", contentType)
     responseHeaders.add("Cache-Control", "no-store")
-    responseHeaders.add("Access-Control-Allow-Origin", "*")
+    addCorsHeaders()
     sendResponseHeaders(status, bytes.size.toLong())
     responseBody.use { it.write(bytes) }
 }
 
+private fun HttpExchange.respondNoContent(status: Int) {
+    addCorsHeaders()
+    sendResponseHeaders(status, -1)
+    close()
+}
+
+private fun HttpExchange.addCorsHeaders() {
+    responseHeaders.add("Access-Control-Allow-Origin", "*")
+    responseHeaders.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+    responseHeaders.add("Access-Control-Allow-Headers", "Content-Type")
+    responseHeaders.add("Access-Control-Max-Age", "600")
+}
+
 private fun ByteArray.hex(): String = joinToString("") { "%02x".format(it) }
+
+private fun String.toSteamQrDisplayCode(): String? =
+    trim()
+        .trimEnd('/')
+        .substringAfterLast('/')
+        .takeIf { it.length in 3..24 && it.all { ch -> ch.isLetterOrDigit() } }
+        ?.uppercase()
 
 private fun AuthorizationState.AwaitingTwoFactor.ConfirmationMethod.isApprovalBased(): Boolean =
     this == AuthorizationState.AwaitingTwoFactor.ConfirmationMethod.DeviceConfirmation ||
@@ -493,6 +625,9 @@ private fun uiHtml(port: Int): String =
         button.secondary { background: #2a333d; color: #edf1f5; }
         button:disabled { opacity: .48; cursor: default; }
         .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+        .qr { display: none; margin-top: 14px; padding: 12px; border: 1px solid #343d47; border-radius: 8px; background: #0f1317; }
+        .qr strong { display: block; color: #edf1f5; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24px; letter-spacing: .08em; margin-bottom: 6px; }
+        .qr a { color: #e7b84e; overflow-wrap: anywhere; }
         pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0b0e11; border: 1px solid #252d35; border-radius: 8px; padding: 12px; min-height: 120px; color: #dbe4ec; }
         .full { grid-column: 1 / -1; }
         @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
@@ -513,8 +648,14 @@ private fun uiHtml(port: Int): String =
             <button id="loginBtn">Login / mint</button>
             <button id="guardBtn" class="secondary">Submit code</button>
             <button id="approvalBtn" class="secondary">Check approval</button>
+            <button id="qrBtn" class="secondary">Start QR</button>
+            <button id="qrStatusBtn" class="secondary">Check QR</button>
             <button id="statusBtn" class="secondary">Status</button>
             <button id="cancelBtn" class="secondary">Cancel</button>
+          </div>
+          <div id="qrBox" class="qr">
+            <strong id="qrCode"></strong>
+            <a id="qrUrl" href="#" target="_blank" rel="noreferrer"></a>
           </div>
         </section>
         <pre id="out">Ready.</pre>
@@ -522,9 +663,18 @@ private fun uiHtml(port: Int): String =
       <script>
         let flowId = "";
         const out = document.getElementById("out");
+        const qrBox = document.getElementById("qrBox");
+        const qrCode = document.getElementById("qrCode");
+        const qrUrl = document.getElementById("qrUrl");
         const val = id => document.getElementById(id).value;
         const print = data => {
           if (data.flowId) flowId = data.flowId;
+          if (data.qrUrl) {
+            qrBox.style.display = "block";
+            qrCode.textContent = data.qrCode || "QR";
+            qrUrl.textContent = data.qrUrl;
+            qrUrl.href = data.qrUrl;
+          }
           out.textContent = JSON.stringify(data, null, 2);
         };
         async function post(url, body) {
@@ -540,6 +690,8 @@ private fun uiHtml(port: Int): String =
         });
         document.getElementById("guardBtn").onclick = () => post("/api/guard", { flowId, code: val("code") });
         document.getElementById("approvalBtn").onclick = () => post("/api/approval", { flowId, waitSeconds: 10 });
+        document.getElementById("qrBtn").onclick = () => post("/api/qr/start", { appId: Number(val("appId") || $DEFAULT_APP_ID) });
+        document.getElementById("qrStatusBtn").onclick = () => post("/api/qr/status", { flowId, waitSeconds: 10 });
         document.getElementById("statusBtn").onclick = async () => {
           const r = await fetch("/api/status?flowId=" + encodeURIComponent(flowId));
           print(await r.json());

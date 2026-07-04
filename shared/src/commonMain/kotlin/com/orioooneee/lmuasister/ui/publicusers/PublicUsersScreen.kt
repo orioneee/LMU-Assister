@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -190,16 +191,28 @@ private fun DriversTopBar(onSearch: () -> Unit) {
 
 @Composable
 private fun DistributionSection(distribution: UsersDistributionDto) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        DistributionCard("Driver Rating", distribution.driverRating)
-        DistributionCard("Safety Rating", distribution.safetyRating)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth >= 820.dp) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                DistributionCard("Driver Rating", distribution.driverRating, Modifier.weight(1f))
+                DistributionCard("Safety Rating", distribution.safetyRating, Modifier.weight(1f))
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                DistributionCard("Driver Rating", distribution.driverRating)
+                DistributionCard("Safety Rating", distribution.safetyRating)
+            }
+        }
     }
 }
 
 @Composable
-private fun DistributionCard(title: String, data: Map<String, RatingDistributionBucketDto>) {
+private fun DistributionCard(title: String, data: Map<String, RatingDistributionBucketDto>, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(Surface1)

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,9 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.StatTotalsDto
 import com.orioooneee.lmuasister.ui.IconChevronRight
+import com.orioooneee.lmuasister.ui.components.rankTierColor
 import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.ClassGt3
 import com.orioooneee.lmuasister.ui.theme.ClassLmp2
@@ -36,8 +41,10 @@ import com.orioooneee.lmuasister.ui.theme.SkillInter
 import com.orioooneee.lmuasister.ui.theme.SkillPro
 import com.orioooneee.lmuasister.ui.theme.Surface1
 import com.orioooneee.lmuasister.ui.theme.Surface2
+import com.orioooneee.lmuasister.ui.theme.Surface3
 import com.orioooneee.lmuasister.ui.theme.TextHigh
 import com.orioooneee.lmuasister.ui.theme.TextLow
+import com.orioooneee.lmuasister.ui.theme.TextMed
 
 private val StatCyan = Color(0xFF6FE3F0)
 
@@ -82,6 +89,8 @@ private const val COLUMNS = 3
 fun CareerStatsGrid(
     totals: StatTotalsDto,
     modifier: Modifier = Modifier,
+    driverRating: RatingDto? = null,
+    safetyRating: RatingDto? = null,
     enableCategoryClicks: Boolean = true,
     hideUnavailableCategories: Boolean = false,
     onOpenCategory: (StatCategory) -> Unit = {},
@@ -114,6 +123,15 @@ fun CareerStatsGrid(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (driverRating != null || safetyRating != null) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                RatingStatTile("Driver Rating", driverRating, Modifier.weight(1f))
+                RatingStatTile("Safety Rating", safetyRating, Modifier.weight(1f))
+            }
+        }
         cells.chunked(COLUMNS).forEach { rowCells ->
             Row(
                 Modifier.fillMaxWidth(),
@@ -132,6 +150,69 @@ fun CareerStatsGrid(
 private fun categoryAvailable(cell: StatCell, totals: StatTotalsDto): Boolean = when (cell.category) {
     StatCategory.PolesConverted -> totals.polePositions > 0 && totals.polesConverted > 0
     else -> cell.value > 0
+}
+
+@Composable
+private fun RatingStatTile(label: String, rating: RatingDto?, modifier: Modifier = Modifier) {
+    val color = rankTierColor(rating?.rank.orEmpty())
+    Column(
+        modifier
+            .heightIn(min = 118.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface2)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Text(
+            label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = TextLow,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+        if (rating == null) {
+            Text("—", style = MaterialTheme.typography.titleLarge, color = TextMed)
+            return@Column
+        }
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                rating.rank.ifBlank { "Unranked" },
+                style = MaterialTheme.typography.titleLarge,
+                color = color,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (rating.tier > 0) {
+                Text(
+                    roman(rating.tier),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = color,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+            }
+        }
+        rating.progress?.let { progress ->
+            val fraction = (progress.toFloat() / 100f).coerceIn(0f, 1f)
+            Box(Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(4.dp)).background(Surface3)) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(fraction)
+                        .height(7.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(color),
+                )
+            }
+            Text(
+                "${(fraction * 100).toInt()}%",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextMed,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
 }
 
 @Composable
@@ -178,4 +259,13 @@ private fun StatTile(
             )
         }
     }
+}
+
+private fun roman(n: Int): String = when (n) {
+    1 -> "I"
+    2 -> "II"
+    3 -> "III"
+    4 -> "IV"
+    5 -> "V"
+    else -> n.toString()
 }

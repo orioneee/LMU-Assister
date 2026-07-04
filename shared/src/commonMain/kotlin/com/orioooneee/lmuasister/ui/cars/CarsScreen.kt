@@ -381,39 +381,45 @@ private fun CarCardSkeleton(modifier: Modifier = Modifier) {
 
 @Composable
 private fun CarDetailContent(car: CarDetailedDto, bottomInset: androidx.compose.ui.unit.Dp) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp + bottomInset),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (car.heroUrl() != null || car.description.isNotBlank()) {
-            item { CarHeroCard(car) }
-        } else {
-            item { CarSummaryCard(car) }
-        }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val liveryColumns = if (maxWidth >= 840.dp) 2 else 1
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp + bottomInset),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (car.heroUrl() != null || car.description.isNotBlank()) {
+                item { CarHeroCard(car) }
+            } else {
+                item { CarSummaryCard(car) }
+            }
 
-        val gallery = car.galleryUrls()
-        if (gallery.isNotEmpty()) {
-            item { SectionTitle("Gallery") }
-            item { GalleryStrip(gallery, car.name) }
-        }
+            val gallery = car.galleryUrls()
+            if (gallery.isNotEmpty()) {
+                item { SectionTitle("Gallery") }
+                item { GalleryStrip(gallery, car.name) }
+            }
 
-        val specItems = headlineSpecs(car)
-        if (specItems.isNotEmpty()) {
-            item { SectionTitle("Specs") }
-            item { SpecsCard(specItems) }
-        }
+            val specItems = headlineSpecs(car)
+            if (specItems.isNotEmpty()) {
+                item { SectionTitle("Specs") }
+                item { SpecsCard(specItems) }
+            }
 
-        val tech = extraTechSpecs(car, specItems)
-        if (tech.isNotEmpty()) {
-            item { SectionTitle("Tech specs") }
-            item { SpecsCard(tech) }
-        }
+            val tech = extraTechSpecs(car, specItems)
+            if (tech.isNotEmpty()) {
+                item { SectionTitle("Tech specs") }
+                item { SpecsCard(tech) }
+            }
 
-        if (car.liveries.isNotEmpty()) {
-            item { SectionTitle("Liveries") }
-            items(car.liveries, key = { it.id.ifBlank { it.name } }) { livery ->
-                LiveryRow(livery)
+            if (car.liveries.isNotEmpty()) {
+                item { SectionTitle("Liveries") }
+                items(
+                    items = car.liveries.chunked(liveryColumns),
+                    key = { row -> row.joinToString("|") { it.id.ifBlank { it.name } } },
+                ) { row ->
+                    LiveryGridRow(row, liveryColumns)
+                }
             }
         }
     }
@@ -575,9 +581,24 @@ private fun SpecCell(
 }
 
 @Composable
-private fun LiveryRow(livery: CarLiveryItemDto) {
+private fun LiveryGridRow(liveries: List<CarLiveryItemDto>, columns: Int) {
     Row(
-        modifier = Modifier
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        liveries.forEach { livery ->
+            LiveryRow(livery, Modifier.weight(1f).fillMaxHeight())
+        }
+        repeat(columns - liveries.size) {
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun LiveryRow(livery: CarLiveryItemDto, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(Surface1)

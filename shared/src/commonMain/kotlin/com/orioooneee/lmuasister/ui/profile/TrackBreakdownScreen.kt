@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -122,15 +123,22 @@ fun TrackBreakdownView(
 
 @Composable
 private fun TrackGrid(insets: PaddingValues, content: androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit) {
-    LazyVerticalGrid(
-        // ~160dp min → 2 per row on a phone, more on wider screens.
-        columns = GridCells.Adaptive(minSize = 160.dp),
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 16.dp + insets.calculateBottomPadding()),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        content = content,
-    )
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val columns = when {
+            maxWidth < 360.dp -> 1
+            maxWidth < 720.dp -> 2
+            maxWidth < 1080.dp -> 3
+            else -> 4
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 16.dp + insets.calculateBottomPadding()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content,
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

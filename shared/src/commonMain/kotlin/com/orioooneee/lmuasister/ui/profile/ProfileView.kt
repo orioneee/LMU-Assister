@@ -7,11 +7,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -123,49 +126,93 @@ fun ProfileView(
     onOpenTracks: () -> Unit = {},
     onOpenCar: (CarDetailedDto) -> Unit = {},
 ) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        ProfileHeader(profile, accountName, readOnly, enableTrackBreakdown, onOpenSuspensions, onOpenTracks)
-        if (!readOnly && onRefreshProfile != null) {
-            UpdateProfileButton(
-                loading = isRefreshingProfile,
-                enabled = canRefreshProfile && !isRefreshingProfile,
-                onClick = onRefreshProfile,
-            )
-        }
-        RatingsRow(profile.driverRating, profile.safetyRating)
-
-        profile.ratingHistory?.takeIf { it.dr.isNotEmpty() || it.sr.isNotEmpty() }?.let {
-            RatingProgressionCard(it)
-        }
-        profile.stats?.total?.let {
-            CareerStatsGrid(
-                it,
-                enableCategoryClicks = enableCategoryClicks,
-                hideUnavailableCategories = profile.externalData,
-                onOpenCategory = onOpenCategory,
-            )
-        }
-        if (profile.favoriteCars.isNotEmpty()) {
-            FavoriteCarsSection(profile.favoriteCars.take(FAVORITE_CARS_PREVIEW), onOpenCar)
-        }
-
-        if (profile.recentRaces.isNotEmpty()) {
-            SectionHeader("Recent races")
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                profile.recentRaces.take(RECENT_PREVIEW).forEach { race ->
-                    Box(
-                        Modifier.clip(RoundedCornerShape(12.dp))
-                            .clickable(enabled = enableRaceClicks && race.eventId != null) {
-                                race.eventId?.let { onOpenRace(it, race.split ?: race.splitNo) }
-                            },
-                    ) {
-                        RaceHistoryRow(race)
-                    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val wide = maxWidth >= 900.dp
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (wide) {
+                ProfileHeaderWideRow(
+                    profile = profile,
+                    accountName = accountName,
+                    readOnly = readOnly,
+                    enableTrackBreakdown = enableTrackBreakdown,
+                    isRefreshingProfile = isRefreshingProfile,
+                    canRefreshProfile = canRefreshProfile,
+                    onRefreshProfile = onRefreshProfile,
+                    onOpenSuspensions = onOpenSuspensions,
+                    onOpenTracks = onOpenTracks,
+                )
+            } else {
+                ProfileHeader(profile, accountName, readOnly, enableTrackBreakdown, onOpenSuspensions, onOpenTracks)
+                if (!readOnly && onRefreshProfile != null) {
+                    UpdateProfileButton(
+                        loading = isRefreshingProfile,
+                        enabled = canRefreshProfile && !isRefreshingProfile,
+                        onClick = onRefreshProfile,
+                    )
                 }
-                val totalRaces = profile.stats?.total?.races ?: 0
-                val hasMoreRaces = profile.recentRaces.size > RECENT_PREVIEW || totalRaces > RECENT_PREVIEW
-                if (enableAllRaces && hasMoreRaces) {
-                    SeeMoreButton(onSeeAllRaces)
+                RatingsRow(profile.driverRating, profile.safetyRating)
+            }
+
+            profile.ratingHistory?.takeIf { it.dr.isNotEmpty() || it.sr.isNotEmpty() }?.let {
+                if (wide) RatingProgressionGrid(it) else RatingProgressionCard(it)
+            }
+
+            val totals = profile.stats?.total
+            val favoriteCars = profile.favoriteCars.take(FAVORITE_CARS_PREVIEW).takeIf { it.isNotEmpty() }
+            if (wide && totals != null && favoriteCars != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CareerStatsGrid(
+                        totals,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        driverRating = profile.driverRating,
+                        safetyRating = profile.safetyRating,
+                        enableCategoryClicks = enableCategoryClicks,
+                        hideUnavailableCategories = profile.externalData,
+                        onOpenCategory = onOpenCategory,
+                    )
+                    FavoriteCarsSection(
+                        favoriteCars,
+                        onOpenCar,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                }
+            } else {
+                totals?.let {
+                    CareerStatsGrid(
+                        it,
+                        driverRating = profile.driverRating.takeIf { wide },
+                        safetyRating = profile.safetyRating.takeIf { wide },
+                        enableCategoryClicks = enableCategoryClicks,
+                        hideUnavailableCategories = profile.externalData,
+                        onOpenCategory = onOpenCategory,
+                    )
+                }
+                favoriteCars?.let {
+                    FavoriteCarsSection(it, onOpenCar)
+                }
+            }
+
+            if (profile.recentRaces.isNotEmpty()) {
+                SectionHeader("Recent races")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    profile.recentRaces.take(RECENT_PREVIEW).forEach { race ->
+                        Box(
+                            Modifier.clip(RoundedCornerShape(12.dp))
+                                .clickable(enabled = enableRaceClicks && race.eventId != null) {
+                                    race.eventId?.let { onOpenRace(it, race.split ?: race.splitNo) }
+                                },
+                        ) {
+                            RaceHistoryRow(race)
+                        }
+                    }
+                    val totalRaces = profile.stats?.total?.races ?: 0
+                    val hasMoreRaces = profile.recentRaces.size > RECENT_PREVIEW || totalRaces > RECENT_PREVIEW
+                    if (enableAllRaces && hasMoreRaces) {
+                        SeeMoreButton(onSeeAllRaces)
+                    }
                 }
             }
         }
@@ -173,10 +220,47 @@ fun ProfileView(
 }
 
 @Composable
-private fun UpdateProfileButton(loading: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun ProfileHeaderWideRow(
+    profile: SteamProfile,
+    accountName: String,
+    readOnly: Boolean,
+    enableTrackBreakdown: Boolean,
+    isRefreshingProfile: Boolean,
+    canRefreshProfile: Boolean,
+    onRefreshProfile: (() -> Unit)?,
+    onOpenSuspensions: (active: Boolean) -> Unit,
+    onOpenTracks: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ProfileHeader(
+            profile = profile,
+            accountName = accountName,
+            readOnly = readOnly,
+            enableTrackBreakdown = enableTrackBreakdown,
+            onOpenSuspensions = onOpenSuspensions,
+            onOpenTracks = onOpenTracks,
+            modifier = Modifier.weight(1.18f),
+        )
+        if (!readOnly && onRefreshProfile != null) {
+            UpdateProfileButton(
+                loading = isRefreshingProfile,
+                enabled = canRefreshProfile && !isRefreshingProfile,
+                onClick = onRefreshProfile,
+                modifier = Modifier.width(190.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpdateProfileButton(loading: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val alpha = if (enabled) 1f else 0.68f
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(44.dp)
             .clip(RoundedCornerShape(12.dp))
@@ -196,6 +280,7 @@ private fun UpdateProfileButton(loading: Boolean, enabled: Boolean, onClick: () 
                 color = Amber,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         } else {
             Text(
@@ -204,6 +289,7 @@ private fun UpdateProfileButton(loading: Boolean, enabled: Boolean, onClick: () 
                 color = Amber,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -224,8 +310,8 @@ private fun GameVersionBadge(version: GameVersionDto?) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FavoriteCarsSection(cars: List<FavoriteCarDto>, onOpenCar: (CarDetailedDto) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun FavoriteCarsSection(cars: List<FavoriteCarDto>, onOpenCar: (CarDetailedDto) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader("Favorite cars")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             cars.forEachIndexed { index, car ->
@@ -468,9 +554,10 @@ private fun ProfileHeader(
     enableTrackBreakdown: Boolean,
     onOpenSuspensions: (active: Boolean) -> Unit,
     onOpenTracks: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val name = profile.displayName ?: profile.name ?: profile.username ?: accountName.ifBlank { "Driver" }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             CountryFlag(profile.nationality, height = 18.dp)
             Text(
