@@ -351,7 +351,7 @@ private fun HotlapCard(h: Hotlap, onOpen: () -> Unit) {
                 Modifier.align(Alignment.Center).size(28.dp).clip(CircleShape).background(Carbon.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("▶", style = MaterialTheme.typography.labelMedium, color = TextHigh)
+                Text(">", style = MaterialTheme.typography.labelMedium, color = TextHigh)
             }
             h.lapTime?.let {
                 Box(
@@ -376,14 +376,14 @@ private fun HotlapCard(h: Hotlap, onOpen: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ClassBadgeChip(h.classBadge ?: h.carClass?.uppercase() ?: "—")
+                ClassBadgeChip(h.classBadge ?: h.carClass?.uppercase() ?: "-")
                 h.gameVersion?.let {
                     Text("v$it", style = MaterialTheme.typography.labelSmall, color = TextMed, maxLines = 1)
                 }
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                h.car ?: "—",
+                h.car ?: "-",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextHigh,
                 fontWeight = FontWeight.SemiBold,
@@ -392,7 +392,7 @@ private fun HotlapCard(h: Hotlap, onOpen: () -> Unit) {
             )
             Spacer(Modifier.weight(1f))
             Text(
-                h.driver ?: h.author ?: "—",
+                h.driver ?: h.author ?: "-",
                 style = MaterialTheme.typography.labelSmall,
                 color = TextMed,
                 maxLines = 1,
@@ -694,8 +694,8 @@ private fun WeatherSession(label: String, sw: SessionWeather) {
                         .fillMaxHeight()
                         .background(skyColor(seg.sky, seg.rainChance ?: 0)),
                 ) {
-                    Text(skyEmoji(seg.sky, seg.rainChance ?: 0), style = MaterialTheme.typography.bodyLarge)
-                    seg.tempC?.let { Text("$it°", style = MaterialTheme.typography.labelSmall, color = TextHigh) }
+                    Text(skyEmoji(seg.sky, seg.rainChance ?: 0), style = MaterialTheme.typography.labelSmall, color = TextHigh)
+                    seg.tempC?.let { Text("${it}C", style = MaterialTheme.typography.labelSmall, color = TextHigh) }
                 }
             }
         }
@@ -736,7 +736,7 @@ private fun LeaderboardCard(
                     LeaderboardTabs(tabs, selected) { selected = it }
                     Spacer(Modifier.height(10.dp))
                 }
-                board.carClass.isNotBlank() && board.carClass != "—" -> ClassSectionHeader(board.carClass)
+                isUsableClassLabel(board.carClass) -> ClassSectionHeader(board.carClass)
             }
             val leader = board.entries.firstOrNull()?.bestLapMs ?: 0L
             // Where the signed-in player sits on this class's board (token-gated; waits
@@ -784,8 +784,8 @@ private fun LeaderboardCard(
             board.leaderboardId?.let { id ->
                 Spacer(Modifier.height(10.dp))
                 FullLeaderboardButton {
-                    val suffix = board.carClass.takeIf { it.isNotBlank() && it != "—" }
-                        ?.let { " · ${classLabelFull(it)}" } ?: ""
+                    val suffix = board.carClass.takeIf(::isUsableClassLabel)
+                        ?.let { " - ${classLabelFull(it)}" } ?: ""
                     onOpenFull(id, raceTitle + suffix)
                 }
             }
@@ -978,6 +978,9 @@ private fun classLabelFull(carClass: String): String {
     }
 }
 
+private fun isUsableClassLabel(label: String): Boolean =
+    label.isNotBlank() && label != "-" && label != "\u2014"
+
 @Composable
 internal fun LeaderboardRow(
     e: LapEntry,
@@ -1032,7 +1035,7 @@ internal fun LeaderboardRow(
                     maxLines = 1,
                 )
                 Text(
-                    if (e.bestLapMs <= leaderMs) "—" else gapLabel(e.bestLapMs - leaderMs),
+                    if (e.bestLapMs <= leaderMs) "-" else gapLabel(e.bestLapMs - leaderMs),
                     style = MaterialTheme.typography.labelSmall,
                     color = TextMed,
                     fontFamily = FontFamily.Monospace,

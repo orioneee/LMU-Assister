@@ -110,7 +110,7 @@ internal object MockData {
         "LMGT3" to listOf(
             "Ferrari 296 LMGT3", "McLaren 720S LMGT3 Evo", "Porsche 911 GT3 R",
             "BMW M4 LMGT3", "Aston Martin Vantage AMR LMGT3", "Corvette Z06 GT3.R",
-            "Ford Mustang LMGT3", "Lamborghini Huracán LMGT3 Evo2",
+            "Ford Mustang LMGT3", "Lamborghini Huracan LMGT3 Evo2",
         ),
     )
 
@@ -155,10 +155,10 @@ internal object MockData {
         Spec("$prefix-mclaren-q4", "Daily", "Logitech McLaren G Challenge", "Logitech McLaren G Challenge Q4", 1, listOf("LMGT3"), "Bronze", 30),
         Spec("$prefix-lmgt3-spa", "Daily", "LMGT3 Fixed", "LMGT3 Fixed", 0, listOf("LMGT3"), "Bronze", 32),
         Spec("$prefix-elms-sebring", "Daily", "ELMS Sprint Trophy", "ELMS Sprint Trophy", 3, listOf("LMP2", "LMP3", "LMGT3"), "Silver", 42),
-        Spec("$prefix-wec-lemans", "Weekly", "WEC Endurance", "WEC Endurance — 4 Hours", 1, listOf("Hypercar", "LMP2", "LMGT3"), "Gold", 60),
+        Spec("$prefix-wec-lemans", "Weekly", "WEC Endurance", "WEC Endurance - 4 Hours", 1, listOf("Hypercar", "LMP2", "LMGT3"), "Gold", 60),
         Spec("$prefix-hyper-monza", "Weekly", "Hypercar Challenge", "Hypercar Challenge", 4, listOf("Hypercar"), "Silver", 45),
         Spec("$prefix-special-lemans", "Special", "Le Mans 24h Qualifier", "Le Mans 24h Qualifier", 1, listOf("Hypercar", "LMGT3"), "Gold", 50),
-        Spec("$prefix-champ-imola", "Championship", "Spring Championship", "Spring Championship — Round 3", 5, listOf("LMGT3"), "Silver", 40),
+        Spec("$prefix-champ-imola", "Championship", "Spring Championship", "Spring Championship - Round 3", 5, listOf("LMGT3"), "Silver", 40),
     )
 
     private val weekOrder = listOf("week-current" to "This week", "week-next" to "Next week")
@@ -303,7 +303,7 @@ internal object MockData {
             val car = cars[i % cars.size]
             val lap = (classPaceMs[cls] ?: 135_000L) + i * 600L + r.nextInt(400)
             HotlapDto(
-                title = "${race?.circuit ?: "Spa"} — $car",
+                title = "${race?.circuit ?: "Spa"} - $car",
                 videoId = "mock${raceId.hashCode().toUInt().toString(16)}$i",
                 url = "",
                 thumbnail = "",
@@ -567,7 +567,7 @@ internal object MockData {
         val day = 86_400_000L
         val now = Clock.System.now().toEpochMilliseconds()
         return listOf(
-            SuspensionDto(type = 2, reason = "SR ratio below threshold — automatic probation.",
+            SuspensionDto(type = 2, reason = "SR ratio below threshold - automatic probation.",
                 from = now - 2 * day, to = now + 5 * day, permanent = false, active = true),
             SuspensionDto(type = 1, reason = "Causing a collision (T1, lap 1).",
                 from = now - 40 * day, to = now - 38 * day, active = false),
@@ -647,9 +647,9 @@ internal object MockData {
         RaceCard("ELMS Sprint Trophy", 3, "LMGT3", "Ford Mustang LMGT3", "Daily", "Silver", 24, 8, 24, 3, 3, -32.9, -9.9, true),
         RaceCard("LMGT3 Fixed", 0, "LMGT3", "Ferrari 296 LMGT3", "Daily", "Bronze", 22, 6, 3, 12, 14, 9.4, 3.1, false),
         RaceCard("Hypercar Challenge", 4, "Hypercar", "Ferrari 499P", "Weekly", "Silver", 28, 9, 7, 5, 6, 4.2, 1.8, false),
-        RaceCard("WEC Endurance — 4 Hours", 1, "Hypercar", "Toyota GR010 Hybrid", "Weekly", "Gold", 30, 14, 6, 1, 1, 6.0, 2.5, false),
+        RaceCard("WEC Endurance - 4 Hours", 1, "Hypercar", "Toyota GR010 Hybrid", "Weekly", "Gold", 30, 14, 6, 1, 1, 6.0, 2.5, false),
         RaceCard("LMP3 Fixed", 2, "LMP3", "Ligier JS P325", "Daily", "Bronze", 20, 3, 2, 8, 9, 7.7, 2.0, false),
-        RaceCard("Spring Championship — Round 3", 5, "LMGT3", "BMW M4 LMGT3", "Championship", "Silver", 26, 7, 5, 2, 2, 3.3, 1.1, false),
+        RaceCard("Spring Championship - Round 3", 5, "LMGT3", "BMW M4 LMGT3", "Championship", "Silver", 26, 7, 5, 2, 2, 3.3, 1.1, false),
         RaceCard("Le Mans 24h Qualifier", 1, "LMGT3", "Aston Martin Vantage AMR LMGT3", "Special", "Gold", 32, 18, 11, 4, 4, -2.1, 0.4, false),
         RaceCard("LMGT3 Fixed", 0, "LMGT3", "Porsche 911 GT3 R", "Daily", "Bronze", 21, 5, 9, 7, 8, -3.0, -0.8, false),
         RaceCard("Hypercar Challenge", 4, "Hypercar", "Porsche 963", "Weekly", "Silver", 27, 11, 8, 6, 6, 2.0, 0.9, false),
@@ -754,7 +754,7 @@ internal object MockData {
             gameVersion = card.gameVersion,
             // impact is a 1–4 weight (rendered as arrows), not a real point value.
             srReasons = listOf(
-                ReasonDto(impact = 2.0, positive = true, reason = "Clean racing — no incidents"),
+                ReasonDto(impact = 2.0, positive = true, reason = "Clean racing - no incidents"),
                 ReasonDto(impact = 3.0, positive = false, reason = "Contact with another car (T6)"),
                 ReasonDto(impact = 1.0, positive = false, reason = "Off track (T10)"),
             ),

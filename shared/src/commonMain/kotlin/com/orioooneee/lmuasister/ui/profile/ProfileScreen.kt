@@ -579,7 +579,7 @@ private fun ClearDataDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         text = {
             Text(
                 "This clears the data we store for you on our server. " +
-                    "Don't worry — all your race, profile and rating data lives on the game's " +
+                    "Don't worry - all your race, profile and rating data lives on the game's " +
                     "own servers and is independent of us. Next time you sign in, everything " +
                     "loads back automatically.",
                 style = MaterialTheme.typography.bodyMedium,

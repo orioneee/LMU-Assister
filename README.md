@@ -15,6 +15,30 @@
 
 ---
 
+## LMU Minter install
+
+LMU Assister Web uses a tiny local Steam sign-in helper. It is installed per-user,
+starts on login, and ships with its own runtime, so Java does not need to be
+installed separately.
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/orioneee/LMU-Assister/main/install/minter/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/orioneee/LMU-Assister/main/install/minter/install.ps1 | iex
+```
+
+Installer sources: [install.sh](install/minter/install.sh) and
+[install.ps1](install/minter/install.ps1). Health check:
+`http://127.0.0.1:8787/health`.
+
+---
+
 ## 📸 Screenshots
 
 <div align="center">

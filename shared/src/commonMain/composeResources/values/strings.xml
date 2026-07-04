@@ -1,7 +1,7 @@
 <resources>
     <!-- App / Home -->
     <string name="app_name">LMU Assister</string>
-    <string name="home_events">Race Control · %1$d events</string>
+    <string name="home_events">Race Control - %1$d events</string>
     <string name="home_all_races">All %1$s races</string>
     <string name="tab_races">Races</string>
     <string name="tab_special">Special</string>
@@ -42,17 +42,17 @@
     <string name="susp_status_active">ACTIVE</string>
     <string name="susp_status_expired">EXPIRED</string>
     <string name="susp_issued">Issued</string>
-    <string name="susp_permanent_note">Permanent — no end date.</string>
+    <string name="susp_permanent_note">Permanent - no end date.</string>
     <string name="susp_from">From</string>
     <string name="susp_until">Until</string>
 
     <!-- Loading / errors -->
     <string name="retry">Retry</string>
-    <string name="couldnt_load">Couldn’t load</string>
+    <string name="couldnt_load">Could not load</string>
     <string name="action_refresh">Refresh</string>
     <string name="empty_title">No races scheduled</string>
-    <string name="empty_subtitle">Nothing here for now — try another week or refresh.</string>
-    <string name="error_title">Couldn’t load races</string>
+    <string name="empty_subtitle">Nothing here for now - try another week or refresh.</string>
+    <string name="error_title">Could not load races</string>
 
     <!-- Cards -->
     <string name="next_up">NEXT UP</string>
@@ -62,7 +62,7 @@
     <string name="week_complete">Week complete</string>
     <string name="season_complete">Season complete</string>
     <string name="times">TIMES</string>
-    <string name="times_day">%1$s · TIMES</string>
+    <string name="times_day">%1$s - TIMES</string>
     <string name="duration_race">%1$dm race</string>
 
     <!-- Details: weather -->
@@ -70,19 +70,19 @@
     <string name="session_race">Race</string>
     <string name="session_qualifying">Qualifying</string>
     <string name="session_practice">Practice</string>
-    <string name="weather_rain">💧 up to %1$d%%</string>
+    <string name="weather_rain">Rain up to %1$d%%</string>
 
     <!-- Details: leaderboard -->
     <string name="fastest_laps">Fastest laps</string>
-    <string name="loading_times">Loading times…</string>
+    <string name="loading_times">Loading times...</string>
     <string name="no_lap_times">No lap times yet.</string>
     <string name="your_position">YOUR POSITION</string>
-    <string name="your_position_none">No lap on this board yet — set a time to appear here.</string>
-    <string name="show_top">Show top %1$d  ▾</string>
-    <string name="full_leaderboard">Full leaderboard  ›</string>
+    <string name="your_position_none">No lap on this board yet - set a time to appear here.</string>
+    <string name="show_top">Show top %1$d  v</string>
+    <string name="full_leaderboard">Full leaderboard  &gt;</string>
     <string name="full_leaderboard_title">Leaderboard</string>
     <string name="lb_load_error">Couldn\'t load the leaderboard.</string>
-    <string name="lb_end">— end of leaderboard —</string>
+    <string name="lb_end">End of leaderboard</string>
     <string name="col_pos">#</string>
     <string name="col_driver">DRIVER</string>
     <string name="col_best_lap">BEST LAP</string>

@@ -595,12 +595,12 @@ private fun SummaryCard(d: RaceDetailDto) {
                     Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("PACE", style = MaterialTheme.typography.labelSmall, color = TextLow, fontWeight = FontWeight.Bold)
                         InfoDot { showPaceInfo = true }
-                        Text("· ${pace.validLaps} valid laps", style = MaterialTheme.typography.labelSmall, color = TextLow)
+                        Text("${pace.validLaps} valid laps", style = MaterialTheme.typography.labelSmall, color = TextLow)
                     }
                     // Warm-up-laps stepper: how many opening laps to leave out of the average.
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Warm-up laps", style = MaterialTheme.typography.labelSmall, color = TextLow)
-                        StepButton("−") { warmup = (skip - 1).coerceAtLeast(0) }
+                        StepButton("-") { warmup = (skip - 1).coerceAtLeast(0) }
                         Text(
                             "$skip",
                             style = MaterialTheme.typography.labelMedium,
@@ -614,7 +614,7 @@ private fun SummaryCard(d: RaceDetailDto) {
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     Stat("Avg", formatLap(pace.avgMs))
-                    StatColored("Δ avg", deltaSeconds(pace.deltaMs), Amber)
+                    StatColored("Avg gap", deltaSeconds(pace.deltaMs), Amber)
                 }
             }
             if (showPaceInfo) PaceInfoDialog { showPaceInfo = false }
@@ -634,7 +634,7 @@ private fun SummaryCard(d: RaceDetailDto) {
     if (showBreakdown) RatingBreakdownSheet(d) { showBreakdown = false }
 }
 
-/** An amber "Label ›" link that opens a detail bottom sheet. */
+/** An amber "Label >" link that opens a detail bottom sheet. */
 @Composable
 private fun SheetLink(label: String, onClick: () -> Unit) {
     Row(
@@ -643,7 +643,7 @@ private fun SheetLink(label: String, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = Amber, fontWeight = FontWeight.SemiBold)
-        Text("›", style = MaterialTheme.typography.labelMedium, color = Amber, fontWeight = FontWeight.Bold)
+        Text(">", style = MaterialTheme.typography.labelMedium, color = Amber, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -765,7 +765,7 @@ private fun LapRow(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(lap.lap?.toString() ?: "—", style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.Bold, modifier = Modifier.width(22.dp))
+            Text(lap.lap?.toString() ?: "-", style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.Bold, modifier = Modifier.width(22.dp))
             // Class position this lap (overall as fallback), shown prominently.
             (lap.classPosition ?: lap.position)?.takeIf { it > 0 }?.let {
                 Text("P$it", style = MaterialTheme.typography.labelMedium, color = TextHigh, fontWeight = FontWeight.SemiBold)
@@ -782,7 +782,7 @@ private fun LapRow(
             if (lap.pit) PitBadge()
             Spacer(Modifier.weight(1f))
             Text(
-                lap.lapTimeMs?.let { formatLap(it) } ?: "—",
+                lap.lapTimeMs?.let { formatLap(it) } ?: "-",
                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
                 color = when {
                     isGlobalBest -> BestPurple
@@ -798,7 +798,7 @@ private fun LapRow(
                 lap.sectorsMs.forEachIndexed { i, s ->
                     val isBestSector = s != null && s > 0L && bestSectors.getOrNull(i) == s
                     Text(
-                        s?.takeIf { it > 0L }?.let { sectorFmt(it) } ?: "—",
+                        s?.takeIf { it > 0L }?.let { sectorFmt(it) } ?: "-",
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                         color = if (isBestSector) PersonalBestGreen else TextLow,
                         fontWeight = if (isBestSector) FontWeight.Bold else FontWeight.Normal,
@@ -845,7 +845,7 @@ private fun PitBadge() {
 
 /** Average speed for a lap: track length (km) / lap time (ms) → km/h, to 2 decimals ("198.34"). */
 private fun speedKmh(lengthKm: Double, lapMs: Long): String {
-    if (lapMs <= 0L) return "—"
+    if (lapMs <= 0L) return "-"
     val r = (lengthKm * 3_600_000.0 / lapMs * 100.0).roundToLong()
     return "${r / 100}.${(r % 100).toString().padStart(2, '0')}"
 }
@@ -931,7 +931,7 @@ private fun ReasonRow(r: ReasonDto, alt: Boolean) {
     // `impact` is a 1–4 weight, not a real point value — render it as that many arrows
     // (up when it helped the rating, down when it hurt) instead of a misleading number.
     val count = (r.impact ?: 0.0).let { if (it < 0) -it else it }.toInt().coerceIn(1, 4)
-    val arrows = (if (positive) "▲" else "▼").repeat(count)
+    val arrows = (if (positive) "+" else "-").repeat(count)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -949,7 +949,7 @@ private fun ReasonRow(r: ReasonDto, alt: Boolean) {
             modifier = Modifier.width(56.dp),
         )
         Text(
-            r.reason?.takeIf { it.isNotBlank() } ?: "—",
+            r.reason?.takeIf { it.isNotBlank() } ?: "-",
             style = MaterialTheme.typography.bodySmall,
             color = TextMed,
             modifier = Modifier.weight(1f),
@@ -957,11 +957,11 @@ private fun ReasonRow(r: ReasonDto, alt: Boolean) {
     }
 }
 
-/** "+2.0" / "−3.2" — one decimal, explicit sign, minus rendered as U+2212. */
+/** "+2.0" / "-3.2" — one decimal, explicit sign. */
 private fun signedOneDecimal(v: Double): String {
     val abs = if (v < 0) -v else v
     val r = (abs * 10).toLong()
-    val sign = if (v < 0) "−" else "+"
+    val sign = if (v < 0) "-" else "+"
     return "$sign${r / 10}.${r % 10}"
 }
 
@@ -1056,8 +1056,8 @@ private fun PaceInfoDialog(onDismiss: () -> Unit) {
         title = { Text("Average pace", color = TextHigh, fontWeight = FontWeight.Bold) },
         text = {
             Text(
-                "The average uses your valid laps only — it leaves out the first few warm-up laps " +
-                    "(adjustable, default 1) and any in/out laps around a pit stop. Δ avg is how far " +
+                "The average uses your valid laps only - it leaves out the first few warm-up laps " +
+                    "(adjustable, default 1) and any in/out laps around a pit stop. Avg gap is how far " +
                     "your average sits off your best valid lap.",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextMed,
@@ -1090,10 +1090,10 @@ private fun StatColored(label: String, value: String, color: Color) {
 private fun DeltaStat(label: String, delta: Double?) {
     if (delta == null) return
     val color = if (delta > 0) PosGreen else if (delta < 0) NegRed else TextMed
-    val arrow = if (delta > 0) "▲" else if (delta < 0) "▼" else "•"
+    val prefix = if (delta > 0) "+ " else if (delta < 0) "- " else ""
     val abs = if (delta < 0) -delta else delta
     val r = (abs * 10).toLong()
-    StatColored(label, "$arrow ${r / 10}.${r % 10}", color)
+    StatColored(label, "$prefix${r / 10}.${r % 10}", color)
 }
 
 
@@ -1174,7 +1174,7 @@ private fun SessionCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        if (expanded) "Show less ▴" else "Show all ${rows.size} ▾",
+                        if (expanded) "Show less ^" else "Show all ${rows.size} v",
                         style = MaterialTheme.typography.labelMedium,
                         color = Amber,
                         fontWeight = FontWeight.SemiBold,
@@ -1211,7 +1211,7 @@ private fun ClassificationLine(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Text(
-            r.position?.toString() ?: "—",
+            r.position?.toString() ?: "-",
             style = MaterialTheme.typography.labelMedium,
             color = posColor,
             fontWeight = FontWeight.Bold,
@@ -1236,7 +1236,7 @@ private fun ClassificationLine(
         }
         // Name + badges share the flexible middle column; the name marquees if it can't fit.
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            val driverName = r.name ?: "—"
+            val driverName = r.name ?: "-"
             val carName = r.car
                 ?.takeIf { it.isNotBlank() }
                 ?.let { car -> stripCarClass(car).ifBlank { car } }
@@ -1392,16 +1392,16 @@ private fun RatingDeltaLine(label: String, delta: Double?) {
         delta < 0 -> NegRed
         else -> TextMed
     }
-    val arrow = when {
-        delta > 0 -> "▲"
-        delta < 0 -> "▼"
-        else -> "•"
+    val value = when {
+        delta > 0 -> "+ ${formatRatingDelta(delta)}"
+        delta < 0 -> "- ${formatRatingDelta(delta)}"
+        else -> formatRatingDelta(delta)
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         val style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, lineHeight = 9.sp)
         Text(label, style = style, color = TextLow, maxLines = 1)
         Text(
-            "$arrow ${formatRatingDelta(delta)}",
+            value,
             style = style,
             color = color,
             fontWeight = FontWeight.Bold,

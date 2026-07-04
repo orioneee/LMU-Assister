@@ -7,7 +7,9 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -189,17 +191,44 @@ fun MainShell(
         currentDest?.let { Telemetry.screen(screenNameOf(it)) }
     }
 
-    val enterUp: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
-        { slideInVertically(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { it } }
-    val exitFade: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
-        { fadeOut(tween(NAV_ANIM)) }
-    val popEnterFade: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
-        { fadeIn(tween(NAV_ANIM)) }
-    val popExitDown: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
-        { slideOutVertically(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(NAV_ANIM)) }
-
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val useNavigationRail = maxWidth >= 840.dp
+        val enterForward: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
+            if (useNavigationRail) {
+                {
+                    slideInHorizontally(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { it } +
+                        fadeIn(tween(NAV_ANIM))
+                }
+            } else {
+                { slideInVertically(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { it } }
+            }
+        val exitForward: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
+            if (useNavigationRail) {
+                {
+                    slideOutHorizontally(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { -it / 4 } +
+                        fadeOut(tween(NAV_ANIM))
+                }
+            } else {
+                { fadeOut(tween(NAV_ANIM)) }
+            }
+        val popEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
+            if (useNavigationRail) {
+                {
+                    slideInHorizontally(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { -it / 4 } +
+                        fadeIn(tween(NAV_ANIM))
+                }
+            } else {
+                { fadeIn(tween(NAV_ANIM)) }
+            }
+        val popExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
+            if (useNavigationRail) {
+                {
+                    slideOutHorizontally(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { it } +
+                        fadeOut(tween(NAV_ANIM))
+                }
+            } else {
+                { slideOutVertically(tween(NAV_ANIM, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(NAV_ANIM)) }
+            }
         val onSelectTab: (TopTab) -> Unit = { tab ->
             val route: Any = when (tab) {
                 TopTab.Profile -> ProfileRoute
@@ -280,7 +309,7 @@ fun MainShell(
                     onOpenUser = { uid -> nav.navigate(PublicUserDetailRoute(uid)) },
                 )
             }
-            composable<PublicUserDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<PublicUserDetailRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 PublicUserDetailScreen(
                     uid = entry.toRoute<PublicUserDetailRoute>().uid,
                     insets = insets,
@@ -311,7 +340,7 @@ fun MainShell(
                     },
                 )
             }
-            composable<PublicUserRacesRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<PublicUserRacesRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val route = entry.toRoute<PublicUserRacesRoute>()
                 PublicUserRacesScreen(
                     uid = route.uid,
@@ -323,7 +352,7 @@ fun MainShell(
                     },
                 )
             }
-            composable<PublicUserCategoryRacesRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<PublicUserCategoryRacesRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val route = entry.toRoute<PublicUserCategoryRacesRoute>()
                 PublicUserCategoryRacesScreen(
                     uid = route.uid,
@@ -337,7 +366,7 @@ fun MainShell(
                     },
                 )
             }
-            composable<PublicUserTrackBreakdownRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<PublicUserTrackBreakdownRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val route = entry.toRoute<PublicUserTrackBreakdownRoute>()
                 PublicUserTrackBreakdownScreen(
                     uid = route.uid,
@@ -349,7 +378,7 @@ fun MainShell(
                     },
                 )
             }
-            composable<PublicUserTrackDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<PublicUserTrackDetailRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val route = entry.toRoute<PublicUserTrackDetailRoute>()
                 PublicTrackDetailScreen(
                     uid = route.uid,
@@ -358,7 +387,7 @@ fun MainShell(
                     onBack = { nav.popBackStack() },
                 )
             }
-            composable<PublicUserRaceDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<PublicUserRaceDetailRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val route = entry.toRoute<PublicUserRaceDetailRoute>()
                 PublicRaceProfileDetailScreen(
                     uid = route.uid,
@@ -383,7 +412,7 @@ fun MainShell(
                     },
                 )
             }
-            composable<CarDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<CarDetailRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val route = entry.toRoute<CarDetailRoute>()
                 val initial = selectedCar?.takeIf { it.id == route.carId || it.slug == route.carId || it.displayId() == route.carId }
                 CarDetailScreen(
@@ -393,7 +422,7 @@ fun MainShell(
                     onBack = { nav.popBackStack() },
                 )
             }
-            composable<TrackDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<TrackDetailRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 TrackDetailScreen(
                     viewModel = profileViewModel,
                     insets = insets,
@@ -405,7 +434,7 @@ fun MainShell(
                     },
                 )
             }
-            composable<SuspensionsRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<SuspensionsRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 SuspensionsScreen(
                     viewModel = profileViewModel,
                     insets = insets,
@@ -413,10 +442,10 @@ fun MainShell(
                     onBack = { nav.popBackStack() },
                 )
             }
-            composable<PrivacyRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) {
+            composable<PrivacyRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) {
                 PrivacyPolicyScreen(insets = insets, onBack = { nav.popBackStack() })
             }
-            composable<TrackBreakdownRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) {
+            composable<TrackBreakdownRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) {
                 TrackBreakdownScreen(
                     viewModel = profileViewModel,
                     insets = insets,
@@ -424,7 +453,7 @@ fun MainShell(
                     onOpenTrack = { trackId -> nav.navigate(TrackDetailRoute(trackId)) },
                 )
             }
-            composable<AllRacesRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) {
+            composable<AllRacesRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) {
                 AllRacesScreen(
                     viewModel = profileViewModel,
                     insets = insets,
@@ -435,7 +464,7 @@ fun MainShell(
                     },
                 )
             }
-            composable<CategoryRacesRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<CategoryRacesRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val route = entry.toRoute<CategoryRacesRoute>()
                 CategoryRacesScreen(
                     viewModel = profileViewModel,
@@ -449,7 +478,7 @@ fun MainShell(
                     },
                 )
             }
-            composable<ProfileRaceDetailRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<ProfileRaceDetailRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val route = entry.toRoute<ProfileRaceDetailRoute>()
                 RaceProfileDetailScreen(
                     viewModel = profileViewModel,
@@ -459,7 +488,7 @@ fun MainShell(
                     onBack = { nav.popBackStack() },
                 )
             }
-            composable<DetailsRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<DetailsRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val id = entry.toRoute<DetailsRoute>().raceId
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 val race = (state as? ScheduleUiState.Success)?.data?.schedule?.races?.firstOrNull { it.id == id }
@@ -475,7 +504,7 @@ fun MainShell(
                     )
                 }
             }
-            composable<LeaderboardRoute>(enterTransition = enterUp, exitTransition = exitFade, popEnterTransition = popEnterFade, popExitTransition = popExitDown) { entry ->
+            composable<LeaderboardRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val route = entry.toRoute<LeaderboardRoute>()
                 FullLeaderboardScreen(
                     leaderboardId = route.leaderboardId,

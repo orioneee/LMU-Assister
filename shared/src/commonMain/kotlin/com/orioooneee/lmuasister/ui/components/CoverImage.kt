@@ -61,7 +61,7 @@ fun CoverImage(
 
             is AsyncImagePainter.State.Error ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("⚠️", style = MaterialTheme.typography.titleMedium)
+                    Text("!", style = MaterialTheme.typography.titleMedium, color = TextLow)
                     Spacer(Modifier.height(2.dp))
                     Text(
                         stringResource(Res.string.couldnt_load),

@@ -159,7 +159,7 @@ class SteamBackendApi(private val client: HttpClient) {
             contentType(ContentType.Application.Json)
             setBody("""{"ticket":"$ticketHex"}""") // hex is [0-9a-f], no escaping needed
         }
-        SteamLog.d("backend: POST /auth/steam → ${resp.status.value}")
+        SteamLog.d("backend: POST /auth/steam -> ${resp.status.value}")
         return when (resp.status.value) {
             in 200..299 -> AppJson.decodeFromString(resp.bodyAsText())
             else -> throw resp.toError()
@@ -197,7 +197,7 @@ class SteamBackendApi(private val client: HttpClient) {
         val resp = client.post("$API_BASE/auth/sign-out") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
-        SteamLog.d("backend: POST /auth/sign-out → ${resp.status.value}")
+        SteamLog.d("backend: POST /auth/sign-out -> ${resp.status.value}")
         if (resp.status.value !in 200..299) throw resp.toError()
     }
 
@@ -209,7 +209,7 @@ class SteamBackendApi(private val client: HttpClient) {
         val resp = client.post("$API_BASE/auth/clear-my-data") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
-        SteamLog.d("backend: POST /auth/clear-my-data → ${resp.status.value}")
+        SteamLog.d("backend: POST /auth/clear-my-data -> ${resp.status.value}")
         if (resp.status.value !in 200..299) throw resp.toError()
     }
 
@@ -344,7 +344,7 @@ class SteamBackendApi(private val client: HttpClient) {
 
     private suspend fun getAuthed(url: String, token: String): String {
         val resp = client.get(url) { header(HttpHeaders.Authorization, "Bearer $token") }
-        SteamLog.d("backend: GET ${url.substringAfterLast("/api/v2")} → ${resp.status.value}")
+        SteamLog.d("backend: GET ${url.substringAfterLast("/api/v2")} -> ${resp.status.value}")
         return when (resp.status.value) {
             in 200..299 -> resp.bodyAsText()
             else -> throw resp.toError()

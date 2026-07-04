@@ -9,7 +9,8 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.ksteam.core)
+    implementation(libs.javasteam)
+    implementation("com.google.protobuf:protobuf-java:4.31.1")
     implementation(libs.kotlinx.coroutinesCore)
     implementation(libs.kotlinx.serializationJson)
     implementation(libs.ktor.client.cio)

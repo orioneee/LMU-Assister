@@ -151,7 +151,7 @@ class SteamLoginViewModel(
             }
             try {
                 if (LocalCache.read(DEMO_FLAG_KEY) == "1") {
-                    SteamLog.d("vm: restoring demo session…")
+                    SteamLog.d("vm: restoring demo session...")
                     val r = runCatching { backend.authDemo(DEMO_USERNAME, DEMO_PASSWORD) }.getOrNull()
                     if (r != null) {
                         appToken = r.token
@@ -164,7 +164,7 @@ class SteamLoginViewModel(
                     SteamLog.d("vm: demo restore failed, falling back")
                     runCatching { LocalCache.write(DEMO_FLAG_KEY, "") }
                 }
-                SteamLog.d("vm: trying silent session restore…")
+                SteamLog.d("vm: trying silent session restore...")
                 val restored = runCatching { signIn.restore() }
                 val token = restored.getOrNull()
                 if (token != null) {

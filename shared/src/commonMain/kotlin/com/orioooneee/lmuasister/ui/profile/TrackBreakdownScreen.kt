@@ -100,7 +100,7 @@ fun TrackBreakdownView(
                 )
                 profile?.let {
                     Text(
-                        "${formatKm(it.totalDistanceKm)} km total · ${tracks?.size ?: 0} tracks",
+                        "${formatKm(it.totalDistanceKm)} km total - ${tracks?.size ?: 0} tracks",
                         style = MaterialTheme.typography.labelMedium,
                         color = TextMed,
                         maxLines = 1,

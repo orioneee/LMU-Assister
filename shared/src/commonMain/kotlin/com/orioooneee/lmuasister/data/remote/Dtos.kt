@@ -206,7 +206,7 @@ data class WeatherSegmentDto(
 @Serializable
 data class LeaderboardEntryDto(
     val rank: Int = 0,
-    val initials: String = "—",
+    val initials: String = "-",
     val bestLapMs: Long = 0,
     val sectors: List<Double> = emptyList(),
     val car: String? = null,

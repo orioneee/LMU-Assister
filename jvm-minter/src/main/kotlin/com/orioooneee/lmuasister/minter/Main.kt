@@ -1,47 +1,52 @@
 package com.orioooneee.lmuasister.minter
 
-import bruhcollective.itaysonlab.ksteam.SteamClient
-import bruhcollective.itaysonlab.ksteam.handlers.Account
-import bruhcollective.itaysonlab.ksteam.kSteam
-import bruhcollective.itaysonlab.ksteam.models.AppId
-import bruhcollective.itaysonlab.ksteam.models.SteamId
-import bruhcollective.itaysonlab.ksteam.models.account.AuthorizationState
-import bruhcollective.itaysonlab.ksteam.models.enums.EGamingDeviceType
-import bruhcollective.itaysonlab.ksteam.models.enums.EOSType
-import bruhcollective.itaysonlab.ksteam.persistence.MemoryPersistenceDriver
-import bruhcollective.itaysonlab.ksteam.platform.DeviceInformation
+import `in`.dragonbra.javasteam.enums.EResult
+import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesAuthSteamclient.CAuthentication_AllowedConfirmation
+import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesAuthSteamclient.EAuthSessionGuardType
+import `in`.dragonbra.javasteam.steam.authentication.AuthPollResult
+import `in`.dragonbra.javasteam.steam.authentication.AuthSession
+import `in`.dragonbra.javasteam.steam.authentication.AuthSessionDetails
+import `in`.dragonbra.javasteam.steam.authentication.AuthenticationException
+import `in`.dragonbra.javasteam.steam.authentication.CredentialsAuthSession
+import `in`.dragonbra.javasteam.steam.authentication.IChallengeUrlChanged
+import `in`.dragonbra.javasteam.steam.authentication.QrAuthSession
+import `in`.dragonbra.javasteam.steam.handlers.steamauthticket.SteamAuthTicket
+import `in`.dragonbra.javasteam.steam.handlers.steamuser.LogOnDetails
+import `in`.dragonbra.javasteam.steam.handlers.steamuser.SteamUser
+import `in`.dragonbra.javasteam.steam.handlers.steamuser.callback.LoggedOnCallback
+import `in`.dragonbra.javasteam.steam.steamclient.SteamClient
+import `in`.dragonbra.javasteam.steam.steamclient.callbackmgr.CallbackManager
+import `in`.dragonbra.javasteam.steam.steamclient.callbacks.ConnectedCallback
+import `in`.dragonbra.javasteam.steam.steamclient.callbacks.DisconnectedCallback
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okio.Path.Companion.toPath
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import steam.enums.EAuthTokenPlatformType
+import java.io.Closeable
 import java.net.InetSocketAddress
 import java.net.URLDecoder
 import java.security.Security
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
-import kotlin.io.path.Path
-import kotlin.io.path.createDirectories
-import kotlin.time.Duration.Companion.seconds
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 private const val DEFAULT_APP_ID = 2_399_420
 private const val DEFAULT_PORT = 8787
 private const val LOGIN_WAIT_MS = 45_000L
-private const val GUARD_PROMPT_WAIT_MS = 2_000L
+private const val POLL_REQUEST_WAIT_MS = 15_000L
+private const val STATUS_POLL_REQUEST_WAIT_MS = 2_000L
 private const val APPROVAL_WAIT_SECONDS = 120
 
 private val json = Json {
@@ -141,7 +146,6 @@ private class TicketMinterService {
         val flow = AuthFlow(
             id = UUID.randomUUID().toString(),
             appId = req.appId ?: DEFAULT_APP_ID,
-            rootDir = minterRoot().resolve(UUID.randomUUID().toString()),
         )
         flows[flow.id] = flow
         flow.start(req.username, req.password, req.guardCode)
@@ -152,7 +156,6 @@ private class TicketMinterService {
         val flow = AuthFlow(
             id = UUID.randomUUID().toString(),
             appId = req.appId ?: DEFAULT_APP_ID,
-            rootDir = minterRoot().resolve(UUID.randomUUID().toString()),
         )
         flows[flow.id] = flow
         flow.startQr()
@@ -182,7 +185,6 @@ private class TicketMinterService {
         val flow = AuthFlow(
             id = UUID.randomUUID().toString(),
             appId = req.appId ?: DEFAULT_APP_ID,
-            rootDir = minterRoot().resolve(UUID.randomUUID().toString()),
         )
         try {
             flow.mintFromSession(session)
@@ -225,47 +227,49 @@ private class TicketMinterService {
 private class AuthFlow(
     val id: String,
     private val appId: Int,
-    private val rootDir: java.nio.file.Path,
 ) {
     val createdAt: Instant = Instant.now()
     private val mutex = Mutex()
-    private var steam: SteamClient? = null
+    private var steam: SteamCmSession? = null
+    private var authSession: AuthSession? = null
     private var completed: ApiResponse? = null
     private var lastMessage: String = "created"
     private var qrUrl: String? = null
     private var qrCode: String? = null
+    private var steamSession: SteamSessionPayload? = null
 
     suspend fun start(username: String, password: String, guardCode: String?): ApiResponse = mutex.withLock {
         val client = startedClient()
         qrUrl = null
         qrCode = null
         lastMessage = "signing in"
-        val authResult = runCatching {
-            client.account.signIn(username.trim(), password, rememberSession = true)
+
+        val credentials = runCatching {
+            client.client.authentication.beginAuthSessionViaCredentials(
+                AuthSessionDetails().apply {
+                    this.username = username.trim()
+                    this.password = password
+                    this.persistentSession = true
+                    this.deviceFriendlyName = "LMU Assister JVM Minter"
+                },
+            ).awaitSteam(LOGIN_WAIT_MS)
         }.getOrElse {
             closeClient()
-            return@withLock ApiResponse(status = "error", flowId = id, message = it.message ?: "Steam sign-in failed")
+            return@withLock authError(it, "Steam sign-in failed")
         }
 
-        when (authResult) {
-            Account.AuthorizationResult.InvalidPassword -> {
-                closeClient()
-                return@withLock ApiResponse(status = "error", flowId = id, message = "Steam rejected the password")
-            }
-            Account.AuthorizationResult.RpcError -> {
-                closeClient()
-                return@withLock ApiResponse(status = "error", flowId = id, message = "Steam auth RPC failed")
-            }
-            Account.AuthorizationResult.ProceedToTfa -> Unit
-        }
-
-        val awaiting = awaitGuardPrompt(client)
-        if (awaiting == null) return@withLock mintTicket(client)
-
+        authSession = credentials
         val typedCode = guardCode?.trim().orEmpty()
-        if (typedCode.isNotBlank()) return@withLock submitGuardCode(client, typedCode)
+        if (typedCode.isNotBlank()) {
+            return@withLock submitGuardCode(credentials, typedCode)
+        }
 
-        guardResponse(awaiting)
+        if (!credentials.requiresConfirmation()) {
+            return@withLock waitForAuthAndMint(LOGIN_WAIT_MS / 1_000)
+                ?: ApiResponse(status = "error", flowId = id, message = "Steam sign-in timed out")
+        }
+
+        guardResponse(credentials)
     }
 
     suspend fun startQr(): ApiResponse = mutex.withLock {
@@ -273,24 +277,44 @@ private class AuthFlow(
         qrUrl = null
         qrCode = null
         lastMessage = "starting Steam QR sign-in"
-        val qr = runCatching { client.account.getSignInQrCode() }.getOrElse {
-            closeClient()
-            return@withLock ApiResponse(status = "error", flowId = id, message = it.message ?: "Steam QR sign-in failed")
-        } ?: return@withLock ApiResponse(status = "error", flowId = id, message = "Steam QR sign-in is unavailable")
 
-        qrUrl = qr.data
-        qrCode = qr.data.toSteamQrDisplayCode()
+        val qr = runCatching {
+            client.client.authentication.beginAuthSessionViaQR(
+                AuthSessionDetails().apply {
+                    this.persistentSession = true
+                    this.deviceFriendlyName = "LMU Assister JVM Minter"
+                },
+            ).awaitSteam(LOGIN_WAIT_MS)
+        }.getOrElse {
+            closeClient()
+            return@withLock authError(it, "Steam QR sign-in failed")
+        }
+
+        qr.challengeUrlChanged = IChallengeUrlChanged { changed ->
+            changed?.challengeUrl?.let(::setQrUrl)
+        }
+        authSession = qr
+        setQrUrl(qr.challengeUrl)
         qrResponse()
     }
 
     suspend fun mintFromSession(session: SteamSessionPayload): ApiResponse = mutex.withLock {
-        val steamId = session.steamId.trim().toULongOrNull()
+        val steamId = session.steamId.trim().toLongOrNull()
             ?: return@withLock ApiResponse(
                 status = "session_invalid",
                 flowId = id,
                 appId = appId,
                 message = "Steam session steamId is missing",
             )
+        val accountName = session.accountName.trim()
+        if (accountName.isBlank()) {
+            return@withLock ApiResponse(
+                status = "session_invalid",
+                flowId = id,
+                appId = appId,
+                message = "Steam session accountName is missing",
+            )
+        }
         val refreshToken = session.refreshToken.trim()
         if (refreshToken.isBlank()) {
             return@withLock ApiResponse(
@@ -306,103 +330,61 @@ private class AuthFlow(
         qrCode = null
         lastMessage = "restoring Steam session"
 
-        val restoreStarted = runCatching {
-            client.account.signInWithRefreshToken(
-                steamId = SteamId(steamId),
-                refreshToken = refreshToken,
-            )
-            true
+        val restoredSteamId = runCatching {
+            client.logOn(accountName, refreshToken).takeIf { it != 0L } ?: steamId
         }.getOrElse {
-            if (client.account.clientAuthState.value is AuthorizationState.Success) true
-            else {
-                closeClient()
-                return@withLock ApiResponse(
-                    status = "session_invalid",
-                    flowId = id,
-                    appId = appId,
-                    message = it.message ?: "Steam refresh session is invalid",
-                )
-            }
-        }
-
-        if (!restoreStarted) {
             closeClient()
             return@withLock ApiResponse(
                 status = "session_invalid",
                 flowId = id,
                 appId = appId,
-                message = "Steam refresh session could not be restored",
+                message = it.rootMessage("Steam refresh session expired. Sign in again."),
             )
         }
 
-        val signedIn = client.account.clientAuthState.value is AuthorizationState.Success ||
-            withTimeoutOrNull(LOGIN_WAIT_MS) {
-                client.account.clientAuthState.filterIsInstance<AuthorizationState.Success>().first()
-                true
-            } == true
-
-        if (!signedIn) {
-            closeClient()
-            return@withLock ApiResponse(
-                status = "session_invalid",
-                flowId = id,
-                appId = appId,
-                message = "Steam refresh session expired. Sign in again.",
-            )
-        }
-
-        mintTicket(client)
+        steamSession = session.copy(steamId = restoredSteamId.toString())
+        mintTicket()
     }
 
     suspend fun submitGuard(code: String): ApiResponse = mutex.withLock {
-        val client = steam ?: return@withLock ApiResponse(status = "error", flowId = id, message = "flow is closed")
+        val credentials = authSession as? CredentialsAuthSession
+            ?: return@withLock completed ?: ApiResponse(status = "error", flowId = id, message = "flow is closed")
         if (code.isBlank()) return@withLock ApiResponse(status = "error", flowId = id, message = "code is required")
-        submitGuardCode(client, code.trim())
+        submitGuardCode(credentials, code.trim())
     }
 
     suspend fun waitForApproval(waitSeconds: Int): ApiResponse = mutex.withLock {
-        val client = steam ?: return@withLock completed ?: ApiResponse(status = "error", flowId = id, message = "flow is closed")
-        val state = client.account.clientAuthState.value
-        if (state !is AuthorizationState.AwaitingTwoFactor) {
-            return@withLock mintTicket(client)
+        completed?.let { return@withLock it }
+        val active = authSession
+            ?: return@withLock ApiResponse(status = "error", flowId = id, message = "flow is closed")
+        if (!active.hasApproval()) {
+            return@withLock authSessionResponse(active)
         }
-        val hasApproval = state.supportedConfirmationMethods.any { it.isApprovalBased() }
-        if (!hasApproval) return@withLock guardResponse(state)
 
-        lastMessage = "waiting for Steam Guard approval"
-        val signedIn = withTimeoutOrNull(waitSeconds.seconds) {
-            client.account.clientAuthState.filterIsInstance<AuthorizationState.Success>().first()
-        }
-        if (signedIn != null) mintTicket(client) else guardResponse(state)
+        waitForAuthAndMint(waitSeconds.toLong()) ?: authSessionResponse(active)
     }
 
     suspend fun waitForQr(waitSeconds: Int): ApiResponse = mutex.withLock {
-        val client = steam ?: return@withLock completed ?: ApiResponse(status = "error", flowId = id, message = "flow is closed")
         completed?.let { return@withLock it }
+        authSession ?: return@withLock ApiResponse(status = "error", flowId = id, message = "flow is closed")
         if (qrUrl == null) {
-            return@withLock when (val state = client.account.clientAuthState.value) {
-                AuthorizationState.Success -> mintTicket(client)
-                AuthorizationState.Unauthorized -> ApiResponse(status = "pending", flowId = id, appId = appId, message = lastMessage)
-                is AuthorizationState.AwaitingTwoFactor -> guardResponse(state)
-            }
+            return@withLock ApiResponse(status = "pending", flowId = id, appId = appId, message = lastMessage)
         }
-        if (client.account.clientAuthState.value is AuthorizationState.Success) {
-            return@withLock mintTicket(client)
-        }
-        lastMessage = "waiting for Steam QR scan"
-        val signedIn = withTimeoutOrNull(waitSeconds.seconds) {
-            client.account.clientAuthState.filterIsInstance<AuthorizationState.Success>().first()
-        }
-        if (signedIn != null) mintTicket(client) else qrResponse()
+
+        waitForAuthAndMint(waitSeconds.toLong()) ?: qrResponse()
     }
 
     suspend fun status(): ApiResponse = mutex.withLock {
         completed?.let { return@withLock it }
-        val client = steam ?: return@withLock ApiResponse(status = "closed", flowId = id, message = lastMessage)
-        when (val state = client.account.clientAuthState.value) {
-            AuthorizationState.Success -> mintTicket(client)
-            AuthorizationState.Unauthorized -> qrResponseOrPending()
-            is AuthorizationState.AwaitingTwoFactor -> guardResponse(state)
+        val active = authSession
+            ?: return@withLock ApiResponse(status = "closed", flowId = id, message = lastMessage)
+
+        pollOnceAndMint(STATUS_POLL_REQUEST_WAIT_MS)?.let { return@withLock it }
+
+        if (qrUrl != null || active is QrAuthSession) {
+            qrResponse()
+        } else {
+            authSessionResponse(active)
         }
     }
 
@@ -410,77 +392,90 @@ private class AuthFlow(
         runCatching { closeClient() }
     }
 
-    private suspend fun startedClient(): SteamClient {
+    private fun startedClient(): SteamCmSession {
         val existing = steam
         if (existing != null) return existing
-        rootDir.createDirectories()
-        return kSteam {
-            rootFolder = rootDir.toString().toPath(normalize = true)
-            persistenceDriver = MemoryPersistenceDriver
-            deviceInfo = DeviceInformation(
-                osType = EOSType.k_WinUnknown,
-                gamingDeviceType = EGamingDeviceType.k_EGamingDeviceType_StandardPC,
-                deviceName = "LMU Assister JVM Minter",
-                platformType = EAuthTokenPlatformType.k_EAuthTokenPlatformType_SteamClient,
-            )
-        }.also {
+        return SteamCmSession().also {
             steam = it
-            it.start()
+            it.open()
+            it.awaitConnected()
         }
     }
 
-    private suspend fun awaitGuardPrompt(client: SteamClient): AuthorizationState.AwaitingTwoFactor? =
-        (client.account.clientAuthState.value as? AuthorizationState.AwaitingTwoFactor)
-            ?: withTimeoutOrNull(GUARD_PROMPT_WAIT_MS) {
-                client.account.clientAuthState.filterIsInstance<AuthorizationState.AwaitingTwoFactor>().first()
-            }
-
-    private suspend fun submitGuardCode(client: SteamClient, code: String): ApiResponse {
-        val accepted = runCatching { client.account.updateCurrentSessionWithCode(code) }.getOrDefault(false)
-        if (!accepted) {
-            val state = client.account.clientAuthState.value as? AuthorizationState.AwaitingTwoFactor
-            return if (state != null) guardResponse(state)
-            else ApiResponse(status = "error", flowId = id, message = "Steam Guard code was rejected")
+    private fun submitGuardCode(credentials: CredentialsAuthSession, code: String): ApiResponse {
+        val codeType = credentials.preferredCodeType()
+            ?: return guardResponse(credentials)
+        runCatching {
+            credentials.sendSteamGuardCode(code, codeType).awaitSteam(POLL_REQUEST_WAIT_MS)
+        }.getOrElse {
+            return guardResponse(credentials)
         }
-        return waitForSignedInAndMint(client)
+        return waitForAuthAndMint(LOGIN_WAIT_MS / 1_000)
+            ?: ApiResponse(status = "error", flowId = id, message = "Steam sign-in timed out")
     }
 
-    private suspend fun waitForSignedInAndMint(client: SteamClient): ApiResponse =
-        try {
-            withTimeout(LOGIN_WAIT_MS) {
-                client.account.clientAuthState.filterIsInstance<AuthorizationState.Success>().first()
-                mintTicket(client)
-            }
-        } catch (_: TimeoutCancellationException) {
-            ApiResponse(status = "error", flowId = id, message = "Steam sign-in timed out")
+    private fun waitForAuthAndMint(waitSeconds: Long): ApiResponse? {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(waitSeconds)
+        lastMessage = if (qrUrl != null) "waiting for Steam QR scan" else "waiting for Steam Guard approval"
+        while (System.nanoTime() < deadline) {
+            val remainingMs = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())
+                .coerceAtLeast(1L)
+                .coerceAtMost(POLL_REQUEST_WAIT_MS)
+            pollOnceAndMint(remainingMs)?.let { return it }
+            Thread.sleep(authSession.pollIntervalMillis())
         }
+        return null
+    }
 
-    private suspend fun mintTicket(client: SteamClient): ApiResponse {
+    private fun pollOnceAndMint(timeoutMs: Long = POLL_REQUEST_WAIT_MS): ApiResponse? {
+        val result = runCatching { authSession?.pollAuthSessionStatus()?.awaitSteam(timeoutMs) }
+            .getOrElse {
+                return authError(it, "Steam auth polling failed")
+            }
+        return result?.let(::finishAuthAndMint)
+    }
+
+    private fun finishAuthAndMint(result: AuthPollResult): ApiResponse {
+        val client = steam ?: return ApiResponse(status = "error", flowId = id, message = "flow is closed")
+        lastMessage = "logging on to Steam"
+        val steamId = runCatching { client.logOn(result.accountName, result.refreshToken) }
+            .getOrElse {
+                closeClient()
+                return authError(it, "Steam logon failed")
+            }
+
+        steamSession = SteamSessionPayload(
+            steamId = steamId.toString(),
+            accountName = result.accountName,
+            accessToken = result.accessToken,
+            refreshToken = result.refreshToken,
+        )
+        return mintTicket()
+    }
+
+    private fun mintTicket(): ApiResponse {
         completed?.let { return it }
+        val client = steam ?: return ApiResponse(status = "error", flowId = id, message = "flow is closed")
         lastMessage = "minting ticket"
         val ticket = runCatching {
-            withTimeout(LOGIN_WAIT_MS) {
-                client.authTickets.getAuthSessionTicket(AppId(appId)).ticket
-            }
+            client.authSessionTicket(appId)
         }.getOrElse {
-            return ApiResponse(status = "error", flowId = id, message = it.message ?: "ticket mint failed")
+            return authError(it, "ticket mint failed")
         }
+
         val response = ApiResponse(
             status = "success",
             flowId = id,
             appId = appId,
             ticketHex = ticket.hex(),
             ticketBytes = ticket.size,
-            steamSession = client.steamSessionPayloadOrNull(),
+            steamSession = steamSession,
             message = "Steam auth session ticket minted",
         )
         completed = response
+        closeClient()
         return response
     }
-
-    private fun qrResponseOrPending(): ApiResponse =
-        if (qrUrl != null) qrResponse()
-        else ApiResponse(status = "pending", flowId = id, appId = appId, message = lastMessage)
 
     private fun qrResponse(): ApiResponse {
         val url = qrUrl.orEmpty()
@@ -496,16 +491,16 @@ private class AuthFlow(
         )
     }
 
-    private fun guardResponse(state: AuthorizationState.AwaitingTwoFactor): ApiResponse {
-        val hasApproval = state.supportedConfirmationMethods.any { it.isApprovalBased() }
-        val codeKind = state.supportedConfirmationMethods.firstNotNullOfOrNull { it.codeKindOrNull() }
+    private fun guardResponse(session: AuthSession): ApiResponse {
+        val hasApproval = session.hasApproval()
+        val codeKind = session.codeKindOrNull()
         lastMessage = if (hasApproval) "waiting for Steam Guard approval" else "waiting for Steam Guard code"
         return ApiResponse(
             status = if (hasApproval) "approval_required" else "guard_required",
             flowId = id,
             appId = appId,
             guardKind = codeKind?.name?.lowercase(),
-            challengeId = state.steamId.toString(),
+            challengeId = id,
             expiresIn = APPROVAL_WAIT_SECONDS.takeIf { hasApproval },
             message = if (hasApproval) {
                 "Approve in Steam app or submit a Steam Guard code"
@@ -515,14 +510,110 @@ private class AuthFlow(
         )
     }
 
-    private fun closeClient() {
-        steam?.let {
-            runCatching { it.account.cancelSignInAttempt() }
-            runCatching { it.stop() }
+    private fun authSessionResponse(session: AuthSession): ApiResponse =
+        if (session.requiresConfirmation()) {
+            guardResponse(session)
+        } else {
+            ApiResponse(status = "pending", flowId = id, appId = appId, message = lastMessage)
         }
+
+    private fun authError(error: Throwable, fallback: String): ApiResponse =
+        ApiResponse(
+            status = "error",
+            flowId = id,
+            appId = appId,
+            message = error.humanSteamMessage(fallback),
+        )
+
+    private fun setQrUrl(url: String) {
+        qrUrl = url
+        qrCode = url.toSteamQrDisplayCode()
+    }
+
+    private fun closeClient() {
+        steam?.close()
         steam = null
+        authSession = null
         qrUrl = null
         qrCode = null
+    }
+}
+
+private class SteamCmSession {
+    val client = SteamClient()
+    private val manager = CallbackManager(client)
+    private val subscriptions = mutableListOf<Closeable>()
+    private val pump = Thread {
+        while (running) {
+            runCatching { manager.runWaitCallbacks(500L) }
+        }
+    }.apply {
+        isDaemon = true
+        name = "lmu-minter-steam-callbacks"
+    }
+
+    @Volatile private var running = true
+    private val connectedLatch = CountDownLatch(1)
+    @Volatile private var connectError: String? = null
+    @Volatile private var loggedOnLatch: CountDownLatch? = null
+    @Volatile private var logonResult: EResult? = null
+    @Volatile private var loggedOnSteamId: Long = 0L
+
+    fun open() {
+        subscriptions += manager.subscribe(ConnectedCallback::class.java) {
+            connectedLatch.countDown()
+        }
+        subscriptions += manager.subscribe(DisconnectedCallback::class.java) {
+            connectError = "Disconnected from Steam"
+            connectedLatch.countDown()
+            loggedOnLatch?.countDown()
+        }
+        subscriptions += manager.subscribe(LoggedOnCallback::class.java) { cb: LoggedOnCallback ->
+            logonResult = cb.result
+            loggedOnSteamId = cb.clientSteamID?.convertToUInt64() ?: 0L
+            loggedOnLatch?.countDown()
+        }
+        pump.start()
+        client.connect()
+    }
+
+    fun awaitConnected(timeoutSeconds: Long = 30) {
+        check(connectedLatch.await(timeoutSeconds, TimeUnit.SECONDS)) { "Timed out connecting to Steam" }
+        connectError?.let { error(it) }
+    }
+
+    fun logOn(accountName: String, refreshToken: String): Long {
+        connectError = null
+        logonResult = null
+        loggedOnSteamId = 0L
+        val latch = CountDownLatch(1).also { loggedOnLatch = it }
+        val user = client.getHandler(SteamUser::class.java) ?: error("SteamUser handler unavailable")
+        user.logOn(
+            LogOnDetails().apply {
+                username = accountName
+                accessToken = refreshToken
+                shouldRememberPassword = true
+                loginID = 149
+            },
+        )
+        check(latch.await(30, TimeUnit.SECONDS)) { "Timed out logging on to Steam" }
+        connectError?.let { error(it) }
+        val result = logonResult
+        if (result != EResult.OK) error("Steam logon failed: $result")
+        return loggedOnSteamId
+    }
+
+    fun authSessionTicket(appId: Int): ByteArray {
+        val handler = client.getHandler(SteamAuthTicket::class.java)
+            ?: error("SteamAuthTicket handler unavailable")
+        return handler.getAuthSessionTicket(appId).awaitSteam(LOGIN_WAIT_MS).ticket
+    }
+
+    fun close() {
+        running = false
+        subscriptions.forEach { runCatching { it.close() } }
+        subscriptions.clear()
+        runCatching { client.disconnect() }
     }
 }
 
@@ -671,23 +762,6 @@ private fun HttpExchange.addCorsHeaders() {
 
 private fun ByteArray.hex(): String = joinToString("") { "%02x".format(it) }
 
-private fun SteamClient.steamSessionPayloadOrNull(): SteamSessionPayload? =
-    runCatching {
-        val current = account.getCurrentAccount() ?: return@runCatching null
-        val steamId = configuration.getValidSecureAccountIds()
-            .firstOrNull()
-            ?.toString()
-            ?: return@runCatching null
-        val refreshToken = current.refreshToken.takeIf { it.isNotBlank() }
-            ?: return@runCatching null
-        SteamSessionPayload(
-            steamId = steamId,
-            accountName = current.accountName,
-            accessToken = current.accessToken,
-            refreshToken = refreshToken,
-        )
-    }.getOrNull()
-
 private fun String.toSteamQrDisplayCode(): String? =
     trim()
         .trimEnd('/')
@@ -695,23 +769,76 @@ private fun String.toSteamQrDisplayCode(): String? =
         .takeIf { it.length in 3..24 && it.all { ch -> ch.isLetterOrDigit() } }
         ?.uppercase()
 
-private fun AuthorizationState.AwaitingTwoFactor.ConfirmationMethod.isApprovalBased(): Boolean =
-    this == AuthorizationState.AwaitingTwoFactor.ConfirmationMethod.DeviceConfirmation ||
-        this == AuthorizationState.AwaitingTwoFactor.ConfirmationMethod.EmailConfirmation
+private fun AuthSession.requiresConfirmation(): Boolean =
+    allowedConfirmations.any { it.confirmationType != EAuthSessionGuardType.k_EAuthSessionGuardType_None }
 
-private fun AuthorizationState.AwaitingTwoFactor.ConfirmationMethod.codeKindOrNull(): SteamGuardKind? =
-    when (this) {
-        AuthorizationState.AwaitingTwoFactor.ConfirmationMethod.EmailCode -> SteamGuardKind.EMAIL
-        AuthorizationState.AwaitingTwoFactor.ConfirmationMethod.DeviceCode -> SteamGuardKind.DEVICE
+private fun AuthSession.hasApproval(): Boolean =
+    allowedConfirmations.any { it.confirmationType.isApprovalBased() }
+
+private fun AuthSession.preferredCodeType(): EAuthSessionGuardType? =
+    allowedConfirmations.firstOrNull { it.confirmationType == EAuthSessionGuardType.k_EAuthSessionGuardType_DeviceCode }
+        ?.confirmationType
+        ?: allowedConfirmations.firstOrNull { it.confirmationType == EAuthSessionGuardType.k_EAuthSessionGuardType_EmailCode }
+            ?.confirmationType
+
+private fun AuthSession.codeKindOrNull(): SteamGuardKind? =
+    allowedConfirmations.firstNotNullOfOrNull { it.codeKindOrNull() }
+
+private fun CAuthentication_AllowedConfirmation.codeKindOrNull(): SteamGuardKind? =
+    when (confirmationType) {
+        EAuthSessionGuardType.k_EAuthSessionGuardType_EmailCode -> SteamGuardKind.EMAIL
+        EAuthSessionGuardType.k_EAuthSessionGuardType_DeviceCode -> SteamGuardKind.DEVICE
         else -> null
     }
 
-private enum class SteamGuardKind { EMAIL, DEVICE }
+private fun EAuthSessionGuardType.isApprovalBased(): Boolean =
+    this == EAuthSessionGuardType.k_EAuthSessionGuardType_DeviceConfirmation ||
+        this == EAuthSessionGuardType.k_EAuthSessionGuardType_EmailConfirmation
 
-private fun minterRoot(): java.nio.file.Path {
-    val base = System.getProperty("java.io.tmpdir") ?: "."
-    return Path(base, "lmu-jvm-minter").also { it.createDirectories() }
+private fun AuthSession?.pollIntervalMillis(): Long =
+    (((this?.pollingInterval ?: 1f) * 1_000).toLong()).coerceIn(500L, 5_000L)
+
+private fun <T> CompletableFuture<T>.awaitSteam(timeoutMs: Long): T =
+    try {
+        get(timeoutMs, TimeUnit.MILLISECONDS)
+    } catch (e: ExecutionException) {
+        throw e.cause ?: e
+    } catch (e: TimeoutException) {
+        throw e
+    }
+
+private fun Throwable.humanSteamMessage(fallback: String): String {
+    val root = rootCause()
+    if (root is TimeoutException) return "$fallback: timed out"
+    if (root is AuthenticationException) {
+        return when (root.result) {
+            EResult.InvalidPassword -> "Steam rejected the password"
+            EResult.AccountNotFound -> "Steam account was not found"
+            EResult.InvalidLoginAuthCode,
+            EResult.ExpiredLoginAuthCode,
+            EResult.TwoFactorCodeMismatch,
+            -> "Steam Guard code was rejected"
+            EResult.RateLimitExceeded,
+            EResult.AccountLoginDeniedThrottle,
+            -> "Steam rejected the request due to rate limiting"
+            else -> root.message ?: fallback
+        }
+    }
+    return root.message ?: fallback
 }
+
+private fun Throwable.rootMessage(fallback: String): String =
+    rootCause().message ?: fallback
+
+private fun Throwable.rootCause(): Throwable {
+    var current = this
+    while (current is ExecutionException && current.cause != null) {
+        current = current.cause!!
+    }
+    return current
+}
+
+private enum class SteamGuardKind { EMAIL, DEVICE }
 
 @Volatile
 private var bouncyCastleReady = false
@@ -765,7 +892,7 @@ private fun uiHtml(port: Int): String =
     <body>
       <main>
         <h1>LMU JVM Minter</h1>
-        <p>Local kSteam login server on 127.0.0.1:$port. Default appId is $DEFAULT_APP_ID.</p>
+        <p>Local JavaSteam login server on 127.0.0.1:$port. Default appId is $DEFAULT_APP_ID.</p>
         <section>
           <div class="grid">
             <label>Steam login <input id="username" autocomplete="username"></label>

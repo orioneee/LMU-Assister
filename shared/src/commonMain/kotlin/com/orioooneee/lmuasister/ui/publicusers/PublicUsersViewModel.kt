@@ -132,7 +132,7 @@ class PublicUsersViewModel(
                 }
                 .onFailure {
                     if (cached == null) {
-                        _state.value = PublicUsersUiState.Error(it.readableMessage("Couldn’t load drivers"))
+                        _state.value = PublicUsersUiState.Error(it.readableMessage("Could not load drivers"))
                     }
                 }
         }
@@ -223,7 +223,7 @@ class PublicUsersViewModel(
                 .onFailure {
                     _races.value = _races.value.copy(
                         loading = false,
-                        error = it.readableMessage("Couldn’t load races"),
+                        error = it.readableMessage("Could not load races"),
                     )
                 }
         }
@@ -275,7 +275,7 @@ class PublicUsersViewModel(
                 .onFailure {
                     _categoryRaces.value = _categoryRaces.value.copy(
                         loading = false,
-                        error = it.readableMessage("Couldn’t load races"),
+                        error = it.readableMessage("Could not load races"),
                     )
                 }
         }

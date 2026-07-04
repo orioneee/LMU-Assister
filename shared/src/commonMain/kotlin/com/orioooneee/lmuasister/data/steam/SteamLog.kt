@@ -16,6 +16,6 @@ internal object SteamLog {
     fun short(s: String?): String = when {
         s == null -> "null"
         s.length <= 12 -> s
-        else -> "${s.take(6)}…${s.takeLast(4)}(${s.length})"
+        else -> "${s.take(6)}...${s.takeLast(4)}(${s.length})"
     }
 }

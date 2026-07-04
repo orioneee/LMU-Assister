@@ -63,7 +63,7 @@ private val tools = listOf(
         IconTools, ClassGt3,
     ),
     ToolLink(
-        "Online Championships · S7",
+        "Online Championships - S7",
         "Standings & calendar",
         "https://community.lemansultimate.com/index.php?threads/le-mans-ultimate-online-championships-season-7.13109/",
         IconChampionship, ClassMixed,

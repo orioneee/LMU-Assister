@@ -71,7 +71,7 @@ fun formatKm(km: Double): String {
 
 /** Lap time in ms -> "1:42.623". */
 fun formatLap(ms: Long): String {
-    if (ms <= 0) return "—"
+    if (ms <= 0) return "-"
     val m = ms / 60_000
     val s = (ms % 60_000) / 1000
     val mmm = ms % 1000
@@ -84,13 +84,13 @@ fun formatSector(sec: Double): String {
     return "${total / 1000}.${(total % 1000).toString().padStart(3, '0')}"
 }
 
-/** Weather sky code (+ rain chance) -> emoji. */
+/** Weather sky code (+ rain chance) -> compact text label. */
 fun skyEmoji(sky: Int, rainChance: Int): String = when {
-    rainChance >= 40 || sky >= 8 -> "🌧"
-    sky >= 6 -> "☁️"
-    sky >= 4 -> "⛅"
-    sky >= 2 -> "🌤"
-    else -> "☀️"
+    rainChance >= 40 || sky >= 8 -> "Wet"
+    sky >= 6 -> "Cld"
+    sky >= 4 -> "Mix"
+    sky >= 2 -> "Sun"
+    else -> "Clr"
 }
 
 /** Background colour for a weather segment (clearer = bluer, rainy = dark slate). */

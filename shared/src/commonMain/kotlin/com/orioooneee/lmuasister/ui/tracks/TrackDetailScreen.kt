@@ -478,7 +478,7 @@ private fun BestLapCard(
         }
         attemptMeta(best, includeVersion = false)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = TextMed) }
         if (fasterClass != null) {
-            Text("Absolute best — set in $fasterClass.", style = MaterialTheme.typography.labelSmall, color = TextLow)
+            Text("Absolute best - set in $fasterClass.", style = MaterialTheme.typography.labelSmall, color = TextLow)
         }
     }
 }
@@ -538,7 +538,7 @@ private fun RacesHeader(races: Int, laps: Int, distanceKm: Double) {
         if (distanceKm > 0) add("${formatKm(distanceKm)} km")
     }
     Text(
-        parts.joinToString(" · ") + " on this track",
+        parts.joinToString(" - ") + " on this track",
         style = MaterialTheme.typography.bodyMedium,
         color = TextMed,
         fontWeight = FontWeight.SemiBold,
@@ -603,7 +603,7 @@ private fun attemptMeta(a: TrackAttemptDto, includeVersion: Boolean = true): Str
         if (includeVersion) versionFullLabel(a.gameVersion)?.let { add("v$it") }
         formatIsoDateTime(a.date)?.let { add(it) }
     }
-    return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" - ")
 }
 
-private fun lap(ms: Long?): String = if (ms != null && ms > 0) formatLap(ms) else "—"
+private fun lap(ms: Long?): String = if (ms != null && ms > 0) formatLap(ms) else "-"

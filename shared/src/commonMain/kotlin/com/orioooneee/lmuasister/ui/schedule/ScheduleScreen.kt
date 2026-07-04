@@ -93,7 +93,7 @@ fun ScheduleScreen(
             Column {
                 Text("Race Control", style = MaterialTheme.typography.headlineMedium, color = TextHigh, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(2.dp))
-                Text("${category.label} · ${races.size} events", style = MaterialTheme.typography.bodyMedium, color = TextMed)
+                Text("${category.label} - ${races.size} events", style = MaterialTheme.typography.bodyMedium, color = TextMed)
                 if (weeks.size > 1) {
                     Spacer(Modifier.height(14.dp))
                     Row(

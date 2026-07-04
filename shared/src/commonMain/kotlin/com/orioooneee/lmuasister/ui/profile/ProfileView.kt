@@ -445,7 +445,7 @@ private fun ManufacturerMark(manufacturer: String?, logoUrl: String?) {
             )
         } else {
             Text(
-                manufacturer?.firstOrNull()?.uppercaseChar()?.toString() ?: "—",
+                manufacturer?.firstOrNull()?.uppercaseChar()?.toString() ?: "-",
                 style = MaterialTheme.typography.titleMedium,
                 color = TextMed,
                 fontWeight = FontWeight.Black,
@@ -703,7 +703,7 @@ private fun RatingCard(label: String, rating: RatingDto?, modifier: Modifier = M
     ) {
         Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = TextLow)
         if (rating == null) {
-            Text("—", style = MaterialTheme.typography.titleLarge, color = TextMed)
+            Text("-", style = MaterialTheme.typography.titleLarge, color = TextMed)
             return@Column
         }
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -798,7 +798,7 @@ internal fun RaceHistoryRow(race: RecentRaceDto) {
                 race.track?.let {
                     Text(it, style = MaterialTheme.typography.labelMedium, color = TextMed, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                if (race.sessions == null) race.bestLapMs?.let { MetaChip("⏱ ${formatLap(it)}") }
+                if (race.sessions == null) race.bestLapMs?.let { MetaChip("Lap ${formatLap(it)}") }
             }
             SessionsBreakdown(race.sessions, includeRace = finished)
         }
@@ -927,7 +927,7 @@ private fun GridToFinish(grid: Int?, finish: Int?) {
         gained < 0 -> NegRed
         else -> TextMed
     }
-    Text("$grid→$finish", style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.SemiBold)
+    Text("$grid->$finish", style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.SemiBold)
 }
 
 
@@ -966,7 +966,7 @@ private fun PositionBadge(position: Int, subtitle: String?, finishStatus: String
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                if (position > 0) position.toString() else "—",
+                if (position > 0) position.toString() else "-",
                 style = MaterialTheme.typography.titleLarge,
                 color = if (onPodium) onBadgeText(podium) else TextHigh,
                 fontWeight = FontWeight.Black,
@@ -1040,15 +1040,15 @@ private fun DeltaText(label: String, delta: Double?) {
         delta < 0 -> NegRed
         else -> TextMed
     }
-    val arrow = when {
-        delta > 0 -> "▲"
-        delta < 0 -> "▼"
-        else -> "•"
+    val value = when {
+        delta > 0 -> "+ ${formatDelta(delta)}"
+        delta < 0 -> "- ${formatDelta(delta)}"
+        else -> formatDelta(delta)
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = TextLow)
         Text(
-            "$arrow ${formatDelta(delta)}",
+            value,
             style = MaterialTheme.typography.labelMedium,
             color = color,
             fontWeight = FontWeight.Bold,

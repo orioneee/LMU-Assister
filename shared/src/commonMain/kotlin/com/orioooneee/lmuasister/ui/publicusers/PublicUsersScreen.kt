@@ -114,7 +114,7 @@ fun PublicUsersScreen(
         when (val s = state) {
             PublicUsersUiState.Loading -> ProfileSkeleton()
             is PublicUsersUiState.Error -> EmptyState(
-                title = "Couldn’t load drivers",
+                title = "Could not load drivers",
                 subtitle = s.message,
                 accent = MaterialTheme.colorScheme.error,
                 actionLabel = "Retry",
@@ -643,7 +643,7 @@ fun PublicUserTrackBreakdownScreen(
         is PublicUserDetailUiState.Error -> Column(Modifier.fillMaxSize().background(Carbon)) {
             Spacer(Modifier.height(insets.calculateTopPadding() + 48.dp))
             EmptyState(
-                title = "Couldn’t load tracks",
+                title = "Could not load tracks",
                 subtitle = s.message,
                 accent = MaterialTheme.colorScheme.error,
                 modifier = Modifier.fillMaxSize(),

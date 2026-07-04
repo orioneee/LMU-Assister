@@ -70,7 +70,7 @@ data class GameVersionDto(
 @Serializable
 data class TrackBreakdownDto(
     @SerialName("track_id") val trackId: String? = null,   // per-layout asset id → opens track detail
-    val track: String = "—",
+    val track: String = "-",
     @SerialName("length_km") val lengthKm: Double? = null,
     @SerialName("num_turns") val numTurns: Int? = null,
     // Absolute CDN (R2) asset URLs — sent flat in each breakdown row, loaded directly.

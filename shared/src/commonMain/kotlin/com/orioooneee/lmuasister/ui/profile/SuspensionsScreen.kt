@@ -109,7 +109,7 @@ fun SuspensionsScreen(
 private fun EmptyState(active: Boolean) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("✓", style = MaterialTheme.typography.displaySmall, color = PosGreen, fontWeight = FontWeight.Black)
+            Text("OK", style = MaterialTheme.typography.displaySmall, color = PosGreen, fontWeight = FontWeight.Black)
             Text(
                 stringResource(if (active) Res.string.susp_empty_active else Res.string.susp_empty_past),
                 style = MaterialTheme.typography.titleMedium,

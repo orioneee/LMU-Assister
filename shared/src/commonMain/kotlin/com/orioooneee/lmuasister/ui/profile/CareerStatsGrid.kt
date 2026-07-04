@@ -77,9 +77,9 @@ private data class StatCell(
     val display: String? = null,
 )
 
-/** Whole-percent share, e.g. 5 of 13 → "38%". "—" when there's nothing to divide by. */
+/** Whole-percent share, e.g. 5 of 13 -> "38%". "-" when there's nothing to divide by. */
 private fun pctOf(part: Int, whole: Int): String =
-    if (whole <= 0) "—" else "${(part * 100 + whole / 2) / whole}%"
+    if (whole <= 0) "-" else "${(part * 100 + whole / 2) / whole}%"
 
 private const val COLUMNS = 3
 
@@ -107,7 +107,7 @@ fun CareerStatsGrid(
         StatCell("PODIUMS", totals.podiums, Amber, StatCategory.Podiums),
         StatCell("FAST LAPS", totals.fastestLaps, ClassMixed, StatCategory.FastestLaps),
         StatCell("TOP 5", totals.top5, ClassLmp2, StatCategory.Top5),
-        StatCell("POLE→WIN", totals.polesConverted, ClassGt3, StatCategory.PolesConverted, display = pctOf(totals.polesConverted, totals.polePositions)),
+        StatCell("POLE->WIN", totals.polesConverted, ClassGt3, StatCategory.PolesConverted, display = pctOf(totals.polesConverted, totals.polePositions)),
         StatCell("WIN W/O POLE", totals.winsNoPole, ClassLmp3, StatCategory.WinsNoPole),
         StatCell("DNF", totals.dnfs, SkillPro, StatCategory.Dnf),
     ).filter { cell ->
@@ -171,7 +171,7 @@ private fun RatingStatTile(label: String, rating: RatingDto?, modifier: Modifier
             maxLines = 1,
         )
         if (rating == null) {
-            Text("—", style = MaterialTheme.typography.titleLarge, color = TextMed)
+            Text("-", style = MaterialTheme.typography.titleLarge, color = TextMed)
             return@Column
         }
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

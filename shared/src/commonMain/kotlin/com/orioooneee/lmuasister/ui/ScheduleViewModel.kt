@@ -101,7 +101,7 @@ class ScheduleViewModel(
                 fetchWeek(selected)
                 prefetchOtherWeeks()
             } else if (_state.value !is ScheduleUiState.Success) {
-                _state.value = ScheduleUiState.Error("Network error — could not load schedule")
+                _state.value = ScheduleUiState.Error("Network error - could not load schedule")
                 Telemetry.log(AnalyticsEvent.ScheduleError("network"))
                 Telemetry.recordError(TelemetryError("schedule_refresh_failed"), "stage" to "refresh")
             }
@@ -118,7 +118,7 @@ class ScheduleViewModel(
             .onFailure {
                 Telemetry.recordError(it, "stage" to "fetch_week", "week" to (key ?: "current"))
                 if (_state.value !is ScheduleUiState.Success) {
-                    _state.value = ScheduleUiState.Error(it.message ?: "Network error — could not load schedule")
+                    _state.value = ScheduleUiState.Error(it.message ?: "Network error - could not load schedule")
                     Telemetry.log(AnalyticsEvent.ScheduleError("network"))
                 }
             }
