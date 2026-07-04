@@ -15,6 +15,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 private const val WEB_APP_TOKEN_KEY = "web_companion_app_token"
+private const val WEB_STEAM_SESSION_KEY = "web_companion_steam_session"
 private const val APPROVAL_WAIT_SECONDS = 15
 
 private val CompanionJson = Json {
@@ -71,11 +72,26 @@ internal class WebCompanionSteamSignIn(
     override suspend fun restore(): String? =
         LocalCache.read(WEB_APP_TOKEN_KEY)?.takeIf { it.isNotBlank() }
 
-    override suspend fun reauth(): String? = null
+    override suspend fun reauth(): String? {
+        val session = readSteamSession() ?: return null
+        val response = companionPost(
+            "/api/ticket",
+            TicketRequest(
+                appId = LMU_APP_ID,
+                steamSession = session,
+            ),
+        )
+        if (response.status == "session_invalid") {
+            LocalCache.remove(WEB_STEAM_SESSION_KEY)
+            return null
+        }
+        return (response.exchangeTicket() as? SignInOutcome.Success)?.appToken
+    }
 
     override fun signOut() {
         activeFlowId = null
         LocalCache.remove(WEB_APP_TOKEN_KEY)
+        LocalCache.remove(WEB_STEAM_SESSION_KEY)
     }
 
     private suspend inline fun <reified T> companionPost(path: String, body: T): CompanionResponse =
@@ -142,11 +158,18 @@ internal class WebCompanionSteamSignIn(
             val auth = backend.authSteam(ticket)
             activeFlowId = null
             LocalCache.write(WEB_APP_TOKEN_KEY, auth.token)
+            steamSession?.let { LocalCache.write(WEB_STEAM_SESSION_KEY, CompanionJson.encodeToString(it)) }
             SignInOutcome.Success(auth.token, auth.uid)
         } catch (t: Throwable) {
             SignInOutcome.Failure(t.message ?: "Steam ticket exchange failed")
         }
     }
+
+    private fun readSteamSession(): SteamSessionPayload? =
+        LocalCache.read(WEB_STEAM_SESSION_KEY)
+            ?.takeIf { it.isNotBlank() }
+            ?.let { raw -> runCatching { CompanionJson.decodeFromString<SteamSessionPayload>(raw) }.getOrNull() }
+            ?.takeIf { it.steamId.isNotBlank() && it.refreshToken.isNotBlank() }
 
     private fun String?.toSteamGuardKind(): SteamGuardKind =
         when (this?.lowercase()) {
@@ -187,6 +210,20 @@ private data class QrStatusRequest(
 )
 
 @Serializable
+private data class TicketRequest(
+    val appId: Int,
+    val steamSession: SteamSessionPayload,
+)
+
+@Serializable
+private data class SteamSessionPayload(
+    val steamId: String = "",
+    val accountName: String = "",
+    val accessToken: String = "",
+    val refreshToken: String = "",
+)
+
+@Serializable
 private data class CompanionResponse(
     val status: String,
     val flowId: String? = null,
@@ -199,4 +236,5 @@ private data class CompanionResponse(
     val appId: Int? = null,
     val ticketHex: String? = null,
     val ticketBytes: Int? = null,
+    val steamSession: SteamSessionPayload? = null,
 )

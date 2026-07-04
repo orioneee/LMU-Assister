@@ -4,6 +4,7 @@ import bruhcollective.itaysonlab.ksteam.SteamClient
 import bruhcollective.itaysonlab.ksteam.handlers.Account
 import bruhcollective.itaysonlab.ksteam.kSteam
 import bruhcollective.itaysonlab.ksteam.models.AppId
+import bruhcollective.itaysonlab.ksteam.models.SteamId
 import bruhcollective.itaysonlab.ksteam.models.account.AuthorizationState
 import bruhcollective.itaysonlab.ksteam.models.enums.EGamingDeviceType
 import bruhcollective.itaysonlab.ksteam.models.enums.EOSType
@@ -97,6 +98,12 @@ fun main(args: Array<String>) {
             service.waitForQr(req).respond(exchange)
         }
     }
+    server.createContext("/api/ticket") { exchange ->
+        exchange.requirePost {
+            val req = exchange.readJson<TicketRequest>()
+            service.mintTicket(req).respond(exchange)
+        }
+    }
     server.createContext("/api/status") { exchange ->
         val flowId = exchange.query()["flowId"].orEmpty()
         service.status(flowId).respond(exchange)
@@ -116,7 +123,7 @@ fun main(args: Array<String>) {
     server.start()
 
     println("jvm-minter listening on http://127.0.0.1:$port/ui/")
-    println("API: POST /api/login, /api/guard, /api/approval, /api/qr/start, /api/qr/status; GET /api/status?flowId=...")
+    println("API: POST /api/login, /api/guard, /api/approval, /api/qr/start, /api/qr/status, /api/ticket; GET /api/status?flowId=...")
 }
 
 private fun healthResponse(): ApiResponse =
@@ -166,6 +173,22 @@ private class TicketMinterService {
         val waitSeconds = (req.waitSeconds ?: 15).coerceIn(1, APPROVAL_WAIT_SECONDS)
         flow(req.flowId)?.waitForQr(waitSeconds)
             ?: ApiResponse(status = "error", message = "flow not found")
+    }
+
+    fun mintTicket(req: TicketRequest): ApiResponse = runBlocking {
+        cleanup()
+        val session = req.steamSession
+            ?: return@runBlocking ApiResponse(status = "session_invalid", message = "steamSession is required")
+        val flow = AuthFlow(
+            id = UUID.randomUUID().toString(),
+            appId = req.appId ?: DEFAULT_APP_ID,
+            rootDir = minterRoot().resolve(UUID.randomUUID().toString()),
+        )
+        try {
+            flow.mintFromSession(session)
+        } finally {
+            flow.close()
+        }
     }
 
     fun status(flowId: String): ApiResponse = runBlocking {
@@ -218,7 +241,7 @@ private class AuthFlow(
         qrCode = null
         lastMessage = "signing in"
         val authResult = runCatching {
-            client.account.signIn(username.trim(), password, rememberSession = false)
+            client.account.signIn(username.trim(), password, rememberSession = true)
         }.getOrElse {
             closeClient()
             return@withLock ApiResponse(status = "error", flowId = id, message = it.message ?: "Steam sign-in failed")
@@ -258,6 +281,77 @@ private class AuthFlow(
         qrUrl = qr.data
         qrCode = qr.data.toSteamQrDisplayCode()
         qrResponse()
+    }
+
+    suspend fun mintFromSession(session: SteamSessionPayload): ApiResponse = mutex.withLock {
+        val steamId = session.steamId.trim().toULongOrNull()
+            ?: return@withLock ApiResponse(
+                status = "session_invalid",
+                flowId = id,
+                appId = appId,
+                message = "Steam session steamId is missing",
+            )
+        val refreshToken = session.refreshToken.trim()
+        if (refreshToken.isBlank()) {
+            return@withLock ApiResponse(
+                status = "session_invalid",
+                flowId = id,
+                appId = appId,
+                message = "Steam session refreshToken is missing",
+            )
+        }
+
+        val client = startedClient()
+        qrUrl = null
+        qrCode = null
+        lastMessage = "restoring Steam session"
+
+        val restoreStarted = runCatching {
+            client.account.signInWithRefreshToken(
+                steamId = SteamId(steamId),
+                refreshToken = refreshToken,
+            )
+            true
+        }.getOrElse {
+            if (client.account.clientAuthState.value is AuthorizationState.Success) true
+            else {
+                closeClient()
+                return@withLock ApiResponse(
+                    status = "session_invalid",
+                    flowId = id,
+                    appId = appId,
+                    message = it.message ?: "Steam refresh session is invalid",
+                )
+            }
+        }
+
+        if (!restoreStarted) {
+            closeClient()
+            return@withLock ApiResponse(
+                status = "session_invalid",
+                flowId = id,
+                appId = appId,
+                message = "Steam refresh session could not be restored",
+            )
+        }
+
+        val signedIn = client.account.clientAuthState.value is AuthorizationState.Success ||
+            withTimeoutOrNull(LOGIN_WAIT_MS) {
+                client.account.clientAuthState.filterIsInstance<AuthorizationState.Success>().first()
+                true
+            } == true
+
+        if (!signedIn) {
+            closeClient()
+            return@withLock ApiResponse(
+                status = "session_invalid",
+                flowId = id,
+                appId = appId,
+                message = "Steam refresh session expired. Sign in again.",
+            )
+        }
+
+        mintTicket(client)
     }
 
     suspend fun submitGuard(code: String): ApiResponse = mutex.withLock {
@@ -377,6 +471,7 @@ private class AuthFlow(
             appId = appId,
             ticketHex = ticket.hex(),
             ticketBytes = ticket.size,
+            steamSession = client.steamSessionPayloadOrNull(),
             message = "Steam auth session ticket minted",
         )
         completed = response
@@ -463,7 +558,21 @@ private data class QrStatusRequest(
 )
 
 @Serializable
+private data class TicketRequest(
+    val appId: Int? = null,
+    val steamSession: SteamSessionPayload? = null,
+)
+
+@Serializable
 private data class FlowRequest(val flowId: String = "")
+
+@Serializable
+private data class SteamSessionPayload(
+    val steamId: String = "",
+    val accountName: String = "",
+    val accessToken: String = "",
+    val refreshToken: String = "",
+)
 
 @Serializable
 private data class ApiResponse(
@@ -478,6 +587,7 @@ private data class ApiResponse(
     val appId: Int? = null,
     val ticketHex: String? = null,
     val ticketBytes: Int? = null,
+    val steamSession: SteamSessionPayload? = null,
 )
 
 private fun ApiResponse.respond(exchange: HttpExchange) {
@@ -561,6 +671,23 @@ private fun HttpExchange.addCorsHeaders() {
 
 private fun ByteArray.hex(): String = joinToString("") { "%02x".format(it) }
 
+private fun SteamClient.steamSessionPayloadOrNull(): SteamSessionPayload? =
+    runCatching {
+        val current = account.getCurrentAccount() ?: return@runCatching null
+        val steamId = configuration.getValidSecureAccountIds()
+            .firstOrNull()
+            ?.toString()
+            ?: return@runCatching null
+        val refreshToken = current.refreshToken.takeIf { it.isNotBlank() }
+            ?: return@runCatching null
+        SteamSessionPayload(
+            steamId = steamId,
+            accountName = current.accountName,
+            accessToken = current.accessToken,
+            refreshToken = refreshToken,
+        )
+    }.getOrNull()
+
 private fun String.toSteamQrDisplayCode(): String? =
     trim()
         .trimEnd('/')
@@ -620,7 +747,9 @@ private fun uiHtml(port: Int): String =
         section { border: 1px solid #2b333c; background: #171c21; border-radius: 8px; padding: 16px; }
         .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
         label { display: grid; gap: 6px; color: #b8c3cc; font-size: 13px; }
-        input { height: 40px; border-radius: 6px; border: 1px solid #343d47; background: #0f1317; color: #f5f7fa; padding: 0 10px; font: inherit; }
+        input, textarea { border-radius: 6px; border: 1px solid #343d47; background: #0f1317; color: #f5f7fa; padding: 0 10px; font: inherit; }
+        input { height: 40px; }
+        textarea { min-height: 92px; padding: 10px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
         button { height: 42px; border: 0; border-radius: 6px; background: #e7b84e; color: #15100a; font-weight: 800; cursor: pointer; padding: 0 14px; }
         button.secondary { background: #2a333d; color: #edf1f5; }
         button:disabled { opacity: .48; cursor: default; }
@@ -643,6 +772,7 @@ private fun uiHtml(port: Int): String =
             <label>Password <input id="password" type="password" autocomplete="current-password"></label>
             <label>Steam Guard code <input id="code" inputmode="numeric" placeholder="optional"></label>
             <label>App ID <input id="appId" value="$DEFAULT_APP_ID"></label>
+            <label class="full">Steam session JSON <textarea id="steamSession" placeholder="Filled after successful login; paste it here to mint from refresh session"></textarea></label>
           </div>
           <div class="row">
             <button id="loginBtn">Login / mint</button>
@@ -650,6 +780,7 @@ private fun uiHtml(port: Int): String =
             <button id="approvalBtn" class="secondary">Check approval</button>
             <button id="qrBtn" class="secondary">Start QR</button>
             <button id="qrStatusBtn" class="secondary">Check QR</button>
+            <button id="ticketBtn" class="secondary">Mint from session</button>
             <button id="statusBtn" class="secondary">Status</button>
             <button id="cancelBtn" class="secondary">Cancel</button>
           </div>
@@ -667,8 +798,16 @@ private fun uiHtml(port: Int): String =
         const qrCode = document.getElementById("qrCode");
         const qrUrl = document.getElementById("qrUrl");
         const val = id => document.getElementById(id).value;
+        const appId = () => Number(val("appId") || $DEFAULT_APP_ID);
+        const parseSteamSession = () => {
+          const raw = val("steamSession").trim();
+          return raw ? JSON.parse(raw) : null;
+        };
         const print = data => {
           if (data.flowId) flowId = data.flowId;
+          if (data.steamSession) {
+            document.getElementById("steamSession").value = JSON.stringify(data.steamSession, null, 2);
+          }
           if (data.qrUrl) {
             qrBox.style.display = "block";
             qrCode.textContent = data.qrCode || "QR";
@@ -686,12 +825,13 @@ private fun uiHtml(port: Int): String =
           username: val("username"),
           password: val("password"),
           guardCode: val("code") || null,
-          appId: Number(val("appId") || $DEFAULT_APP_ID)
+          appId: appId()
         });
         document.getElementById("guardBtn").onclick = () => post("/api/guard", { flowId, code: val("code") });
         document.getElementById("approvalBtn").onclick = () => post("/api/approval", { flowId, waitSeconds: 10 });
-        document.getElementById("qrBtn").onclick = () => post("/api/qr/start", { appId: Number(val("appId") || $DEFAULT_APP_ID) });
+        document.getElementById("qrBtn").onclick = () => post("/api/qr/start", { appId: appId() });
         document.getElementById("qrStatusBtn").onclick = () => post("/api/qr/status", { flowId, waitSeconds: 10 });
+        document.getElementById("ticketBtn").onclick = () => post("/api/ticket", { appId: appId(), steamSession: parseSteamSession() });
         document.getElementById("statusBtn").onclick = async () => {
           const r = await fetch("/api/status?flowId=" + encodeURIComponent(flowId));
           print(await r.json());

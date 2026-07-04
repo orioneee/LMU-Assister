@@ -1,0 +1,59 @@
+name: Deploy to Web
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-to-web
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build WASM web app
+        run: ./gradlew :webApp:wasmJsBrowserDistribution
+
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_deploy_key
+          chmod 600 ~/.ssh/vps_deploy_key
+          ssh-keyscan -p "${VPS_PORT:-22}" "$VPS_HOST" >> ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host vps
+            HostName $VPS_HOST
+            User ${VPS_USER:-ubuntu}
+            Port ${VPS_PORT:-22}
+            IdentityFile ~/.ssh/vps_deploy_key
+            StrictHostKeyChecking yes
+          EOF
+
+      - name: Deploy web files
+        run: |
+          set -euo pipefail
+          ssh vps 'mkdir -p "$HOME/LMUAssisterWeb"'
+          rsync -az --delete webApp/build/dist/wasmJs/productionExecutable/ vps:~/LMUAssisterWeb/
