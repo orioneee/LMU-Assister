@@ -35,4 +35,5 @@ plugins {
 
 include(":androidApp")
 include(":desktopApp")
+include(":jvm-minter")
 include(":shared")
