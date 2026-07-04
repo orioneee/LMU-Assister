@@ -47,6 +47,13 @@ jobs:
       - name: Build WASM web app
         run: ./gradlew :webApp:wasmJsBrowserDistribution
 
+      - name: Verify web distribution
+        run: |
+          set -euo pipefail
+          test -f webApp/build/dist/wasmJs/productionExecutable/index.html
+          test -f webApp/build/dist/wasmJs/productionExecutable/webApp.js
+          test -f webApp/build/dist/wasmJs/productionExecutable/composeResources/lmuassister.shared.generated.resources/values/strings.commonMain.cvr
+
       - name: Configure SSH
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -72,5 +79,7 @@ jobs:
       - name: Deploy web files
         run: |
           set -euo pipefail
-          ssh vps 'mkdir -p "$HOME/LMUAssisterWeb"'
-          rsync -az --delete webApp/build/dist/wasmJs/productionExecutable/ vps:~/LMUAssisterWeb/
+          ssh vps 'sudo mkdir -p /var/www/LMUAssisterWeb && sudo chown -R "${USER:-ubuntu}:www-data" /var/www/LMUAssisterWeb'
+          rsync -az --delete webApp/build/dist/wasmJs/productionExecutable/ vps:/var/www/LMUAssisterWeb/
+          ssh vps 'sudo find /var/www/LMUAssisterWeb -type d -exec chmod 755 {} \; && sudo find /var/www/LMUAssisterWeb -type f -exec chmod 644 {} \;'
+          ssh vps 'test -f /var/www/LMUAssisterWeb/composeResources/lmuassister.shared.generated.resources/values/strings.commonMain.cvr'

@@ -47,6 +47,13 @@ jobs:
       - name: Build WASM web app
         run: ./gradlew :webApp:wasmJsBrowserDistribution
 
+      - name: Verify web distribution
+        run: |
+          set -euo pipefail
+          test -f webApp/build/dist/wasmJs/productionExecutable/index.html
+          test -f webApp/build/dist/wasmJs/productionExecutable/webApp.js
+          test -f webApp/build/dist/wasmJs/productionExecutable/composeResources/lmuassister.shared.generated.resources/values/strings.commonMain.cvr
+
       - name: Upload web artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
