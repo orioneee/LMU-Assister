@@ -82,6 +82,7 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
           BUILD_RESULT: ${{ needs.build.result }}
         run: |
@@ -90,11 +91,11 @@ jobs:
           if [ "$BUILD_RESULT" != "success" ]; then
             notes="${notes}"$'\n\n'"Build matrix result: ${BUILD_RESULT}. This release contains the artifacts that were produced successfully."
           fi
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" release-assets/* --clobber
-            gh release edit "$TAG" --notes "$notes"
+          if gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-assets/* --clobber --repo "$GH_REPO"
+            gh release edit "$TAG" --notes "$notes" --repo "$GH_REPO"
           else
-            gh release create "$TAG" release-assets/* \
+            gh release create "$TAG" release-assets/* --repo "$GH_REPO" \
               --title "LMU Assister Minter $TAG" \
               --notes "$notes"
           fi
