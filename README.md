@@ -2,11 +2,11 @@
 
 # 🏁 LMU Assister
 
-**A companion app for [Le Mans Ultimate](https://www.lemansultimate.com/) — schedule, tracks, public driver profiles, leaderboards and your own driver profile, on every platform from one Kotlin codebase.**
+**A companion app for [Le Mans Ultimate](https://www.lemansultimate.com/) — schedule, tracks, public driver profiles, leaderboards and your own driver profile on Android, iOS, Desktop and Web from one Kotlin codebase.**
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.4.0-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.11.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
-[![Platforms](https://img.shields.io/badge/platforms-Android%20%7C%20iOS%20%7C%20Desktop-2ea44f)](#-platforms)
+[![Platforms](https://img.shields.io/badge/platforms-Android%20%7C%20iOS%20%7C%20Desktop%20%7C%20Web-2ea44f)](#-platforms)
 [![Android](https://img.shields.io/badge/minSdk-24-3DDC84?logo=android&logoColor=white)](#-running-the-apps)
 [![Ktor](https://img.shields.io/badge/Ktor-3.5.1-087CFA?logo=ktor&logoColor=white)](https://ktor.io)
 [![Koin](https://img.shields.io/badge/DI-Koin%204.2.2-orange)](https://insert-koin.io)
@@ -15,11 +15,17 @@
 
 ---
 
-## LMU Minter install
+## 🌐 Web Steam Sign-In Helper
 
-LMU Assister Web uses a tiny local Steam sign-in helper. It is installed per-user,
-starts on login, and ships with its own runtime, so Java does not need to be
-installed separately.
+LMU Assister Web runs in the browser, so it cannot talk to Steam directly. Steam
+sign-in is delegated to a tiny local JVM minter that runs on `127.0.0.1:8787`,
+mints a short-lived Steam ticket locally, and sends only that ticket to the
+backend. The helper is installed per-user, starts on login, and ships with its
+own runtime, so Java does not need to be installed separately.
+
+On first web sign-in, the browser may ask for permission to access apps and
+services on this device. LMU Assister uses that permission only to reach the
+local minter.
 
 macOS / Linux:
 
@@ -36,6 +42,36 @@ irm https://raw.githubusercontent.com/orioneee/LMU-Assister/main/install/minter/
 Installer sources: [install.sh](install/minter/install.sh) and
 [install.ps1](install/minter/install.ps1). Health check:
 `http://127.0.0.1:8787/health`.
+
+Uninstall macOS:
+
+```bash
+launchctl unload -w "$HOME/Library/LaunchAgents/com.lmu-assister.minter.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.lmu-assister.minter.plist"
+rm -rf "$HOME/Library/Application Support/LMU Assister/Minter"
+```
+
+Uninstall Linux:
+
+```bash
+systemctl --user disable --now lmu-minter.service 2>/dev/null || true
+rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/lmu-minter.service"
+systemctl --user daemon-reload 2>/dev/null || true
+rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/lmu-minter.desktop"
+pkill -f 'lmu-assister/minter/bin/lmu-minter' 2>/dev/null || true
+rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/lmu-assister/minter"
+```
+
+Uninstall Windows PowerShell:
+
+```powershell
+Stop-ScheduledTask -TaskName "LMU Assister Minter" -ErrorAction SilentlyContinue
+Unregister-ScheduledTask -TaskName "LMU Assister Minter" -Confirm:$false -ErrorAction SilentlyContinue
+Remove-Item "$env:LOCALAPPDATA\LMU Assister\Minter" -Recurse -Force -ErrorAction SilentlyContinue
+```
+
+If you installed with a custom `LMU_MINTER_HOME`, remove that directory instead
+of the default install path.
 
 ---
 
@@ -75,31 +111,37 @@ Installer sources: [install.sh](install/minter/install.sh) and
 | **Android** | ✅ | On-device (kSteam) |
 | **Desktop (JVM)** | ✅ | On-device (kSteam) |
 | **iOS** | ✅ | On-device (kSteam) |
+| **Web (WASM)** | ✅ | Browser + local JVM minter |
 
 > **Android, iOS & Desktop** sign in to Steam **on-device** through the shared kSteam flow: your credentials never leave the machine — only a short-lived Steam Web API ticket is sent to the backend, which exchanges it for a game-data session. Session tokens are persisted securely per platform (Android `EncryptedSharedPreferences`, iOS **Keychain**, JVM a local file).
+>
+> **Web** uses the local JVM minter for the same ticket-minting step, because browsers cannot open the Steam network flow directly. The web app checks local-network permission and minter health before showing the login form.
 
 ## 🔐 Security & privacy
 
 - **Android, iOS & Desktop — credentials never leave your device.** kSteam performs the whole Steam login locally; only a short-lived Steam Web API ticket is sent to the backend (exchanged for a game-data session). Your password and 2FA code never touch the network beyond Steam itself.
+- **Web — Steam auth stays local through the minter.** The browser talks to `127.0.0.1:8787`, where the local JVM minter performs Steam sign-in and ticket minting. If the browser permission is missing or the minter is offline, the login form is gated until the user fixes that environment.
 - **Steam refresh tokens stay on your device, encrypted** (Android `EncryptedSharedPreferences`, iOS Keychain, JVM a local file). The backend stores only game-backend session tokens tied to your game-account id — never your Steam password or 2FA.
 - **No ads.** Public content (schedule, tracks, public drivers, leaderboards) is read through a shared service account, so browsing needs no sign-in; only your own data (profile, ratings, history, your leaderboard row) requires it.
 - The full policy is available here: https://www.lmu-assister.com/privacy/
-- **Telemetry is platform-scoped.** Android and iOS wire common analytics/non-fatal events into Firebase Analytics + Crashlytics; Desktop leaves telemetry as a no-op.
+- **Telemetry is platform-scoped.** Android and iOS wire common analytics/non-fatal events into Firebase Analytics + Crashlytics; Web wires common analytics events into Firebase Analytics; Desktop leaves telemetry as a no-op.
 
 ## 🧱 Tech stack
 
 | Concern | Library |
 | --- | --- |
 | UI | Compose Multiplatform 1.11.1 |
+| Web target | Kotlin/Wasm + Compose browser executable |
 | Navigation | `navigation-compose` 2.9.2 (type-safe routes) |
 | Networking | Ktor 3.5.1 (OkHttp / Darwin / CIO engines) |
 | Serialization | `kotlinx.serialization` 1.11.0 (snake_case ↔ camelCase) |
 | DI | Koin 4.2.2 |
 | Steam auth | kSteam r67 |
+| Web auth helper | `:jvm-minter` local JVM companion |
 | Images | Coil 3.5.0 (+ SVG) |
 | Pagination | AndroidX Paging 3.5.0 (multiplatform) |
 | Secure storage | `androidx.security.crypto` / iOS Keychain |
-| Telemetry | Firebase Analytics + Crashlytics on Android/iOS; no-op on Desktop |
+| Telemetry | Firebase Analytics + Crashlytics on Android/iOS; Firebase Analytics on Web; no-op on Desktop |
 
 ## 🚀 Running the apps
 
@@ -124,6 +166,8 @@ Toggles:
 - `backend.url` **unset** → mock on (falls back to `http://localhost:8000/api/v2` for the URL, but no network is hit).
 - `backend.mock=true|false` → force mock on/off regardless of `backend.url` (e.g. run the real URL but with mock data, or vice-versa).
 - `demo.username` / `demo.password` → optional app-review/demo login credentials for `/auth/demo`; leave unset for normal Steam auth.
+- `companion.url` → optional web minter URL; defaults to `http://127.0.0.1:8787`.
+- `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`, `measurementId` → optional Firebase Web Analytics config.
 
 ### 2. Run
 
@@ -132,12 +176,16 @@ Toggles:
 | **Android** | `./gradlew :androidApp:assembleDebug` (or run from the IDE) |
 | **Desktop** | `./gradlew :desktopApp:run` — hot reload: `./gradlew :desktopApp:hotRun --auto` |
 | **iOS** | open `iosApp/` in Xcode and run, or use the KMP run configuration |
+| **Web dev server** | `./gradlew :webApp:wasmJsBrowserDevelopmentRun` |
+| **Web production build** | `./gradlew :webApp:wasmJsBrowserDistribution` |
+| **Local minter** | `./gradlew :jvm-minter:run` |
 
 ## ⚙️ Requirements
 
 - JDK 21
 - Android SDK (compileSdk 37, minSdk 24)
 - Xcode (for the iOS target)
+- A modern Chromium-based browser for the Web/WASM app
 - Firebase config files for production telemetry builds (`androidApp/google-services.json`, iOS `GoogleService-Info.plist`)
 
 ---

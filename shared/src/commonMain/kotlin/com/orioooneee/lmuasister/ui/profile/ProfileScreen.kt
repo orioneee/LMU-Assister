@@ -55,6 +55,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -95,6 +96,7 @@ private val QrPaper = Color(0xFFFAF8F1)
 private val DangerRed = Color(0xFFE5484D)
 private const val STEAM_GUARD_APPROVAL_SECONDS = 120
 private const val STEAM_QR_SECONDS = 120
+private const val MINTER_INSTALL_URL = "https://www.lmu-assister.com/#minter-install"
 
 @Composable
 fun ProfileScreen(
@@ -153,6 +155,7 @@ fun ProfileScreen(
     val approvalTimerStart = pendingApproval?.expiresIn?.takeIf { it > 0 } ?: STEAM_GUARD_APPROVAL_SECONDS
     val qrTimerStart = pendingQr?.expiresIn?.takeIf { it > 0 } ?: STEAM_QR_SECONDS
     val lifecycleOwner = LocalLifecycleOwner.current
+    val uriHandler = LocalUriHandler.current
     val onQrSignInClick = {
         if (privacyAccepted) {
             qrPrivacyNotice = false
@@ -313,6 +316,7 @@ fun ProfileScreen(
                     minterUnavailable = minterUnavailable,
                     onGrantPermission = viewModel::grantLocalNetworkPermission,
                     onRetryMinter = viewModel::retryAuthEnvironmentCheck,
+                    onOpenMinterInstall = { runCatching { uriHandler.openUri(MINTER_INSTALL_URL) } },
                 )
             } else {
                 if (credentialFieldsVisible) {
@@ -559,6 +563,7 @@ private fun AuthEnvironmentGate(
     minterUnavailable: SteamLoginUiState.MinterUnavailable?,
     onGrantPermission: () -> Unit,
     onRetryMinter: () -> Unit,
+    onOpenMinterInstall: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -618,7 +623,7 @@ private fun AuthEnvironmentGate(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Start the JVM minter, then check again. Installation instructions will be linked here soon.",
+                    "Start the JVM minter, then check again. If it isn't installed yet, open the installation guide.",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMed,
                 )
@@ -631,6 +636,13 @@ private fun AuthEnvironmentGate(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(16.dp))
+                AuthGateButton(
+                    text = "Installation instructions",
+                    loading = false,
+                    enabled = true,
+                    onClick = onOpenMinterInstall,
+                )
+                Spacer(Modifier.height(10.dp))
                 AuthGateButton(
                     text = "Check again",
                     loading = false,

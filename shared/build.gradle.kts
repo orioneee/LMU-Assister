@@ -171,6 +171,21 @@ val generateBuildConfig by tasks.registering {
         val demoPass = props.getProperty("demo.password")?.trim().orEmpty()
         val companionUrl = props.getProperty("companion.url")?.trim()?.trimEnd('/')
             ?: "http://127.0.0.1:8787"
+        val firebaseApiKey = (props.getProperty("firebase.apiKey") ?: props.getProperty("apiKey")).orEmpty().trim()
+        val firebaseAuthDomain = (props.getProperty("firebase.authDomain") ?: props.getProperty("authDomain")).orEmpty().trim()
+        val firebaseProjectId = (props.getProperty("firebase.projectId") ?: props.getProperty("projectId")).orEmpty().trim()
+        val firebaseStorageBucket =
+            (props.getProperty("firebase.storageBucket") ?: props.getProperty("storageBucket")).orEmpty().trim()
+        val firebaseMessagingSenderId =
+            (props.getProperty("firebase.messagingSenderId") ?: props.getProperty("messagingSenderId")).orEmpty().trim()
+        val firebaseAppId = (props.getProperty("firebase.appId") ?: props.getProperty("appId")).orEmpty().trim()
+        val firebaseMeasurementId =
+            (props.getProperty("firebase.measurementId") ?: props.getProperty("measurementId")).orEmpty().trim()
+        val firebaseWebAnalyticsEnabled =
+            firebaseApiKey.isNotBlank() &&
+                firebaseProjectId.isNotBlank() &&
+                firebaseAppId.isNotBlank() &&
+                firebaseMeasurementId.isNotBlank()
         val pkgDir = outDir.get().asFile.resolve("com/orioooneee/lmuasister/config")
         pkgDir.mkdirs()
         pkgDir.resolve("BuildConfig.kt").writeText(
@@ -184,6 +199,14 @@ val generateBuildConfig by tasks.registering {
             |    const val DEMO_USERNAME: String = "$demoUser"
             |    const val DEMO_PASSWORD: String = "$demoPass"
             |    const val COMPANION_URL: String = "$companionUrl"
+            |    const val FIREBASE_WEB_ANALYTICS_ENABLED: Boolean = $firebaseWebAnalyticsEnabled
+            |    const val FIREBASE_WEB_API_KEY: String = "$firebaseApiKey"
+            |    const val FIREBASE_WEB_AUTH_DOMAIN: String = "$firebaseAuthDomain"
+            |    const val FIREBASE_WEB_PROJECT_ID: String = "$firebaseProjectId"
+            |    const val FIREBASE_WEB_STORAGE_BUCKET: String = "$firebaseStorageBucket"
+            |    const val FIREBASE_WEB_MESSAGING_SENDER_ID: String = "$firebaseMessagingSenderId"
+            |    const val FIREBASE_WEB_APP_ID: String = "$firebaseAppId"
+            |    const val FIREBASE_WEB_MEASUREMENT_ID: String = "$firebaseMeasurementId"
             |}
             |
             """.trimMargin(),
