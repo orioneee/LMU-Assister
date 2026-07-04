@@ -36,6 +36,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout kSteam fork
+        uses: actions/checkout@v4
+        with:
+          repository: orioneee/kSteam
+          ref: auth-session-tickets-pr
+          path: kSteam
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -45,8 +52,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Publish kSteam fork to Maven local
+        working-directory: kSteam
+        shell: bash
+        run: ./gradlew publishToMavenLocal --no-configuration-cache
+
       - name: Build minter distribution
-        run: ./gradlew :jvm-minter:installDist
+        shell: bash
+        run: ./gradlew :jvm-minter:installDist --no-configuration-cache
 
       - name: Package minter
         if: runner.os != 'Windows'
