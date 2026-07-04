@@ -19,10 +19,6 @@ jobs:
             platform: linux-x64
             archive: tar.gz
             package-script: scripts/ci/package_minter_unix.sh
-          - os: macos-13
-            platform: macos-x64
-            archive: zip
-            package-script: scripts/ci/package_minter_unix.sh
           - os: macos-14
             platform: macos-arm64
             archive: zip
