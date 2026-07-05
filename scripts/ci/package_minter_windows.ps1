@@ -79,16 +79,31 @@ foreach ($Module in @("jdk.crypto.ec", "java.security.jgss")) {
     --output "$WorkDir\runtime"
 
 @"
-@echo off
-set APP_HOME=%~dp0..
-"%APP_HOME%\runtime\bin\java.exe" -cp "%APP_HOME%\lib\*" $MainClass %*
-"@ | Set-Content -Encoding ASCII "$WorkDir\bin\lmu-minter.bat"
+Set fso = CreateObject("Scripting.FileSystemObject")
+Set shell = CreateObject("WScript.Shell")
+
+appHome = fso.GetParentFolderName(fso.GetParentFolderName(WScript.ScriptFullName))
+javaw = fso.BuildPath(appHome, "runtime\bin\javaw.exe")
+classpath = fso.BuildPath(appHome, "lib\*")
+args = ""
+
+For Each arg In WScript.Arguments
+    args = args & " " & Quote(arg)
+Next
+
+shell.CurrentDirectory = appHome
+shell.Run Quote(javaw) & " -cp " & Quote(classpath) & " $MainClass" & args, 0, False
+
+Function Quote(value)
+    Quote = Chr(34) & Replace(value, Chr(34), Chr(34) & Chr(34)) & Chr(34)
+End Function
+"@ | Set-Content -Encoding ASCII "$WorkDir\bin\lmu-minter.vbs"
 
 @"
 LMU Assister JVM Minter
 
 Run:
-  bin\lmu-minter.bat
+  wscript bin\lmu-minter.vbs
 
 The runtime directory is bundled. Java does not need to be installed separately.
 "@ | Set-Content -Encoding ASCII "$WorkDir\README.txt"

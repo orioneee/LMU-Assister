@@ -1,6 +1,115 @@
+param(
+    [switch]$SkipElevate
+)
+
 $ErrorActionPreference = "Stop"
 
 $Repo = "orioneee/LMU-Assister"
+$InstallerUrl = "https://raw.githubusercontent.com/$Repo/main/install/minter/install.ps1"
+$MainClass = "com.orioooneee.lmuasister.minter.MainKt"
+
+function Test-IsAdministrator {
+    $Identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    $Principal = [System.Security.Principal.WindowsPrincipal]::new($Identity)
+    return $Principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function ConvertTo-PowerShellLiteral {
+    param([AllowNull()][string]$Value)
+
+    if ($null -eq $Value) {
+        return "''"
+    }
+    return "'" + $Value.Replace("'", "''") + "'"
+}
+
+function Invoke-ElevatedInstaller {
+    if ($env:LMU_MINTER_NO_ELEVATE -eq "1") {
+        return
+    }
+    if (Test-IsAdministrator) {
+        return
+    }
+    if ($SkipElevate) {
+        throw "Administrator rights are required to install and register the LMU Minter scheduled task."
+    }
+
+    Write-Host "Requesting administrator rights to install LMU Minter..."
+
+    $Bootstrap = $null
+    if ($PSCommandPath) {
+        $ArgumentList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -SkipElevate"
+    } else {
+        $Bootstrap = Join-Path ([System.IO.Path]::GetTempPath()) ("lmu-minter-install-" + [System.Guid]::NewGuid().ToString("N") + ".ps1")
+        $Lines = @('$ErrorActionPreference = "Stop"')
+        foreach ($Name in @("LMU_MINTER_VERSION", "LMU_MINTER_PORT", "LMU_MINTER_HOME", "LMU_MINTER_NO_ELEVATE")) {
+            $Value = [System.Environment]::GetEnvironmentVariable($Name, "Process")
+            if (-not [string]::IsNullOrWhiteSpace($Value)) {
+                $Lines += ('Set-Item -Path {0} -Value {1}' -f (ConvertTo-PowerShellLiteral "Env:$Name"), (ConvertTo-PowerShellLiteral $Value))
+            }
+        }
+        $Lines += ('irm {0} | iex' -f (ConvertTo-PowerShellLiteral $InstallerUrl))
+        Set-Content -Encoding ASCII -Path $Bootstrap -Value $Lines
+        $ArgumentList = "-NoProfile -ExecutionPolicy Bypass -File `"$Bootstrap`""
+    }
+
+    try {
+        $PowerShell = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+        if ([string]::IsNullOrWhiteSpace($PowerShell)) {
+            $PowerShell = "powershell.exe"
+        }
+        $Process = Start-Process -FilePath $PowerShell -ArgumentList $ArgumentList -Verb RunAs -Wait -PassThru
+        if ($null -ne $Process.ExitCode -and $Process.ExitCode -ne 0) {
+            exit $Process.ExitCode
+        }
+        exit 0
+    } finally {
+        if ($Bootstrap -and (Test-Path $Bootstrap)) {
+            Remove-Item $Bootstrap -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Stop-ExistingMinterProcesses {
+    param([string]$Path)
+
+    $FullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd([System.IO.Path]::DirectorySeparatorChar)
+    $Processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+    foreach ($Process in $Processes) {
+        if ($Process.ProcessId -eq $PID -or [string]::IsNullOrWhiteSpace($Process.CommandLine)) {
+            continue
+        }
+        if ($Process.CommandLine.IndexOf($FullPath, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            continue
+        }
+
+        Write-Host "Stopping existing LMU Minter process $($Process.ProcessId)"
+        Stop-Process -Id $Process.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Remove-InstallDirectory {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        return
+    }
+
+    for ($Attempt = 1; $Attempt -le 5; $Attempt++) {
+        try {
+            Remove-Item $Path -Recurse -Force
+            return
+        } catch {
+            if ($Attempt -eq 5) {
+                throw
+            }
+            Start-Sleep -Seconds 1
+        }
+    }
+}
+
+Invoke-ElevatedInstaller
+
 $Version = $env:LMU_MINTER_VERSION
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version = "latest"
@@ -45,23 +154,33 @@ try {
     $ExistingTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
     if ($ExistingTask) {
         Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     }
 
-    if (Test-Path $InstallDir) {
-        Remove-Item $InstallDir -Recurse -Force
-    }
+    Stop-ExistingMinterProcesses -Path $InstallDir
+    Remove-InstallDirectory -Path $InstallDir
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
     Copy-Item -Path (Join-Path $SourceDir "*") -Destination $InstallDir -Recurse -Force
 
-    $Launcher = Join-Path $InstallDir "bin\lmu-minter.bat"
-    if (-not (Test-Path $Launcher)) {
-        throw "Launcher not found: $Launcher"
+    $JavaLauncher = Join-Path $InstallDir "runtime\bin\javaw.exe"
+    if (-not (Test-Path $JavaLauncher)) {
+        throw "Hidden Java launcher not found: $JavaLauncher"
     }
 
-    $Action = New-ScheduledTaskAction -Execute $Launcher -Argument "$Port" -WorkingDirectory $InstallDir
+    $Classpath = Join-Path $InstallDir "lib\*"
+    $TaskUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $Action = New-ScheduledTaskAction `
+        -Execute $JavaLauncher `
+        -Argument "-cp `"$Classpath`" $MainClass $Port" `
+        -WorkingDirectory $InstallDir
     $Trigger = New-ScheduledTaskTrigger -AtLogOn
+    $Principal = New-ScheduledTaskPrincipal `
+        -UserId $TaskUser `
+        -LogonType Interactive `
+        -RunLevel LeastPrivilege
     $Settings = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries `
+        -Hidden `
         -StartWhenAvailable `
         -RestartCount 3 `
         -RestartInterval (New-TimeSpan -Minutes 1)
@@ -70,6 +189,7 @@ try {
         -TaskName $TaskName `
         -Action $Action `
         -Trigger $Trigger `
+        -Principal $Principal `
         -Settings $Settings `
         -Description "Local Steam sign-in helper for LMU Assister Web." `
         -Force | Out-Null
