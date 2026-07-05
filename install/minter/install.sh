@@ -8,8 +8,7 @@ PORT="${LMU_MINTER_PORT:-8787}"
 progress() {
   percent="$1"
   shift
-  remaining=$((100 - percent))
-  printf '[%3s%% | %3s%% left] %s\n' "$percent" "$remaining" "$*"
+  printf '[%3s%%] %s\n' "$percent" "$*"
 }
 
 need() {

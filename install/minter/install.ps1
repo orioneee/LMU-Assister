@@ -21,6 +21,7 @@ $Script:InstallLogPath = if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
 } else {
     $null
 }
+$Script:InstallWriteConsole = [string]::IsNullOrWhiteSpace($Script:InstallLogPath)
 
 function Test-IsAdministrator {
     $Identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
@@ -61,9 +62,10 @@ function Write-InstallProgress {
     )
 
     $ClampedPercent = [Math]::Max(0, [Math]::Min(100, $Percent))
-    $Remaining = 100 - $ClampedPercent
-    $Line = "[{0,3}% | {1,3}% left] {2}" -f $ClampedPercent, $Remaining, $Message
-    Write-Host $Line
+    $Line = "[{0,3}%] {1}" -f $ClampedPercent, $Message
+    if ($Script:InstallWriteConsole) {
+        Write-Host $Line
+    }
     Add-InstallLogLine $Line
 }
 
@@ -72,7 +74,9 @@ function Write-InstallFailure {
 
     $Message = if ($ErrorRecord.Exception.Message) { $ErrorRecord.Exception.Message } else { $ErrorRecord.ToString() }
     $Line = "[ERROR] $Message"
-    Write-Host $Line -ForegroundColor Red
+    if ($Script:InstallWriteConsole) {
+        Write-Host $Line -ForegroundColor Red
+    }
     Add-InstallLogLine $Line
     Add-InstallLogLine ($ErrorRecord | Out-String)
 }
@@ -137,7 +141,7 @@ function Invoke-ElevatedInstaller {
 
     $Bootstrap = $null
     if ($PSCommandPath) {
-        $ArgumentList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -SkipElevate -LogPath `"$ElevatedLogPath`""
+        $ArgumentList = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -SkipElevate -LogPath `"$ElevatedLogPath`""
     } else {
         $Bootstrap = Join-Path ([System.IO.Path]::GetTempPath()) ("lmu-minter-install-" + [System.Guid]::NewGuid().ToString("N") + ".ps1")
         $Lines = @('$ErrorActionPreference = "Stop"')
@@ -159,7 +163,7 @@ function Invoke-ElevatedInstaller {
         $Lines += '    exit 1'
         $Lines += '}'
         Set-Content -Encoding ASCII -Path $Bootstrap -Value $Lines
-        $ArgumentList = "-NoProfile -ExecutionPolicy Bypass -File `"$Bootstrap`""
+        $ArgumentList = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$Bootstrap`""
     }
 
     try {
@@ -167,7 +171,7 @@ function Invoke-ElevatedInstaller {
         if ([string]::IsNullOrWhiteSpace($PowerShell)) {
             $PowerShell = "powershell.exe"
         }
-        $Process = Start-Process -FilePath $PowerShell -ArgumentList $ArgumentList -Verb RunAs -PassThru
+        $Process = Start-Process -FilePath $PowerShell -ArgumentList $ArgumentList -Verb RunAs -WindowStyle Hidden -PassThru
         Wait-ElevatedInstaller -Process $Process -Path $ElevatedLogPath
         if ($null -ne $Process.ExitCode -and $Process.ExitCode -ne 0) {
             Write-Host ""
@@ -347,7 +351,7 @@ try {
     $Principal = New-ScheduledTaskPrincipal `
         -UserId $TaskUser `
         -LogonType Interactive `
-        -RunLevel LeastPrivilege
+        -RunLevel Limited
     $Settings = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries `
         -Hidden `
