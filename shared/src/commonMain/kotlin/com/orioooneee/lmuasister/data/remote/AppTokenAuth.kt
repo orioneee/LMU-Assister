@@ -1,0 +1,42 @@
+package com.orioooneee.lmuasister.data.remote
+
+import com.orioooneee.lmuasister.config.BuildConfig
+import io.ktor.client.plugins.api.createClientPlugin
+import io.ktor.client.request.header
+import io.ktor.http.HttpHeaders
+import io.ktor.http.Url
+import io.ktor.http.encodedPath
+
+fun appTokenAuthPlugin(tokenHolder: AppTokenHolder) = createClientPlugin("AppTokenAuth") {
+    val backend = Url(BuildConfig.BACKEND_URL.trimEnd('/'))
+    val backendPath = backend.encodedPath.trimEnd('/')
+
+    onRequest { request, _ ->
+        val token = tokenHolder.token.value?.takeIf { it.isNotBlank() } ?: return@onRequest
+        if (request.headers.contains(HttpHeaders.Authorization)) return@onRequest
+        if (!request.url.isBackendV2Request(backend, backendPath)) return@onRequest
+
+        request.header(HttpHeaders.Authorization, "Bearer $token")
+    }
+}
+
+private fun io.ktor.http.URLBuilder.isBackendV2Request(backend: Url, backendPath: String): Boolean {
+    if (protocol.name != backend.protocol.name || host != backend.host || port != backend.port) return false
+
+    val path = encodedPath
+    if (path != backendPath && !path.startsWith("$backendPath/")) return false
+
+    val relative = path.removePrefix(backendPath).ifBlank { "/" }
+    return !relative.isPublicAuthExcluded()
+}
+
+private fun String.isPublicAuthExcluded(): Boolean {
+    val path = if (startsWith('/')) this else "/$this"
+    return path == "/privacy" ||
+        path == "/docs" ||
+        path.startsWith("/docs/") ||
+        path == "/internal" ||
+        path.startsWith("/internal/") ||
+        path == "/auth" ||
+        path.startsWith("/auth/")
+}

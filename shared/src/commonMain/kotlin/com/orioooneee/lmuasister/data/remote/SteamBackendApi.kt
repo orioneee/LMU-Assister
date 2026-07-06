@@ -189,8 +189,10 @@ class SteamBackendApi(private val client: HttpClient) {
 
     /** Track reference block + the caller's personal record on it. trackId = id / code / base.
      *  All-snake-case payload (no camelCase outlier), so it decodes with [AppJson]. */
-    suspend fun trackDetail(token: String, trackId: String): TrackDetailResponse =
-        AppJson.decodeFromString(getAuthed("$API_BASE/profile/track/${trackId.encodeURLPathPart()}", token))
+    suspend fun trackDetail(token: String, trackId: String, patch: String? = null): TrackDetailResponse {
+        val qs = patch?.takeIf { it.isNotBlank() }?.let { "?patch=${it.encodeURLQueryComponent()}" }.orEmpty()
+        return AppJson.decodeFromString(getAuthed("$API_BASE/profile/track/${trackId.encodeURLPathPart()}$qs", token))
+    }
 
     /** Drops the server-side session. */
     suspend fun signOut(token: String) {

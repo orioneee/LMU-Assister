@@ -1,5 +1,7 @@
 package com.orioooneee.lmuasister.data.mock
 
+import com.orioooneee.lmuasister.data.remote.AppTokenHolder
+import com.orioooneee.lmuasister.data.remote.appTokenAuthPlugin
 import com.orioooneee.lmuasister.data.steam.SignInOutcome
 import com.orioooneee.lmuasister.data.steam.SteamSignIn
 import io.ktor.client.HttpClient
@@ -26,7 +28,8 @@ import org.koin.dsl.module
 private val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
 
 /** Drop-in for the real network client — every request is served from [MockData]. */
-fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
+fun mockHttpClient(tokenHolder: AppTokenHolder? = null): HttpClient = HttpClient(MockEngine) {
+    if (tokenHolder != null) install(appTokenAuthPlugin(tokenHolder))
     followRedirects = true
     engine {
         addHandler { request ->
@@ -51,7 +54,7 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
                     val rest = path.removePrefix("/users/")
                     val uid = rest.substringBefore("/track/")
                     val trackId = rest.substringAfter("/track/")
-                    MockData.publicUserTrack(uid, trackId)?.let(::json)
+                    MockData.publicUserTrack(uid, trackId, params["patch"])?.let(::json)
                         ?: respond("""{"error":"track_not_found"}""", HttpStatusCode.NotFound, jsonHeaders)
                 }
                 path.startsWith("/users/") -> MockData.publicUser(path.removePrefix("/users/"))?.let(::json)
@@ -63,7 +66,7 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
                 path.startsWith("/profile/races/") ->
                     json(MockData.categoryRacesPage(path.removePrefix("/profile/races/"), params["page"]?.toIntOrNull() ?: 1))
                 path.startsWith("/profile/track/") ->
-                    json(MockData.trackDetail(path.removePrefix("/profile/track/")))
+                    json(MockData.trackDetail(path.removePrefix("/profile/track/"), params["patch"]))
                 path.startsWith("/profile/race/") ->
                     json(MockData.profileRaceDetail(path.removePrefix("/profile/race/")))
 

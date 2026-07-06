@@ -20,12 +20,17 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,12 +41,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.TrackAttemptDto
 import com.orioooneee.lmuasister.data.remote.TrackFullDto
+import com.orioooneee.lmuasister.data.remote.TrackPatchOptionDto
 import com.orioooneee.lmuasister.data.remote.TrackPersonalDto
 import com.orioooneee.lmuasister.ui.components.BlockSkeleton
 import com.orioooneee.lmuasister.ui.components.MetaChip
@@ -54,6 +61,7 @@ import com.orioooneee.lmuasister.ui.profile.SteamLoginUiState
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
 import com.orioooneee.lmuasister.ui.profile.versionFullLabel
 import com.orioooneee.lmuasister.ui.profile.versionPatchWildcardLabel
+import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.Carbon
 import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.Surface1
@@ -77,15 +85,16 @@ fun TrackDetailScreen(
     val repo = koinInject<RaceRepository>()
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val auth = uiState.authAvailability()
+    var selectedPatch by remember(trackId) { mutableStateOf<String?>(null) }
     // Re-keyed on auth so the personal record loads in once auth lands (e.g. after a cold-start restore).
-    val result by produceState<Result<TrackDetailData>?>(null, trackId, auth) {
+    val result by produceState<Result<TrackDetailData>?>(null, trackId, auth, selectedPatch) {
         fun paint(track: TrackFullDto, personal: PersonalRecordsState) {
             value = Result.success(TrackDetailData(track, personal))
         }
 
         // 1) Paint instantly: cached personal detail for an active/restoring session, else the public
         // track block from the roster. While auth is restoring, keep personal records in loading state.
-        viewModel.cachedTrackDetail(trackId)?.let { cached ->
+        viewModel.cachedTrackDetail(trackId, selectedPatch)?.let { cached ->
             paint(
                 cached.track,
                 when (auth) {
@@ -107,7 +116,7 @@ fun TrackDetailScreen(
         }
         // 2) Only hit the personal endpoint when signed in — avoids withReauth's 60s token wait when signed out.
         if (auth == AuthAvailability.SignedIn) {
-            val fresh = runCatching { viewModel.trackDetail(trackId) }
+            val fresh = runCatching { viewModel.trackDetail(trackId, selectedPatch) }
             when {
                 fresh.isSuccess -> fresh.getOrNull()?.let { paint(it.track, PersonalRecordsState.Ready(it.personal)) }
                 value == null -> value = Result.failure(fresh.exceptionOrNull() ?: IllegalStateException("Couldn't load this track"))
@@ -144,7 +153,14 @@ fun TrackDetailScreen(
         when (val res = result) {
             null -> TrackDetailSkeleton()
             else -> res.fold(
-                onSuccess = { TrackContent(it, insets.calculateBottomPadding(), onOpenRace) },
+                onSuccess = {
+                    TrackContent(
+                        d = it,
+                        bottomInset = insets.calculateBottomPadding(),
+                        onOpenRace = onOpenRace,
+                        onPatchSelected = { selectedPatch = it },
+                    )
+                },
                 onFailure = {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(it.message ?: "Couldn't load this track", style = MaterialTheme.typography.bodyMedium, color = TextMed)
@@ -163,9 +179,10 @@ fun PublicTrackDetailScreen(
     onBack: () -> Unit,
 ) {
     val api = koinInject<BackendApi>()
-    val result by produceState<Result<TrackDetailData>?>(null, uid, trackId) {
+    var selectedPatch by remember(uid, trackId) { mutableStateOf<String?>(null) }
+    val result by produceState<Result<TrackDetailData>?>(null, uid, trackId, selectedPatch) {
         value = runCatching {
-            val resp = api.publicUserTrack(uid, trackId)
+            val resp = api.publicUserTrack(uid, trackId, selectedPatch)
             TrackDetailData(resp.track, PersonalRecordsState.Ready(resp.personal))
         }
     }
@@ -198,6 +215,7 @@ fun PublicTrackDetailScreen(
                         bottomInset = insets.calculateBottomPadding(),
                         onOpenRace = { _, _ -> },
                         allowRaceLinks = false,
+                        onPatchSelected = { selectedPatch = it },
                     )
                 },
                 onFailure = {
@@ -253,6 +271,7 @@ private fun TrackContent(
     bottomInset: androidx.compose.ui.unit.Dp,
     onOpenRace: (String, Int?) -> Unit,
     allowRaceLinks: Boolean = true,
+    onPatchSelected: (String?) -> Unit = {},
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 900.dp
@@ -291,12 +310,17 @@ private fun TrackContent(
                     if (personal == null || personal.races <= 0) {
                         item(key = "personal-empty") { Hint("No lap times recorded on this track yet.") }
                     } else {
-                        item(key = "personal-summary") { RacesHeader(personal.races, personal.laps, personal.distanceKm) }
+                        item(key = "personal-summary:${personal.patchFilter.orEmpty()}") {
+                            TrackRecordsHeader(personal, onPatchSelected)
+                        }
+                        val patchFilter = personal.patchFilter?.takeIf { it.isNotBlank() }
                         val bestEver = personal.bestLapEver ?: personal.bestLap
                         val bestCurrentPatch = personal.bestLapCurrentPatch
                         val currentIsEver = bestCurrentPatch != null && bestEver != null && sameAttempt(bestCurrentPatch, bestEver)
-                        val current = if (!currentIsEver) bestCurrentPatch?.takeIf { it.bestLapMs != null } else null
+                        val current = if (patchFilter == null && !currentIsEver) bestCurrentPatch?.takeIf { it.bestLapMs != null } else null
                         val ever = bestEver?.takeIf { it.bestLapMs != null }
+                        val currentLabel = "BEST CURRENT PATCH"
+                        val everLabel = if (patchFilter != null) "BEST ON PATCH" else "BEST EVER"
 
                         if (wide && current != null && ever != null) {
                             item(key = "best-laps-row:${attemptKey("current", current)}:${attemptKey("ever", ever)}") {
@@ -304,7 +328,7 @@ private fun TrackContent(
                                     modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
-                                    LabeledTrackBlock("BEST CURRENT PATCH", Modifier.weight(1f).fillMaxHeight()) {
+                                    LabeledTrackBlock(currentLabel, Modifier.weight(1f).fillMaxHeight()) {
                                         BestLapCard(
                                             best = current,
                                             byClass = personal.bestByClass,
@@ -313,7 +337,7 @@ private fun TrackContent(
                                             allowRaceLinks = allowRaceLinks,
                                         )
                                     }
-                                    LabeledTrackBlock("BEST EVER", Modifier.weight(1f).fillMaxHeight()) {
+                                    LabeledTrackBlock(everLabel, Modifier.weight(1f).fillMaxHeight()) {
                                         BestLapCard(
                                             best = ever,
                                             byClass = personal.bestByClass,
@@ -326,7 +350,7 @@ private fun TrackContent(
                             }
                         } else {
                             current?.let { best ->
-                                item(key = "best-current-label") { SectionLabel("BEST CURRENT PATCH") }
+                                item(key = "best-current-label") { SectionLabel(currentLabel) }
                                 item(key = attemptKey("best-current", best)) {
                                     BestLapCard(
                                         best = best,
@@ -338,7 +362,7 @@ private fun TrackContent(
                                 }
                             }
                             ever?.let { best ->
-                                item(key = "best-ever-label") { SectionLabel("BEST EVER") }
+                                item(key = "best-ever-label:${patchFilter.orEmpty()}") { SectionLabel(everLabel) }
                                 item(key = attemptKey("best-ever", best)) {
                                     BestLapCard(
                                         best = best,
@@ -535,18 +559,145 @@ private fun RecentCard(recent: List<TrackAttemptDto>, onOpenRace: (String, Int?)
 }
 
 @Composable
-private fun RacesHeader(races: Int, laps: Int, distanceKm: Double) {
-    val parts = buildList {
-        add("$races races")
-        if (laps > 0) add("$laps laps")
-        if (distanceKm > 0) add("${formatKm(distanceKm)} km")
+private fun TrackRecordsHeader(personal: TrackPersonalDto, onPatchSelected: (String?) -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 560.dp
+        if (compact) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                RacesSummary(personal, Modifier.fillMaxWidth())
+                PatchFilter(personal, onPatchSelected, Modifier.fillMaxWidth(), fill = true)
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                RacesSummary(personal, Modifier.weight(1f))
+                PatchFilter(personal, onPatchSelected)
+            }
+        }
     }
+}
+
+@Composable
+private fun RacesSummary(personal: TrackPersonalDto, modifier: Modifier = Modifier) {
+    val parts = buildList {
+        add("${personal.races} races")
+        if (personal.laps > 0) add("${personal.laps} laps")
+        if (personal.distanceKm > 0) add("${formatKm(personal.distanceKm)} km")
+    }
+    val patchLabel = personal.selectedPatch?.label?.takeIf { it.isNotBlank() }
     Text(
-        parts.joinToString(" - ") + " on this track",
+        parts.joinToString(" - ") + " on this track" + (patchLabel?.let { " on $it" } ?: ""),
         style = MaterialTheme.typography.bodyMedium,
         color = TextMed,
         fontWeight = FontWeight.SemiBold,
+        modifier = modifier,
     )
+}
+
+@Composable
+private fun PatchFilter(
+    personal: TrackPersonalDto,
+    onPatchSelected: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+    fill: Boolean = false,
+) {
+    val patches = personal.patches.filter { it.patch.isNotBlank() }
+    if (patches.isEmpty()) return
+    var expanded by remember(personal.patchFilter, patches.map { it.patch }) { mutableStateOf(false) }
+    val selected = personal.patchFilter?.takeIf { it.isNotBlank() }
+    val selectedLabel = if (selected == null) {
+        "All patches"
+    } else {
+        patches.firstOrNull { it.patch == selected }?.let(::patchOptionLabel)
+            ?: personal.selectedPatch?.label?.takeIf { it.isNotBlank() }
+            ?: selected
+    }
+
+    Box(modifier) {
+        Row(
+            modifier = Modifier
+                .then(if (fill) Modifier.fillMaxWidth() else Modifier)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Surface1)
+                .border(1.dp, Outline, RoundedCornerShape(8.dp))
+                .clickable { expanded = true }
+                .padding(start = 9.dp, end = 11.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Text(
+                "PATCH",
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.7.sp),
+                color = TextLow,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+            )
+            Text(
+                selectedLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = TextHigh,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Text("v", style = MaterialTheme.typography.labelSmall, color = TextLow, fontWeight = FontWeight.Bold)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = Surface1,
+        ) {
+            DropdownMenuItem(
+                text = {
+                    PatchMenuText(
+                        label = "All patches",
+                        selected = selected == null,
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onPatchSelected(null)
+                },
+            )
+            patches.forEach { patch ->
+                DropdownMenuItem(
+                    text = {
+                        PatchMenuText(
+                            label = patchOptionLabel(patch),
+                            selected = selected == patch.patch || patch.selected,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onPatchSelected(patch.patch)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PatchMenuText(label: String, selected: Boolean) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = if (selected) Amber else TextHigh,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+        maxLines = 1,
+    )
+}
+
+private fun patchOptionLabel(patch: TrackPatchOptionDto): String {
+    val label = patch.label?.takeIf { it.isNotBlank() } ?: patch.patch
+    return if (patch.isCurrent) "$label current" else label
 }
 
 @Composable

@@ -6,6 +6,7 @@ import com.orioooneee.lmuasister.data.mock.mockHttpClient
 import com.orioooneee.lmuasister.data.remote.AppTokenHolder
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
+import com.orioooneee.lmuasister.data.remote.appTokenAuthPlugin
 import com.orioooneee.lmuasister.analytics.installPerformanceMonitoring
 import com.orioooneee.lmuasister.featureflags.FeatureFlagsRepository
 import com.orioooneee.lmuasister.featureflags.platformFeatureFlagRemoteSource
@@ -19,10 +20,13 @@ import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 val appModule = module {
+    single { AppTokenHolder() }
     single {
+        val tokenHolder = get<AppTokenHolder>()
         // No real backend configured (or backend.mock=true) → serve bundled mock data.
-        if (BuildConfig.USE_MOCK) mockHttpClient()
+        if (BuildConfig.USE_MOCK) mockHttpClient(tokenHolder)
         else HttpClient {
+            install(appTokenAuthPlugin(tokenHolder))
             installPerformanceMonitoring()
             followRedirects = true
             install(HttpTimeout) {
@@ -33,7 +37,6 @@ val appModule = module {
     }
     single { BackendApi(get()) }
     single { SteamBackendApi(get()) }
-    single { AppTokenHolder() }
     single { RaceRepository(get(), get()) }
     single { platformFeatureFlagRemoteSource() }
     single { FeatureFlagsRepository(get()) }

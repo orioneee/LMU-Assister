@@ -716,17 +716,18 @@ class SteamLoginViewModel(
             ?.let { runCatching { AppJson.decodeFromString<SplitDetailDto>(it) }.getOrNull() }
 
     /** Track detail + personal record. Offline-first: cache the last good payload per track. */
-    suspend fun trackDetail(trackId: String): TrackDetailResponse =
-        withReauth { backend.trackDetail(it, trackId) }
-            .also { runCatching { LocalCache.write(trackDetailKey(trackId), AppJson.encodeToString(it)) } }
+    suspend fun trackDetail(trackId: String, patch: String? = null): TrackDetailResponse =
+        withReauth { backend.trackDetail(it, trackId, patch) }
+            .also { runCatching { LocalCache.write(trackDetailKey(trackId, patch), AppJson.encodeToString(it)) } }
 
-    fun cachedTrackDetail(trackId: String): TrackDetailResponse? =
-        LocalCache.read(trackDetailKey(trackId))?.takeIf { it.isNotBlank() }
+    fun cachedTrackDetail(trackId: String, patch: String? = null): TrackDetailResponse? =
+        LocalCache.read(trackDetailKey(trackId, patch))?.takeIf { it.isNotBlank() }
             ?.let { runCatching { AppJson.decodeFromString<TrackDetailResponse>(it) }.getOrNull() }
 
     private fun raceDetailKey(eventId: String) = "race_detail_$eventId"
     private fun splitKey(eventId: String, splitNo: Int) = "race_split_${eventId}_$splitNo"
-    private fun trackDetailKey(trackId: String) = "track_detail_$trackId"
+    private fun trackDetailKey(trackId: String, patch: String? = null) =
+        "track_detail_${trackId}_${patch?.takeIf { it.isNotBlank() } ?: "all"}"
 
     private suspend fun <T> withReauth(block: suspend (token: String) -> T): T {
         // Auth may still be restoring at launch (Render cold start). Wait for the token

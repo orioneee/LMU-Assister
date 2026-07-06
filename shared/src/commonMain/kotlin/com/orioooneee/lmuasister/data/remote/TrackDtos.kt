@@ -66,6 +66,23 @@ data class TrackPersonalDto(
     val bestByClass: Map<String, TrackAttemptDto> = emptyMap(),
     // Up to 10 most recent attempts on this track (mini-log).
     val recent: List<TrackAttemptDto> = emptyList(),
+    val patches: List<TrackPatchOptionDto> = emptyList(),
+    val selectedPatch: TrackPatchOptionDto? = null,
+    val patchFilter: String? = null,
+    val patchFilterNotFound: String? = null,
+)
+
+@Serializable
+data class TrackPatchOptionDto(
+    val patch: String = "",
+    val label: String? = null,
+    val races: Int = 0,
+    val laps: Int = 0,
+    val distanceKm: Double = 0.0,
+    val bestLap: TrackAttemptDto? = null,
+    val gameVersion: GameVersionDto? = null,
+    val isCurrent: Boolean = false,
+    val selected: Boolean = false,
 )
 
 /** One lap attempt on a track (same shape in bestLap / bestByClass / recent). */

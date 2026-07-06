@@ -135,8 +135,9 @@ class BackendApi(private val client: HttpClient) {
     }
 
     /** Public saved track history for a user. Same payload shape as /profile/track/<track_id>. */
-    suspend fun publicUserTrack(uid: String, trackId: String): TrackDetailResponse {
-        val resp = client.get("$API_BASE/users/${uid.encodeURLPathPart()}/track/${trackId.encodeURLPathPart()}")
+    suspend fun publicUserTrack(uid: String, trackId: String, patch: String? = null): TrackDetailResponse {
+        val qs = patch?.takeIf { it.isNotBlank() }?.let { "?patch=${it.encodeURLQueryComponent()}" }.orEmpty()
+        val resp = client.get("$API_BASE/users/${uid.encodeURLPathPart()}/track/${trackId.encodeURLPathPart()}$qs")
         val text = resp.bodyAsText()
         if (resp.status.value == 404) throw Exception("track_not_found")
         if (resp.status.value !in 200..299) throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")

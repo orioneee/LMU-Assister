@@ -43,6 +43,7 @@ import com.orioooneee.lmuasister.data.remote.TrackBreakdownDto
 import com.orioooneee.lmuasister.data.remote.TrackDetailResponse
 import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.data.remote.TrackFullDto
+import com.orioooneee.lmuasister.data.remote.TrackPatchOptionDto
 import com.orioooneee.lmuasister.data.remote.TrackPersonalDto
 import com.orioooneee.lmuasister.data.remote.TracksResponse
 import com.orioooneee.lmuasister.data.remote.UsersDistributionDto
@@ -516,9 +517,9 @@ internal object MockData {
         )
     }
 
-    fun publicUserTrack(uid: String, trackId: String): String? {
+    fun publicUserTrack(uid: String, trackId: String, patch: String? = null): String? {
         publicUsers.firstOrNull { it.uid == uid } ?: return null
-        return trackDetail(trackId)
+        return trackDetail(trackId, patch)
     }
 
     private fun mockTrackBreakdown(seed: Int): List<TrackBreakdownDto> =
@@ -866,11 +867,19 @@ internal object MockData {
         TracksResponse(count = tracks.size, tracks = tracks.map { trackFull(it) }),
     )
 
-    fun trackDetail(rawId: String): String {
+    fun trackDetail(rawId: String, patch: String? = null): String {
         val key = rawId.lowercase().filter { it.isLetterOrDigit() }
         val t = tracks.firstOrNull { it.idKey() == key } ?: tracks[0]
         val now = Clock.System.now().toEpochMilliseconds()
-        fun attempt(cls: String, lapMs: Long, daysAgo: Int, session: String, pos: Int, status: String) =
+        fun attempt(
+            cls: String,
+            lapMs: Long,
+            daysAgo: Int,
+            session: String,
+            pos: Int,
+            status: String,
+            version: GameVersionDto = currentGameVersion,
+        ) =
             TrackAttemptDto(
                 bestLapMs = lapMs,
                 session = session,
@@ -884,24 +893,70 @@ internal object MockData {
                 split = 4,
                 position = pos,
                 finishStatus = status,
-                gameVersion = currentGameVersion,
+                gameVersion = version,
             )
+        val oldVersion = currentGameVersion.copy(
+            version = "1.2.4",
+            patch = "1.2",
+            buildId = "23100000",
+            title = "V1.2.4 - Mock legacy patch",
+            publishedAt = "2026-02-24T12:00:00Z",
+        )
         val base = classPaceMs["LMGT3"] ?: 143_000L
         val gt3 = attempt("LMGT3", base + 845, 6, "qualifying", 6, "Finished")
         val lmp2 = attempt("LMP2", base - 14_000, 12, "race", 3, "Finished")
+        val oldGt3 = attempt("LMGT3", base + 1_120, 32, "race", 8, "Finished", oldVersion)
+        val oldLmp2 = attempt("LMP2", base - 12_600, 41, "qualifying", 5, "Finished", oldVersion)
+        val selectedPatch = patch?.takeIf { it.isNotBlank() }
+        val patches = listOf(
+            TrackPatchOptionDto(
+                patch = "1.3",
+                label = "v1.3.*",
+                races = 2,
+                laps = 42,
+                distanceKm = 572.3,
+                bestLap = lmp2,
+                gameVersion = currentGameVersion,
+                isCurrent = true,
+                selected = selectedPatch == "1.3",
+            ),
+            TrackPatchOptionDto(
+                patch = "1.2",
+                label = "v1.2.*",
+                races = 2,
+                laps = 38,
+                distanceKm = 517.8,
+                bestLap = oldLmp2,
+                gameVersion = oldVersion,
+                selected = selectedPatch == "1.2",
+            ),
+        )
+        val selected = patches.firstOrNull { it.patch == selectedPatch }
         val personal = TrackPersonalDto(
-            races = 29,
+            races = selected?.races ?: 29,
+            laps = selected?.laps ?: 80,
+            distanceKm = selected?.distanceKm ?: 1_090.1,
             currentPatch = currentGameVersion,
-            bestLapEver = lmp2,
-            bestLapCurrentPatch = gt3,
-            bestLap = lmp2,                                   // absolute best (faster prototype)
-            bestByClass = mapOf("LMGT3" to gt3, "LMP2" to lmp2),
-            recent = listOf(
+            bestLapEver = if (selected?.patch == "1.2") oldLmp2 else lmp2,
+            bestLapCurrentPatch = if (selected == null) gt3 else null,
+            bestLap = if (selected?.patch == "1.2") oldLmp2 else lmp2, // absolute best may be faster prototype
+            bestByClass = if (selected?.patch == "1.2") {
+                mapOf("LMGT3" to oldGt3, "LMP2" to oldLmp2)
+            } else {
+                mapOf("LMGT3" to gt3, "LMP2" to lmp2)
+            },
+            recent = if (selected?.patch == "1.2") listOf(
+                oldGt3,
+                oldLmp2,
+            ) else listOf(
                 gt3,
                 attempt("LMGT3", base + 1_320, 9, "race", 11, "Finished"),
                 lmp2,
                 attempt("LMGT3", base + 2_010, 20, "race", 18, "DNF"),
             ),
+            patches = patches,
+            selectedPatch = selected,
+            patchFilter = selected?.patch,
         )
         return AppJson.encodeToString(TrackDetailResponse(track = trackFull(t), personal = personal))
     }
