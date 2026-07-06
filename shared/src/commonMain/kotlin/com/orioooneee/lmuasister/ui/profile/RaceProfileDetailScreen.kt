@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -66,6 +67,7 @@ import com.orioooneee.lmuasister.data.remote.RaceDetailDto
 import com.orioooneee.lmuasister.data.remote.RaceSessionDetailDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.ReasonDto
+import com.orioooneee.lmuasister.data.remote.TeamMemberDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
 import com.orioooneee.lmuasister.ui.publicusers.PublicUsersViewModel
@@ -1195,6 +1197,50 @@ private fun ClassificationLine(
     bestSectors: List<Long?>,
     bestRaceLapMs: Long?,
 ) {
+    val members = r.teamMembers
+    if (members.isNotEmpty()) {
+        var expanded by remember(r.position, r.name, members.size) { mutableStateOf(false) }
+        Column(Modifier.fillMaxWidth()) {
+            ClassificationSummaryLine(
+                r = r,
+                alt = alt,
+                showRatingDeltas = false,
+                showSectors = showSectors,
+                bestSectors = bestSectors,
+                bestRaceLapMs = bestRaceLapMs,
+                teamMemberCount = members.size,
+                teamExpanded = expanded,
+                onToggle = { expanded = !expanded },
+            )
+            if (expanded) {
+                TeamMembersBlock(members, showRatingDeltas)
+            }
+        }
+    } else {
+        ClassificationSummaryLine(
+            r = r,
+            alt = alt,
+            showRatingDeltas = showRatingDeltas,
+            showSectors = showSectors,
+            bestSectors = bestSectors,
+            bestRaceLapMs = bestRaceLapMs,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ClassificationSummaryLine(
+    r: ClassificationRowDto,
+    alt: Boolean,
+    showRatingDeltas: Boolean,
+    showSectors: Boolean,
+    bestSectors: List<Long?>,
+    bestRaceLapMs: Long?,
+    teamMemberCount: Int? = null,
+    teamExpanded: Boolean = false,
+    onToggle: (() -> Unit)? = null,
+) {
     // Zebra striping like the race leaderboards; the player's own row always wins with an amber tint.
     val bg = when {
         r.isMe -> Amber.copy(alpha = 0.12f)
@@ -1202,10 +1248,12 @@ private fun ClassificationLine(
         else -> Color.Transparent
     }
     val posColor = if (r.isMe) Amber else r.carClass?.let { classColorFor(it) } ?: TextHigh
+    val clickModifier = onToggle?.let { Modifier.clickable(onClick = it) } ?: Modifier
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(bg)
+            .then(clickModifier)
             .padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -1218,22 +1266,7 @@ private fun ClassificationLine(
             maxLines = 1,
             modifier = Modifier.width(18.dp),
         )
-        Column(
-            modifier = Modifier.width(22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            val flag = flagFor(r.nationality)
-            when {
-                flag != null -> FlagCircle(flag, 16.dp)
-                !r.teamIcon.isNullOrBlank() -> AsyncImage(
-                    model = r.teamIcon,
-                    contentDescription = r.teamName,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(16.dp).clip(CircleShape),
-                )
-            }
-        }
+        ClassificationFlag(r.nationality, r.teamIcon, r.teamName)
         // Name + badges share the flexible middle column; the name marquees if it can't fit.
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             val driverName = r.name ?: "-"
@@ -1264,9 +1297,13 @@ private fun ClassificationLine(
                 r.carClass?.takeIf { it.isNotBlank() }?.let { ClassMiniBadge(it) }
                 // Position within the driver's own class (the leading number is the overall position).
                 r.classPosition?.takeIf { it > 0 }?.let { ClassPosBadge(it, r.carClass) }
-                r.driverRating?.let { RatingMiniBadge("DR", it) }
-                r.safetyRating?.let { RatingMiniBadge("SR", it) }
-                if (showRatingDeltas) RatingDeltaColumn(r.drChange, r.srChange)
+                if (teamMemberCount != null) {
+                    TeamToggle(teamMemberCount, teamExpanded)
+                } else {
+                    r.driverRating?.let { RatingMiniBadge("DR", it) }
+                    r.safetyRating?.let { RatingMiniBadge("SR", it) }
+                    if (showRatingDeltas) RatingDeltaColumn(r.drChange, r.srChange)
+                }
             }
             // Best-lap sector splits, when the backend provides them.
             val sectors = classificationSectors(r)
@@ -1307,6 +1344,122 @@ private fun ClassificationLine(
                         maxLines = 1,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClassificationFlag(nationality: String?, teamIcon: String?, teamName: String?) {
+    Column(
+        modifier = Modifier.width(22.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        val flag = flagFor(nationality)
+        when {
+            flag != null -> FlagCircle(flag, 16.dp)
+            !teamIcon.isNullOrBlank() -> AsyncImage(
+                model = teamIcon,
+                contentDescription = teamName,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(16.dp).clip(CircleShape),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TeamToggle(count: Int, expanded: Boolean) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(5.dp))
+            .background(Amber.copy(alpha = 0.13f))
+            .border(1.dp, Amber.copy(alpha = 0.42f), RoundedCornerShape(5.dp))
+            .padding(horizontal = 5.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            "$count drivers",
+            style = MaterialTheme.typography.labelSmall,
+            color = Amber,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+        )
+        Text(
+            ">",
+            style = MaterialTheme.typography.labelSmall,
+            color = Amber,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+            modifier = Modifier.rotate(if (expanded) 90f else 0f),
+        )
+    }
+}
+
+@Composable
+private fun TeamMembersBlock(members: List<TeamMemberDto>, showRatingDeltas: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.08f)),
+    ) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Outline))
+        members.forEachIndexed { i, member ->
+            TeamMemberLine(
+                member = member,
+                alt = i % 2 == 1,
+                showRatingDeltas = showRatingDeltas,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TeamMemberLine(
+    member: TeamMemberDto,
+    alt: Boolean,
+    showRatingDeltas: Boolean,
+) {
+    val bg = when {
+        member.isMe -> Amber.copy(alpha = 0.10f)
+        alt -> Surface2.copy(alpha = 0.55f)
+        else -> Color.Transparent
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(bg)
+            .padding(start = 52.dp, end = 10.dp, top = 7.dp, bottom = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Column(
+            modifier = Modifier.width(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            flagFor(member.nationality)?.let { FlagCircle(it, 16.dp) }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                member.name?.takeIf { it.isNotBlank() } ?: "Driver",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (member.isMe) TextHigh else TextMed,
+                fontWeight = if (member.isMe) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                member.carClass?.takeIf { it.isNotBlank() }?.let { ClassMiniBadge(it) }
+                member.driverRating?.let { RatingMiniBadge("DR", it) }
+                member.safetyRating?.let { RatingMiniBadge("SR", it) }
+                if (showRatingDeltas) RatingDeltaColumn(member.drChange, member.srChange)
             }
         }
     }

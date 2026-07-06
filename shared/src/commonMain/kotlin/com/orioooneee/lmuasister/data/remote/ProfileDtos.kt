@@ -342,6 +342,7 @@ data class RaceDetailDto(
 data class RaceDetailFeaturesDto(
     @SerialName("all_splits") val allSplits: Boolean = false,
     @SerialName("team_classification") val teamClassification: Boolean = false,
+    @SerialName("team_breakdown") val teamBreakdown: Boolean = false,
     @SerialName("lap_progress") val lapProgress: Boolean = true,
     val sectors: Boolean = true,
     @SerialName("nakama_detail") val nakamaDetail: Boolean = true,
@@ -366,11 +367,31 @@ data class RaceSessionDetailDto(
 )
 
 @Serializable
+data class TeamMemberDto(
+    val uid: String? = null,
+    @SerialName("driver_id") val driverId: String? = null,
+    @SerialName("steam_id") val steamId: String? = null,
+    val name: String? = null,
+    val nationality: String? = null,
+    @SerialName("is_me") val isMe: Boolean = false,
+    @SerialName("team_name") val teamName: String? = null,
+    @SerialName("car_class") val carClass: String? = null,
+    @SerialName("sr_change") val srChange: Double? = null,
+    @SerialName("dr_change") val drChange: Double? = null,
+    @SerialName("sr_reasons") val srReasons: List<ReasonDto> = emptyList(),
+    @SerialName("dr_reasons") val drReasons: List<ReasonDto> = emptyList(),
+    @SerialName("driver_rating") val driverRating: RatingDto? = null,
+    @SerialName("safety_rating") val safetyRating: RatingDto? = null,
+)
+
+@Serializable
 data class ClassificationRowDto(
     val position: Int? = null,
     @SerialName("class_position") val classPosition: Int? = null,
     @SerialName("grid_position") val gridPosition: Int? = null,
+    @SerialName("is_team_row") val isTeamRow: Boolean = false,
     val name: String? = null,
+    @SerialName("driver_name") val driverName: String? = null,
     val nationality: String? = null,
     @SerialName("is_me") val isMe: Boolean = false,
     val car: String? = null,
@@ -403,4 +424,6 @@ data class ClassificationRowDto(
     @SerialName("safety_rating") val safetyRating: RatingDto? = null,
     @SerialName("team_name") val teamName: String? = null,
     @SerialName("team_icon") val teamIcon: String? = null,
+    @SerialName("team_member_count") val teamMemberCount: Int = 0,
+    @SerialName("team_members") val teamMembers: List<TeamMemberDto> = emptyList(),
 )
