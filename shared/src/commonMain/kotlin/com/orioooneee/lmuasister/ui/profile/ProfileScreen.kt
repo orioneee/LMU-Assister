@@ -73,7 +73,8 @@ import com.orioooneee.lmuasister.data.steam.SteamGuardKind
 import com.orioooneee.lmuasister.ui.IconSteam
 import com.orioooneee.lmuasister.ui.components.RefreshableContent
 import com.orioooneee.lmuasister.ui.theme.Carbon
-import com.orioooneee.lmuasister.ui.theme.ClassGt3
+import com.orioooneee.lmuasister.ui.theme.ClassHyper
+import com.orioooneee.lmuasister.ui.theme.Lime
 import com.orioooneee.lmuasister.ui.theme.Outline
 import com.orioooneee.lmuasister.ui.theme.Surface1
 import com.orioooneee.lmuasister.ui.theme.TextHigh
@@ -97,6 +98,27 @@ private val DangerRed = Color(0xFFE5484D)
 private const val STEAM_GUARD_APPROVAL_SECONDS = 120
 private const val STEAM_QR_SECONDS = 120
 private const val MINTER_INSTALL_URL = "https://www.lmu-assister.com/#minter-install"
+
+private enum class AuthStepKey { Local, Steam, Verify, Profile }
+
+private enum class AuthStepState { Pending, Current, Done, Error }
+
+private enum class AuthStage {
+    Silent,
+    Login,
+    GuardWait,
+    GuardCheck,
+    Approval,
+    QrStart,
+    Qr,
+    Profile,
+}
+
+private data class AuthStepUi(
+    val key: AuthStepKey,
+    val label: String,
+    val state: AuthStepState,
+)
 
 @Composable
 fun ProfileScreen(
@@ -132,24 +154,31 @@ fun ProfileScreen(
     val minterUnavailable = state as? SteamLoginUiState.MinterUnavailable
     val authEnvironmentBlocked =
         checkingAuthEnvironment || permissionRequired != null || requestingLocalNetworkPermission || minterUnavailable != null
+    val signedIn = state as? SteamLoginUiState.SignedIn
+    val loadingProfileAfterAuth = signedIn?.backend == BackendState.Loading
+    val restoring = state is SteamLoginUiState.Restoring
     val loading = state is SteamLoginUiState.Loading ||
+        restoring ||
+        loadingProfileAfterAuth ||
         startingQr ||
         pendingApproval != null ||
         pendingQr != null ||
         checkingAuthEnvironment ||
         requestingLocalNetworkPermission
     val guardRequired = state is SteamLoginUiState.GuardRequired
-    val restoring = state is SteamLoginUiState.Restoring
-    val signedIn = state as? SteamLoginUiState.SignedIn
     val waitingForGuardApproval = pendingApproval != null
     val waitingForQr = pendingQr != null
     val canSubmitGuardCodeDuringApproval = pendingApproval != null && code.isNotBlank()
-    val credentialFieldsVisible = !authEnvironmentBlocked && pendingQr == null && !startingQr
+    val credentialFieldsVisible = !authEnvironmentBlocked && pendingQr == null && !startingQr && !loadingProfileAfterAuth
     val cancellableCredentialFlow = pendingApproval != null || guardRequired
+    val currentAuthStage = authStageFor(state, code)
+    var lastVisibleAuthStage by remember { mutableStateOf<AuthStage?>(null) }
+    val visibleAuthStage = if (state is SteamLoginUiState.Error) lastVisibleAuthStage else currentAuthStage
+    val authSteps = visibleAuthStage?.steps(markCurrentError = state is SteamLoginUiState.Error)
     val qrNoticeText = when {
         pendingQr != null || startingQr -> null
         qrPrivacyNotice && !privacyAccepted -> "Accept the Privacy Policy to continue with QR sign-in."
-        loading -> "Finish the current sign-in first."
+        loading && !restoring && !loadingProfileAfterAuth -> "Finish the current sign-in first."
         else -> null
     }
     val approvalTimerStart = pendingApproval?.expiresIn?.takeIf { it > 0 } ?: STEAM_GUARD_APPROVAL_SECONDS
@@ -163,6 +192,10 @@ fun ProfileScreen(
         } else {
             qrPrivacyNotice = true
         }
+    }
+
+    LaunchedEffect(currentAuthStage) {
+        if (currentAuthStage != null) lastVisibleAuthStage = currentAuthStage
     }
 
     LaunchedEffect(privacyAccepted) {
@@ -201,17 +234,7 @@ fun ProfileScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    if (restoring) {
-        Column(
-            Modifier.fillMaxSize().background(Carbon).padding(horizontal = 16.dp),
-        ) {
-            Spacer(Modifier.height(topInset + 24.dp))
-            ProfileSkeleton()
-        }
-        return
-    }
-
-    if (signedIn != null) {
+    if (signedIn != null && !loadingProfileAfterAuth) {
         val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
         val updatingProfile by viewModel.updatingProfile.collectAsStateWithLifecycle()
         val exiting by viewModel.exiting.collectAsStateWithLifecycle()
@@ -384,12 +407,18 @@ fun ProfileScreen(
 
                 StatusLine(
                     state = state,
+                    authStage = visibleAuthStage,
                     waitingForGuardApproval = waitingForGuardApproval,
                     guardApprovalSecondsLeft = guardApprovalSecondsLeft,
                     waitingForQr = waitingForQr,
                     qrSecondsLeft = qrSecondsLeft,
                     supportsGuardApproval = supportsSteamGuardMobileApproval,
                 )
+
+                if (authSteps != null) {
+                    Spacer(Modifier.height(14.dp))
+                    AuthSteps(authSteps)
+                }
 
                 if (pendingQr != null) {
                     Spacer(Modifier.height(14.dp))
@@ -399,7 +428,7 @@ fun ProfileScreen(
                 if (credentialFieldsVisible) {
                     Spacer(Modifier.height(16.dp))
                     SignInButton(
-                        loading = (state is SteamLoginUiState.Loading || pendingApproval != null) &&
+                        loading = (restoring || state is SteamLoginUiState.Loading || pendingApproval != null) &&
                             !canSubmitGuardCodeDuringApproval,
                         enabled = privacyAccepted && (!loading || canSubmitGuardCodeDuringApproval),
                         waitingForGuardApproval = waitingForGuardApproval,
@@ -412,7 +441,7 @@ fun ProfileScreen(
                     CancelAuthButton(onClick = viewModel::cancelAuthFlow)
                 }
 
-                if (!credentialFieldsVisible) {
+                if (!credentialFieldsVisible && !loadingProfileAfterAuth) {
                     Spacer(Modifier.height(10.dp))
                     CancelAuthButton(onClick = viewModel::cancelAuthFlow)
                 }
@@ -814,9 +843,170 @@ private fun ProfileMessage(title: String, detail: String) {
     }
 }
 
+private fun authStageFor(state: SteamLoginUiState, guardCode: String): AuthStage? =
+    when (state) {
+        SteamLoginUiState.Restoring -> AuthStage.Silent
+        SteamLoginUiState.Loading -> if (guardCode.isNotBlank()) AuthStage.GuardCheck else AuthStage.Login
+        SteamLoginUiState.QrCodeStarting -> AuthStage.QrStart
+        is SteamLoginUiState.GuardRequired -> AuthStage.GuardWait
+        is SteamLoginUiState.DeviceConfirmationPending -> AuthStage.Approval
+        is SteamLoginUiState.QrCodePending -> AuthStage.Qr
+        is SteamLoginUiState.SignedIn ->
+            if (state.backend == BackendState.Loading) AuthStage.Profile else null
+        else -> null
+    }
+
+private fun AuthStage.steps(markCurrentError: Boolean): List<AuthStepUi> {
+    var localLabel = "Local minter ready"
+    var steamLabel = "Signing in to Steam"
+    var verifyLabel = "Steam Guard check"
+    var profileLabel = "Getting your LMU profile"
+
+    var localState = AuthStepState.Done
+    var steamState = AuthStepState.Pending
+    var verifyState = AuthStepState.Pending
+    var profileState = AuthStepState.Pending
+    var currentStep = AuthStepKey.Steam
+
+    when (this) {
+        AuthStage.Silent -> {
+            steamLabel = "Restoring Steam session"
+            verifyLabel = "Steam authorized"
+            steamState = AuthStepState.Current
+            currentStep = AuthStepKey.Steam
+        }
+        AuthStage.Login -> {
+            steamLabel = "Checking Steam login"
+            verifyLabel = "Steam Guard if needed"
+            steamState = AuthStepState.Current
+            currentStep = AuthStepKey.Steam
+        }
+        AuthStage.GuardWait -> {
+            steamLabel = "Steam credentials accepted"
+            verifyLabel = "Waiting for Steam Guard code"
+            steamState = AuthStepState.Done
+            verifyState = AuthStepState.Current
+            currentStep = AuthStepKey.Verify
+        }
+        AuthStage.GuardCheck -> {
+            steamLabel = "Steam credentials accepted"
+            verifyLabel = "Checking Steam Guard code"
+            steamState = AuthStepState.Done
+            verifyState = AuthStepState.Current
+            currentStep = AuthStepKey.Verify
+        }
+        AuthStage.Approval -> {
+            steamLabel = "Steam sign-in requested"
+            verifyLabel = "Waiting for Steam app approval"
+            steamState = AuthStepState.Done
+            verifyState = AuthStepState.Current
+            currentStep = AuthStepKey.Verify
+        }
+        AuthStage.QrStart -> {
+            steamLabel = "Requesting Steam QR sign-in"
+            verifyLabel = "Waiting for Steam app response"
+            steamState = AuthStepState.Current
+            currentStep = AuthStepKey.Steam
+        }
+        AuthStage.Qr -> {
+            steamLabel = "Steam QR generated"
+            verifyLabel = "Waiting for Steam app response"
+            steamState = AuthStepState.Done
+            verifyState = AuthStepState.Current
+            currentStep = AuthStepKey.Verify
+        }
+        AuthStage.Profile -> {
+            steamLabel = "Steam authorized"
+            verifyLabel = "Steam verification complete"
+            profileLabel = "Getting your LMU profile"
+            steamState = AuthStepState.Done
+            verifyState = AuthStepState.Done
+            profileState = AuthStepState.Current
+            currentStep = AuthStepKey.Profile
+        }
+    }
+
+    if (markCurrentError) {
+        when (currentStep) {
+            AuthStepKey.Local -> localState = AuthStepState.Error
+            AuthStepKey.Steam -> steamState = AuthStepState.Error
+            AuthStepKey.Verify -> verifyState = AuthStepState.Error
+            AuthStepKey.Profile -> profileState = AuthStepState.Error
+        }
+    }
+
+    return listOf(
+        AuthStepUi(AuthStepKey.Local, localLabel, localState),
+        AuthStepUi(AuthStepKey.Steam, steamLabel, steamState),
+        AuthStepUi(AuthStepKey.Verify, verifyLabel, verifyState),
+        AuthStepUi(AuthStepKey.Profile, profileLabel, profileState),
+    )
+}
+
+@Composable
+private fun AuthSteps(steps: List<AuthStepUi>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Carbon.copy(alpha = 0.62f))
+            .border(1.dp, Outline, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        steps.forEach { step ->
+            AuthStepRow(step)
+        }
+    }
+}
+
+@Composable
+private fun AuthStepRow(step: AuthStepUi) {
+    val color = when (step.state) {
+        AuthStepState.Pending -> TextLow
+        AuthStepState.Current -> AuthAccent
+        AuthStepState.Done -> TextMed
+        AuthStepState.Error -> ClassHyper
+    }
+    val dotFill = when (step.state) {
+        AuthStepState.Pending -> Color.Transparent
+        AuthStepState.Current -> AuthAccent.copy(alpha = 0.24f)
+        AuthStepState.Done -> Lime
+        AuthStepState.Error -> ClassHyper
+    }
+    val dotSize = if (step.state == AuthStepState.Current) 12.dp else 10.dp
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .size(dotSize)
+                    .clip(CircleShape)
+                    .background(dotFill)
+                    .border(1.dp, color, CircleShape),
+            )
+        }
+        Text(
+            step.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = if (step.state == AuthStepState.Current || step.state == AuthStepState.Error) {
+                FontWeight.Bold
+            } else {
+                FontWeight.Normal
+            },
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
 @Composable
 private fun StatusLine(
     state: SteamLoginUiState,
+    authStage: AuthStage?,
     waitingForGuardApproval: Boolean,
     guardApprovalSecondsLeft: Int,
     waitingForQr: Boolean,
@@ -829,29 +1019,35 @@ private fun StatusLine(
                 val minutes = guardApprovalSecondsLeft / 60
                 val seconds = guardApprovalSecondsLeft % 60
                 "Approve the sign-in request in the Steam app, then return here. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
-                    MaterialTheme.colorScheme.primary
+                    AuthAccent
             } else if (waitingForQr) {
                 val minutes = qrSecondsLeft / 60
                 val seconds = qrSecondsLeft % 60
                 "Scan the Steam code, then keep this page open. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
-                    MaterialTheme.colorScheme.primary
+                    AuthAccent
             } else {
-                "Checking Steam Guard..." to MaterialTheme.colorScheme.primary
+                if (authStage == AuthStage.GuardCheck) {
+                    "Checking Steam Guard code..."
+                } else {
+                    "Signing in to Steam..."
+                } to AuthAccent
             }
         }
+        SteamLoginUiState.Restoring ->
+            "Restoring your Steam session..." to AuthAccent
         SteamLoginUiState.QrCodeStarting ->
-            "Generating a Steam QR code..." to MaterialTheme.colorScheme.primary
+            "Requesting Steam QR sign-in..." to AuthAccent
         is SteamLoginUiState.DeviceConfirmationPending -> {
             val minutes = guardApprovalSecondsLeft / 60
             val seconds = guardApprovalSecondsLeft % 60
             "Approve the sign-in request in the Steam app, or enter the Steam Guard code here. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
-                MaterialTheme.colorScheme.primary
+                AuthAccent
         }
         is SteamLoginUiState.QrCodePending -> {
             val minutes = qrSecondsLeft / 60
             val seconds = qrSecondsLeft % 60
             "Scan this code in the Steam mobile app. ${minutes}:${seconds.toString().padStart(2, '0')} left." to
-                MaterialTheme.colorScheme.primary
+                AuthAccent
         }
         is SteamLoginUiState.GuardRequired -> {
             when (state.kind) {
@@ -859,9 +1055,17 @@ private fun StatusLine(
                 SteamGuardKind.DEVICE ->
                     if (supportsGuardApproval) "Enter the Steam Guard code from your Steam app."
                     else "Open Steam Guard and enter the current code."
-            } to MaterialTheme.colorScheme.primary
+            } to AuthAccent
         }
-        is SteamLoginUiState.Error -> state.message to MaterialTheme.colorScheme.error
+        is SteamLoginUiState.SignedIn -> {
+            if (state.backend != BackendState.Loading) return
+            if (state.restored) {
+                "Steam session restored. Getting your profile..."
+            } else {
+                "Steam authorized. Getting your profile..."
+            } to AuthAccent
+        }
+        is SteamLoginUiState.Error -> state.message to ClassHyper
         else -> return
     }
     Spacer(Modifier.height(14.dp))

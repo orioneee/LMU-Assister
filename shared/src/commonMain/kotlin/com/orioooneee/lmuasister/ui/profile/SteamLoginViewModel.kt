@@ -64,7 +64,10 @@ sealed interface SteamLoginUiState {
         val checking: Boolean = false,
     ) : SteamLoginUiState
 
-    data class SignedIn(val backend: BackendState = BackendState.Loading) : SteamLoginUiState
+    data class SignedIn(
+        val backend: BackendState = BackendState.Loading,
+        val restored: Boolean = false,
+    ) : SteamLoginUiState
 
     data class Error(val message: String) : SteamLoginUiState
 }
@@ -165,7 +168,10 @@ class SteamLoginViewModel(
                         appToken = r.token
                         Telemetry.log(AnalyticsEvent.LoginSuccess(restored = true))
                         Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
-                        if (cached == null) _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
+                        if (cached == null) _state.value = SteamLoginUiState.SignedIn(
+                            BackendState.Loading,
+                            restored = true,
+                        )
                         loadProfile()
                         return@launch
                     }
@@ -180,7 +186,10 @@ class SteamLoginViewModel(
                     appToken = token
                     Telemetry.log(AnalyticsEvent.LoginSuccess(restored = true))
                     Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
-                    if (cached == null) _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
+                    if (cached == null) _state.value = SteamLoginUiState.SignedIn(
+                        BackendState.Loading,
+                        restored = true,
+                    )
                     loadProfile()
                 } else {
                     val restoreError = restored.exceptionOrNull()
