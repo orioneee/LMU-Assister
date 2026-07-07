@@ -629,10 +629,11 @@ private class AuthFlow(
         val accessToken = session.accessToken.takeIf { it.isNotBlank() }
             ?: throw SteamWebApiAuthException("Steam access token is missing")
         val schemaRaw = steamWebApiGet(
-            path = "/ISteamUserStats/GetSchemaForGame/v2/",
+            path = "/IPlayerService/GetGameAchievements/v1/",
             params = mapOf(
                 "appid" to appId.toString(),
-                "l" to "english",
+                "language" to "english",
+                "hash_only" to "false",
                 "access_token" to accessToken,
             ),
         )
@@ -642,30 +643,32 @@ private class AuthFlow(
         )
         session.steamId.takeIf { it.isNotBlank() }?.let { playerParams["steamid"] = it }
         val userRaw = steamWebApiGet(
-            path = "/ISteamUserStats/GetPlayerAchievements/v1/",
+            path = "/IPlayerService/GetUserAchievements/v1/",
             params = playerParams,
         )
-        val schema = json.decodeFromString<SteamSchemaResponse>(schemaRaw)
-        val user = json.decodeFromString<SteamPlayerAchievementsResponse>(userRaw)
-        val userStats = user.playerstats ?: throw SteamWebApiException("Steam achievements response is empty")
-        userStats.error?.takeIf { it.isNotBlank() }?.let { throw steamWebApiError(it) }
-        if (userStats.success == false) throw SteamWebApiException("Steam achievements request failed")
+        val schema = json.decodeFromString<SteamGameAchievementsEnvelope>(schemaRaw)
+        val user = json.decodeFromString<SteamUserAchievementsEnvelope>(userRaw)
+        val schemaData = schema.response ?: throw SteamWebApiAuthException("Steam achievements schema is empty")
+        val userData = user.response ?: throw SteamWebApiAuthException("Steam user achievements response is empty")
 
-        val progressByName = userStats.achievements.associateBy { it.apiname }
-        val achievements = schema.game
-            ?.availableGameStats
+        val progressByKey = userData.achievements.mapNotNull { progress ->
+            progress.internalKey?.let { it to progress }
+        }.toMap()
+        val achievements = schemaData
             ?.achievements
             .orEmpty()
             .mapNotNull { item ->
-                val apiName = item.name.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                val progress = progressByName[apiName]
-                val displayName = item.displayName.takeIf { it.isNotBlank() } ?: apiName
+                if (item.archived == true) return@mapNotNull null
+                val key = item.internalKey ?: return@mapNotNull null
+                val progress = progressByKey[key]
+                val apiName = item.internalName.takeIf { it.isNotBlank() }
+                val displayName = item.localizedName.takeIf { it.isNotBlank() } ?: apiName ?: return@mapNotNull null
                 SteamAchievementPayload(
                     name = displayName,
-                    description = item.description.takeIf { it.isNotBlank() },
+                    description = item.localizedDesc.takeIf { it.isNotBlank() },
                     achievedImageUrl = item.icon.steamAchievementIconUrl(appId),
                     lockedImageUrl = item.iconGray.steamAchievementIconUrl(appId),
-                    achieved = progress?.achieved == 1,
+                    achieved = progress?.unlocked == true,
                     unlockTime = progress?.unlockTime ?: 0L,
                 )
             }
@@ -925,47 +928,41 @@ private data class ApiResponse(
 )
 
 @Serializable
-private data class SteamSchemaResponse(
-    val game: SteamSchemaGame? = null,
+private data class SteamGameAchievementsEnvelope(
+    val response: SteamGameAchievementsResponse? = null,
 )
 
 @Serializable
-private data class SteamSchemaGame(
-    @SerialName("availableGameStats") val availableGameStats: SteamAvailableGameStats? = null,
+private data class SteamGameAchievementsResponse(
+    val achievements: List<SteamGameAchievement> = emptyList(),
 )
 
 @Serializable
-private data class SteamAvailableGameStats(
-    val achievements: List<SteamSchemaAchievement> = emptyList(),
-)
-
-@Serializable
-private data class SteamSchemaAchievement(
-    val name: String = "",
-    @SerialName("displayName") val displayName: String = "",
-    val description: String = "",
+private data class SteamGameAchievement(
+    @SerialName("internal_name") val internalName: String = "",
+    @SerialName("localized_name") val localizedName: String = "",
+    @SerialName("localized_desc") val localizedDesc: String = "",
     val icon: String = "",
-    @SerialName("icongray") val iconGray: String = "",
+    @SerialName("icon_gray") val iconGray: String = "",
+    @SerialName("internal_key") val internalKey: Int? = null,
+    val archived: Boolean? = null,
 )
 
 @Serializable
-private data class SteamPlayerAchievementsResponse(
-    val playerstats: SteamPlayerStats? = null,
+private data class SteamUserAchievementsEnvelope(
+    val response: SteamUserAchievementsResponse? = null,
 )
 
 @Serializable
-private data class SteamPlayerStats(
-    @SerialName("steamID") val steamId: String = "",
-    val success: Boolean? = null,
-    val error: String? = null,
-    val achievements: List<SteamPlayerAchievement> = emptyList(),
+private data class SteamUserAchievementsResponse(
+    val achievements: List<SteamUserAchievement> = emptyList(),
 )
 
 @Serializable
-private data class SteamPlayerAchievement(
-    val apiname: String = "",
-    val achieved: Int = 0,
-    @SerialName("unlocktime") val unlockTime: Long = 0L,
+private data class SteamUserAchievement(
+    @SerialName("internal_key") val internalKey: Int? = null,
+    val unlocked: Boolean = false,
+    @SerialName("unlock_time") val unlockTime: Long = 0L,
 )
 
 private fun steamWebApiGet(path: String, params: Map<String, String>): String {
@@ -981,6 +978,7 @@ private fun steamWebApiGet(path: String, params: Map<String, String>): String {
     }
     return try {
         val code = connection.responseCode
+        val eresult = connection.getHeaderField("X-EResult")?.trim()?.toIntOrNull()
         val stream = if (code in 200..299) connection.inputStream else connection.errorStream
         val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
         if (code == HttpURLConnection.HTTP_UNAUTHORIZED || code == HttpURLConnection.HTTP_FORBIDDEN) {
@@ -988,6 +986,9 @@ private fun steamWebApiGet(path: String, params: Map<String, String>): String {
         }
         if (code !in 200..299) {
             throw steamWebApiError(body.ifBlank { "Steam WebAPI failed with HTTP $code" })
+        }
+        if (eresult != null && eresult != 1) {
+            throw SteamWebApiAuthException(body.ifBlank { "Steam WebAPI rejected the access token (EResult $eresult)" })
         }
         if (body.isSteamAccessDenied()) throw SteamWebApiAuthException(body)
         body
