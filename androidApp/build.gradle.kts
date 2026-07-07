@@ -1,5 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+val lmuVersionCode = providers.gradleProperty("lmu.versionCode").get().trim().toInt()
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
@@ -33,7 +35,7 @@ android {
         applicationId = "com.orioooneee.lmuasister"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 16
+        versionCode = lmuVersionCode
         versionName = "1.0.0"
     }
     packaging {
@@ -56,4 +58,3 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
-

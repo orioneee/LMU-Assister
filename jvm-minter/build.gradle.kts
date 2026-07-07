@@ -4,8 +4,33 @@ plugins {
     application
 }
 
+val lmuVersionCode = providers.gradleProperty("lmu.versionCode").get().trim().toInt()
+
+val generateMinterBuildConfig by tasks.registering {
+    val outDir = layout.buildDirectory.dir("generated/buildconfig/kotlin")
+    inputs.property("versionCode", lmuVersionCode)
+    outputs.dir(outDir)
+    doLast {
+        val pkgDir = outDir.get().asFile.resolve("com/orioooneee/lmuasister/minter")
+        pkgDir.mkdirs()
+        pkgDir.resolve("MinterBuildConfig.kt").writeText(
+            """
+            |package com.orioooneee.lmuasister.minter
+            |
+            |internal object MinterBuildConfig {
+            |    const val VERSION_CODE: Int = $lmuVersionCode
+            |}
+            |
+            """.trimMargin(),
+        )
+    }
+}
+
 kotlin {
     jvmToolchain(21)
+    sourceSets.named("main") {
+        kotlin.srcDir(generateMinterBuildConfig)
+    }
 }
 
 dependencies {

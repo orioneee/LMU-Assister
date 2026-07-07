@@ -31,8 +31,11 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.io.Closeable
 import java.net.InetSocketAddress
 import java.net.URLDecoder
+import java.security.MessageDigest
+import java.security.SecureRandom
 import java.security.Security
 import java.time.Instant
+import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -48,11 +51,14 @@ private const val LOGIN_WAIT_MS = 45_000L
 private const val POLL_REQUEST_WAIT_MS = 15_000L
 private const val STATUS_POLL_REQUEST_WAIT_MS = 2_000L
 private const val APPROVAL_WAIT_SECONDS = 120
+private const val FLOW_TOKEN_BYTES = 32
 
 private val json = Json {
     ignoreUnknownKeys = true
     explicitNulls = false
 }
+
+private val secureRandom = SecureRandom()
 
 fun main(args: Array<String>) {
     ensureBouncyCastleProvider()
@@ -110,13 +116,16 @@ fun main(args: Array<String>) {
         }
     }
     server.createContext("/api/status") { exchange ->
-        val flowId = exchange.query()["flowId"].orEmpty()
-        service.status(flowId).respond(exchange)
+        val query = exchange.query()
+        service.status(
+            flowId = query["flowId"].orEmpty(),
+            flowToken = query["flowToken"].orEmpty(),
+        ).respond(exchange)
     }
     server.createContext("/api/cancel") { exchange ->
         exchange.requirePost {
             val req = exchange.readJson<FlowRequest>()
-            service.cancel(req.flowId).respond(exchange)
+            service.cancel(req).respond(exchange)
         }
     }
 
@@ -132,7 +141,11 @@ fun main(args: Array<String>) {
 }
 
 private fun healthResponse(): ApiResponse =
-    ApiResponse(status = "ok", message = "jvm-minter is running")
+    ApiResponse(
+        status = "ok",
+        versionCode = MinterBuildConfig.VERSION_CODE,
+        message = "jvm-minter is running",
+    )
 
 private class TicketMinterService {
     private val flows = ConcurrentHashMap<String, AuthFlow>()
@@ -143,38 +156,37 @@ private class TicketMinterService {
             return@runBlocking ApiResponse(status = "error", message = "username and password are required")
         }
 
-        val flow = AuthFlow(
-            id = UUID.randomUUID().toString(),
-            appId = req.appId ?: DEFAULT_APP_ID,
-        )
+        val flow = newFlow(req.appId ?: DEFAULT_APP_ID)
         flows[flow.id] = flow
         flow.start(req.username, req.password, req.guardCode)
+            .also { closeCompletedFlow(flow, it) }
     }
 
     fun startQr(req: QrStartRequest): ApiResponse = runBlocking {
         cleanup()
-        val flow = AuthFlow(
-            id = UUID.randomUUID().toString(),
-            appId = req.appId ?: DEFAULT_APP_ID,
-        )
+        val flow = newFlow(req.appId ?: DEFAULT_APP_ID)
         flows[flow.id] = flow
         flow.startQr()
+            .also { closeCompletedFlow(flow, it) }
     }
 
     fun submitGuard(req: GuardRequest): ApiResponse = runBlocking {
-        flow(req.flowId)?.submitGuard(req.code)
+        flow(req.flowId, req.flowToken)?.submitGuard(req.code)
+            ?.also { closeCompletedFlow(req.flowId, it) }
             ?: ApiResponse(status = "error", message = "flow not found")
     }
 
     fun waitForApproval(req: ApprovalRequest): ApiResponse = runBlocking {
         val waitSeconds = (req.waitSeconds ?: 15).coerceIn(1, APPROVAL_WAIT_SECONDS)
-        flow(req.flowId)?.waitForApproval(waitSeconds)
+        flow(req.flowId, req.flowToken)?.waitForApproval(waitSeconds)
+            ?.also { closeCompletedFlow(req.flowId, it) }
             ?: ApiResponse(status = "error", message = "flow not found")
     }
 
     fun waitForQr(req: QrStatusRequest): ApiResponse = runBlocking {
         val waitSeconds = (req.waitSeconds ?: 15).coerceIn(1, APPROVAL_WAIT_SECONDS)
-        flow(req.flowId)?.waitForQr(waitSeconds)
+        flow(req.flowId, req.flowToken)?.waitForQr(waitSeconds)
+            ?.also { closeCompletedFlow(req.flowId, it) }
             ?: ApiResponse(status = "error", message = "flow not found")
     }
 
@@ -182,10 +194,7 @@ private class TicketMinterService {
         cleanup()
         val session = req.steamSession
             ?: return@runBlocking ApiResponse(status = "session_invalid", message = "steamSession is required")
-        val flow = AuthFlow(
-            id = UUID.randomUUID().toString(),
-            appId = req.appId ?: DEFAULT_APP_ID,
-        )
+        val flow = newFlow(req.appId ?: DEFAULT_APP_ID)
         try {
             flow.mintFromSession(session)
         } finally {
@@ -193,15 +202,18 @@ private class TicketMinterService {
         }
     }
 
-    fun status(flowId: String): ApiResponse = runBlocking {
-        flow(flowId)?.status()
+    fun status(flowId: String, flowToken: String): ApiResponse = runBlocking {
+        flow(flowId, flowToken)?.status()
+            ?.also { closeCompletedFlow(flowId, it) }
             ?: ApiResponse(status = "error", message = "flow not found")
     }
 
-    fun cancel(flowId: String): ApiResponse {
-        val flow = flows.remove(flowId) ?: return ApiResponse(status = "error", message = "flow not found")
+    fun cancel(req: FlowRequest): ApiResponse {
+        val flow = flow(req.flowId, req.flowToken)
+            ?: return ApiResponse(status = "error", message = "flow not found")
+        flows.remove(flow.id, flow)
         flow.close()
-        return ApiResponse(status = "cancelled", flowId = flowId)
+        return ApiResponse(status = "cancelled", flowId = flow.id, flowToken = flow.flowToken)
     }
 
     fun close() {
@@ -209,9 +221,26 @@ private class TicketMinterService {
         flows.clear()
     }
 
-    private fun flow(flowId: String): AuthFlow? {
+    private fun flow(flowId: String, flowToken: String): AuthFlow? {
         cleanup()
-        return flows[flowId]
+        return flows[flowId]?.takeIf { it.hasFlowToken(flowToken) }
+    }
+
+    private fun newFlow(appId: Int): AuthFlow =
+        AuthFlow(
+            id = UUID.randomUUID().toString(),
+            flowToken = newFlowToken(),
+            appId = appId,
+        )
+
+    private fun closeCompletedFlow(flowId: String, response: ApiResponse) {
+        if (response.status != "success") return
+        flows.remove(flowId)?.close()
+    }
+
+    private fun closeCompletedFlow(flow: AuthFlow, response: ApiResponse) {
+        if (response.status != "success") return
+        if (flows.remove(flow.id, flow)) flow.close()
     }
 
     private fun cleanup() {
@@ -226,17 +255,52 @@ private class TicketMinterService {
 
 private class AuthFlow(
     val id: String,
+    val flowToken: String,
     private val appId: Int,
 ) {
     val createdAt: Instant = Instant.now()
     private val mutex = Mutex()
     private var steam: SteamCmSession? = null
     private var authSession: AuthSession? = null
-    private var completed: ApiResponse? = null
+    private var finished = false
     private var lastMessage: String = "created"
     private var qrUrl: String? = null
     private var qrCode: String? = null
     private var steamSession: SteamSessionPayload? = null
+
+    fun hasFlowToken(token: String): Boolean =
+        token.isNotBlank() && token.secureEquals(flowToken)
+
+    private fun response(
+        status: String,
+        message: String? = null,
+        guardKind: String? = null,
+        challengeId: String? = null,
+        expiresIn: Int? = null,
+        qrUrl: String? = null,
+        qrCode: String? = null,
+        ticketHex: String? = null,
+        ticketBytes: Int? = null,
+        steamSession: SteamSessionPayload? = null,
+    ): ApiResponse =
+        ApiResponse(
+            status = status,
+            flowId = id,
+            flowToken = flowToken,
+            message = message,
+            guardKind = guardKind,
+            challengeId = challengeId,
+            expiresIn = expiresIn,
+            qrUrl = qrUrl,
+            qrCode = qrCode,
+            appId = appId,
+            ticketHex = ticketHex,
+            ticketBytes = ticketBytes,
+            steamSession = steamSession,
+        )
+
+    private fun closedResponse(): ApiResponse =
+        response(status = "error", message = "flow is closed")
 
     suspend fun start(username: String, password: String, guardCode: String?): ApiResponse = mutex.withLock {
         val client = startedClient()
@@ -266,7 +330,7 @@ private class AuthFlow(
 
         if (!credentials.requiresConfirmation()) {
             return@withLock waitForAuthAndMint(LOGIN_WAIT_MS / 1_000)
-                ?: ApiResponse(status = "error", flowId = id, message = "Steam sign-in timed out")
+                ?: response(status = "error", message = "Steam sign-in timed out")
         }
 
         guardResponse(credentials)
@@ -300,27 +364,21 @@ private class AuthFlow(
 
     suspend fun mintFromSession(session: SteamSessionPayload): ApiResponse = mutex.withLock {
         val steamId = session.steamId.trim().toLongOrNull()
-            ?: return@withLock ApiResponse(
+            ?: return@withLock response(
                 status = "session_invalid",
-                flowId = id,
-                appId = appId,
                 message = "Steam session steamId is missing",
             )
         val accountName = session.accountName.trim()
         if (accountName.isBlank()) {
-            return@withLock ApiResponse(
+            return@withLock response(
                 status = "session_invalid",
-                flowId = id,
-                appId = appId,
                 message = "Steam session accountName is missing",
             )
         }
         val refreshToken = session.refreshToken.trim()
         if (refreshToken.isBlank()) {
-            return@withLock ApiResponse(
+            return@withLock response(
                 status = "session_invalid",
-                flowId = id,
-                appId = appId,
                 message = "Steam session refreshToken is missing",
             )
         }
@@ -334,10 +392,8 @@ private class AuthFlow(
             client.logOn(accountName, refreshToken).takeIf { it != 0L } ?: steamId
         }.getOrElse {
             closeClient()
-            return@withLock ApiResponse(
+            return@withLock response(
                 status = "session_invalid",
-                flowId = id,
-                appId = appId,
                 message = it.rootMessage("Steam refresh session expired. Sign in again."),
             )
         }
@@ -348,15 +404,15 @@ private class AuthFlow(
 
     suspend fun submitGuard(code: String): ApiResponse = mutex.withLock {
         val credentials = authSession as? CredentialsAuthSession
-            ?: return@withLock completed ?: ApiResponse(status = "error", flowId = id, message = "flow is closed")
-        if (code.isBlank()) return@withLock ApiResponse(status = "error", flowId = id, message = "code is required")
+            ?: return@withLock closedResponse()
+        if (code.isBlank()) return@withLock response(status = "error", message = "code is required")
         submitGuardCode(credentials, code.trim())
     }
 
     suspend fun waitForApproval(waitSeconds: Int): ApiResponse = mutex.withLock {
-        completed?.let { return@withLock it }
+        if (finished) return@withLock closedResponse()
         val active = authSession
-            ?: return@withLock ApiResponse(status = "error", flowId = id, message = "flow is closed")
+            ?: return@withLock closedResponse()
         if (!active.hasApproval()) {
             return@withLock authSessionResponse(active)
         }
@@ -365,19 +421,19 @@ private class AuthFlow(
     }
 
     suspend fun waitForQr(waitSeconds: Int): ApiResponse = mutex.withLock {
-        completed?.let { return@withLock it }
-        authSession ?: return@withLock ApiResponse(status = "error", flowId = id, message = "flow is closed")
+        if (finished) return@withLock closedResponse()
+        authSession ?: return@withLock closedResponse()
         if (qrUrl == null) {
-            return@withLock ApiResponse(status = "pending", flowId = id, appId = appId, message = lastMessage)
+            return@withLock response(status = "pending", message = lastMessage)
         }
 
         waitForAuthAndMint(waitSeconds.toLong()) ?: qrResponse()
     }
 
     suspend fun status(): ApiResponse = mutex.withLock {
-        completed?.let { return@withLock it }
+        if (finished) return@withLock closedResponse()
         val active = authSession
-            ?: return@withLock ApiResponse(status = "closed", flowId = id, message = lastMessage)
+            ?: return@withLock response(status = "closed", message = lastMessage)
 
         pollOnceAndMint(STATUS_POLL_REQUEST_WAIT_MS)?.let { return@withLock it }
 
@@ -411,7 +467,7 @@ private class AuthFlow(
             return guardResponse(credentials)
         }
         return waitForAuthAndMint(LOGIN_WAIT_MS / 1_000)
-            ?: ApiResponse(status = "error", flowId = id, message = "Steam sign-in timed out")
+            ?: response(status = "error", message = "Steam sign-in timed out")
     }
 
     private fun waitForAuthAndMint(waitSeconds: Long): ApiResponse? {
@@ -436,7 +492,7 @@ private class AuthFlow(
     }
 
     private fun finishAuthAndMint(result: AuthPollResult): ApiResponse {
-        val client = steam ?: return ApiResponse(status = "error", flowId = id, message = "flow is closed")
+        val client = steam ?: return closedResponse()
         lastMessage = "logging on to Steam"
         val steamId = runCatching { client.logOn(result.accountName, result.refreshToken) }
             .getOrElse {
@@ -454,8 +510,8 @@ private class AuthFlow(
     }
 
     private fun mintTicket(): ApiResponse {
-        completed?.let { return it }
-        val client = steam ?: return ApiResponse(status = "error", flowId = id, message = "flow is closed")
+        if (finished) return closedResponse()
+        val client = steam ?: return closedResponse()
         lastMessage = "minting ticket"
         val ticket = runCatching {
             client.authSessionTicket(appId)
@@ -463,16 +519,14 @@ private class AuthFlow(
             return authError(it, "ticket mint failed")
         }
 
-        val response = ApiResponse(
+        val response = response(
             status = "success",
-            flowId = id,
-            appId = appId,
             ticketHex = ticket.hex(),
             ticketBytes = ticket.size,
             steamSession = steamSession,
             message = "Steam auth session ticket minted",
         )
-        completed = response
+        finished = true
         closeClient()
         return response
     }
@@ -480,10 +534,8 @@ private class AuthFlow(
     private fun qrResponse(): ApiResponse {
         val url = qrUrl.orEmpty()
         lastMessage = "waiting for Steam QR scan"
-        return ApiResponse(
+        return response(
             status = "qr_required",
-            flowId = id,
-            appId = appId,
             qrUrl = url,
             qrCode = qrCode,
             expiresIn = APPROVAL_WAIT_SECONDS,
@@ -495,10 +547,8 @@ private class AuthFlow(
         val hasApproval = session.hasApproval()
         val codeKind = session.codeKindOrNull()
         lastMessage = if (hasApproval) "waiting for Steam Guard approval" else "waiting for Steam Guard code"
-        return ApiResponse(
+        return response(
             status = if (hasApproval) "approval_required" else "guard_required",
-            flowId = id,
-            appId = appId,
             guardKind = codeKind?.name?.lowercase(),
             challengeId = id,
             expiresIn = APPROVAL_WAIT_SECONDS.takeIf { hasApproval },
@@ -514,14 +564,12 @@ private class AuthFlow(
         if (session.requiresConfirmation()) {
             guardResponse(session)
         } else {
-            ApiResponse(status = "pending", flowId = id, appId = appId, message = lastMessage)
+            response(status = "pending", message = lastMessage)
         }
 
     private fun authError(error: Throwable, fallback: String): ApiResponse =
-        ApiResponse(
+        response(
             status = "error",
-            flowId = id,
-            appId = appId,
             message = error.humanSteamMessage(fallback),
         )
 
@@ -628,12 +676,14 @@ private data class LoginRequest(
 @Serializable
 private data class GuardRequest(
     val flowId: String = "",
+    val flowToken: String = "",
     val code: String = "",
 )
 
 @Serializable
 private data class ApprovalRequest(
     val flowId: String = "",
+    val flowToken: String = "",
     val waitSeconds: Int? = null,
 )
 
@@ -645,6 +695,7 @@ private data class QrStartRequest(
 @Serializable
 private data class QrStatusRequest(
     val flowId: String = "",
+    val flowToken: String = "",
     val waitSeconds: Int? = null,
 )
 
@@ -655,7 +706,10 @@ private data class TicketRequest(
 )
 
 @Serializable
-private data class FlowRequest(val flowId: String = "")
+private data class FlowRequest(
+    val flowId: String = "",
+    val flowToken: String = "",
+)
 
 @Serializable
 private data class SteamSessionPayload(
@@ -669,6 +723,8 @@ private data class SteamSessionPayload(
 private data class ApiResponse(
     val status: String,
     val flowId: String? = null,
+    val flowToken: String? = null,
+    val versionCode: Int? = null,
     val message: String? = null,
     val guardKind: String? = null,
     val challengeId: String? = null,
@@ -761,6 +817,15 @@ private fun HttpExchange.addCorsHeaders() {
 }
 
 private fun ByteArray.hex(): String = joinToString("") { "%02x".format(it) }
+
+private fun newFlowToken(): String {
+    val bytes = ByteArray(FLOW_TOKEN_BYTES)
+    secureRandom.nextBytes(bytes)
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+}
+
+private fun String.secureEquals(other: String): Boolean =
+    MessageDigest.isEqual(toByteArray(), other.toByteArray())
 
 private fun String.toSteamQrDisplayCode(): String? =
     trim()
@@ -920,6 +985,7 @@ private fun uiHtml(port: Int): String =
       </main>
       <script>
         let flowId = "";
+        let flowToken = "";
         const out = document.getElementById("out");
         const qrBox = document.getElementById("qrBox");
         const qrCode = document.getElementById("qrCode");
@@ -932,6 +998,7 @@ private fun uiHtml(port: Int): String =
         };
         const print = data => {
           if (data.flowId) flowId = data.flowId;
+          if (data.flowToken) flowToken = data.flowToken;
           if (data.steamSession) {
             document.getElementById("steamSession").value = JSON.stringify(data.steamSession, null, 2);
           }
@@ -954,16 +1021,16 @@ private fun uiHtml(port: Int): String =
           guardCode: val("code") || null,
           appId: appId()
         });
-        document.getElementById("guardBtn").onclick = () => post("/api/guard", { flowId, code: val("code") });
-        document.getElementById("approvalBtn").onclick = () => post("/api/approval", { flowId, waitSeconds: 10 });
+        document.getElementById("guardBtn").onclick = () => post("/api/guard", { flowId, flowToken, code: val("code") });
+        document.getElementById("approvalBtn").onclick = () => post("/api/approval", { flowId, flowToken, waitSeconds: 10 });
         document.getElementById("qrBtn").onclick = () => post("/api/qr/start", { appId: appId() });
-        document.getElementById("qrStatusBtn").onclick = () => post("/api/qr/status", { flowId, waitSeconds: 10 });
+        document.getElementById("qrStatusBtn").onclick = () => post("/api/qr/status", { flowId, flowToken, waitSeconds: 10 });
         document.getElementById("ticketBtn").onclick = () => post("/api/ticket", { appId: appId(), steamSession: parseSteamSession() });
         document.getElementById("statusBtn").onclick = async () => {
-          const r = await fetch("/api/status?flowId=" + encodeURIComponent(flowId));
+          const r = await fetch("/api/status?flowId=" + encodeURIComponent(flowId) + "&flowToken=" + encodeURIComponent(flowToken));
           print(await r.json());
         };
-        document.getElementById("cancelBtn").onclick = () => post("/api/cancel", { flowId });
+        document.getElementById("cancelBtn").onclick = () => post("/api/cancel", { flowId, flowToken });
       </script>
     </body>
     </html>
