@@ -5,6 +5,7 @@ import org.koin.dsl.module
 
 actual fun steamModule() = module {
     single<SteamSessionStore> { steamSessionStore() }
-    single<SteamSignIn> { KSteamSignIn(get<SteamBackendApi>(), get()) }
+    single { KSteamSignIn(get<SteamBackendApi>(), get()) }
+    single<SteamSignIn> { get<KSteamSignIn>() }
+    single<SteamAchievementsClient> { get<KSteamSignIn>() }
 }
-

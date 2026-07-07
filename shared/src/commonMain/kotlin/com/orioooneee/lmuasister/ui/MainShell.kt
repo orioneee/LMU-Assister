@@ -66,6 +66,7 @@ import com.orioooneee.lmuasister.ui.profile.ProfileScreen
 import com.orioooneee.lmuasister.ui.profile.PublicRaceProfileDetailScreen
 import com.orioooneee.lmuasister.ui.profile.RaceProfileDetailScreen
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
+import com.orioooneee.lmuasister.ui.profile.SteamAchievementsScreen
 import com.orioooneee.lmuasister.ui.profile.SuspensionsScreen
 import com.orioooneee.lmuasister.ui.profile.TrackBreakdownScreen
 import com.orioooneee.lmuasister.ui.publicusers.PublicUserCategoryRacesScreen
@@ -128,6 +129,9 @@ data class SuspensionsRoute(val active: Boolean)
 
 @Serializable
 object TrackBreakdownRoute
+
+@Serializable
+object SteamAchievementsRoute
 
 @Serializable
 data class ProfileRaceDetailRoute(val eventId: String, val split: Int = -1)
@@ -301,6 +305,7 @@ fun MainShell(
                         selectedCar = car
                         nav.navigate(CarDetailRoute(car.displayId()))
                     },
+                    onOpenAchievements = { nav.navigate(SteamAchievementsRoute) },
                 )
             }
             composable<PublicUsersRoute> {
@@ -453,6 +458,13 @@ fun MainShell(
                     onOpenTrack = { trackId -> nav.navigate(TrackDetailRoute(trackId)) },
                 )
             }
+            composable<SteamAchievementsRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) {
+                SteamAchievementsScreen(
+                    viewModel = profileViewModel,
+                    insets = insets,
+                    onBack = { nav.popBackStack() },
+                )
+            }
             composable<AllRacesRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) {
                 AllRacesScreen(
                     viewModel = profileViewModel,
@@ -576,6 +588,7 @@ private fun screenNameOf(dest: NavDestination): String = when {
     dest.hasRoute(LeaderboardRoute::class) -> "full_leaderboard"
     dest.hasRoute(AllRacesRoute::class) -> "all_races"
     dest.hasRoute(SuspensionsRoute::class) -> "suspensions"
+    dest.hasRoute(SteamAchievementsRoute::class) -> "steam_achievements"
     dest.hasRoute(ProfileRaceDetailRoute::class) -> "race_history_detail"
     dest.hasRoute(PrivacyRoute::class) -> "privacy_policy"
     else -> "unknown"

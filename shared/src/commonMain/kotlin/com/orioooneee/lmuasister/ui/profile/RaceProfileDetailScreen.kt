@@ -1204,7 +1204,7 @@ private fun ClassificationLine(
             ClassificationSummaryLine(
                 r = r,
                 alt = alt,
-                showRatingDeltas = false,
+                showRatingDeltas = showRatingDeltas,
                 showSectors = showSectors,
                 bestSectors = bestSectors,
                 bestRaceLapMs = bestRaceLapMs,
@@ -1299,6 +1299,7 @@ private fun ClassificationSummaryLine(
                 r.classPosition?.takeIf { it > 0 }?.let { ClassPosBadge(it, r.carClass) }
                 if (teamMemberCount != null) {
                     TeamToggle(teamMemberCount, teamExpanded)
+                    if (showRatingDeltas) RatingDeltaColumn(r.teamDrChange, r.teamSrChange)
                 } else {
                     r.driverRating?.let { RatingMiniBadge("DR", it) }
                     r.safetyRating?.let { RatingMiniBadge("SR", it) }
@@ -1456,7 +1457,6 @@ private fun TeamMemberLine(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                member.carClass?.takeIf { it.isNotBlank() }?.let { ClassMiniBadge(it) }
                 member.driverRating?.let { RatingMiniBadge("DR", it) }
                 member.safetyRating?.let { RatingMiniBadge("SR", it) }
                 if (showRatingDeltas) RatingDeltaColumn(member.drChange, member.srChange)

@@ -68,6 +68,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.orioooneee.lmuasister.data.remote.CarDetailedDto
+import com.orioooneee.lmuasister.data.steam.SteamAchievements
 import com.orioooneee.lmuasister.supportsSteamGuardMobileApproval
 import com.orioooneee.lmuasister.data.steam.SteamGuardKind
 import com.orioooneee.lmuasister.ui.IconSteam
@@ -131,6 +132,7 @@ fun ProfileScreen(
     onOpenPrivacy: () -> Unit = {},
     onOpenTracks: () -> Unit = {},
     onOpenCar: (CarDetailedDto) -> Unit = {},
+    onOpenAchievements: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val topInset = insets.calculateTopPadding()
@@ -238,7 +240,15 @@ fun ProfileScreen(
         val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
         val updatingProfile by viewModel.updatingProfile.collectAsStateWithLifecycle()
         val exiting by viewModel.exiting.collectAsStateWithLifecycle()
+        val achievements by viewModel.achievementsState.collectAsStateWithLifecycle()
+        val readyProfile = signedIn.backend as? BackendState.Ok
         var showClearConfirm by remember { mutableStateOf(false) }
+
+        LaunchedEffect(readyProfile?.profile?.uid) {
+            if (readyProfile != null) {
+                viewModel.refreshAchievementsIfStale()
+            }
+        }
 
         RefreshableContent(refreshing, viewModel::refresh, topInset = topInset) {
             Column(
@@ -255,6 +265,8 @@ fun ProfileScreen(
                     updatingProfile,
                     !refreshing && !updatingProfile,
                     viewModel::updateProfile,
+                    achievements.data,
+                    onOpenAchievements,
                     onSeeAllRaces,
                     onOpenRace,
                     onOpenSuspensions,
@@ -807,6 +819,8 @@ private fun ProfileContent(
     updatingProfile: Boolean,
     canUpdateProfile: Boolean,
     onUpdateProfile: () -> Unit,
+    achievements: SteamAchievements?,
+    onOpenAchievements: () -> Unit,
     onSeeAllRaces: () -> Unit,
     onOpenRace: (eventId: String, split: Int?) -> Unit,
     onOpenSuspensions: (active: Boolean) -> Unit,
@@ -820,7 +834,9 @@ private fun ProfileContent(
             accountName = "",
             isRefreshingProfile = updatingProfile,
             canRefreshProfile = canUpdateProfile,
+            achievements = achievements,
             onRefreshProfile = onUpdateProfile,
+            onOpenAchievements = onOpenAchievements,
             onSeeAllRaces = onSeeAllRaces,
             onOpenRace = onOpenRace,
             onOpenSuspensions = onOpenSuspensions,

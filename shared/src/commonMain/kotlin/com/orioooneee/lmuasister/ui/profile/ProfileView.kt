@@ -46,6 +46,9 @@ import com.orioooneee.lmuasister.data.remote.RaceSessionsDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SteamProfile
+import com.orioooneee.lmuasister.data.steam.SteamAchievements
+import com.orioooneee.lmuasister.ui.IconChampionship
+import com.orioooneee.lmuasister.ui.IconSteam
 import com.orioooneee.lmuasister.ui.TrackLogoIndex
 import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.RankBadge
@@ -106,6 +109,7 @@ private fun prettyBadge(badge: String): String =
 
 private const val RECENT_PREVIEW = 3
 private const val FAVORITE_CARS_PREVIEW = 5
+private const val ACHIEVEMENT_ICON_PREVIEW = 5
 
 @Composable
 fun ProfileView(
@@ -118,7 +122,9 @@ fun ProfileView(
     enableRaceClicks: Boolean = !readOnly,
     isRefreshingProfile: Boolean = false,
     canRefreshProfile: Boolean = true,
+    achievements: SteamAchievements? = null,
     onRefreshProfile: (() -> Unit)? = null,
+    onOpenAchievements: () -> Unit = {},
     onSeeAllRaces: () -> Unit = {},
     onOpenRace: (eventId: String, split: Int?) -> Unit = { _, _ -> },
     onOpenSuspensions: (active: Boolean) -> Unit = {},
@@ -141,8 +147,14 @@ fun ProfileView(
                     onOpenSuspensions = onOpenSuspensions,
                     onOpenTracks = onOpenTracks,
                 )
+                if (!readOnly) {
+                    SteamAchievementsEntry(achievements, onOpenAchievements)
+                }
             } else {
                 ProfileHeader(profile, accountName, readOnly, enableTrackBreakdown, onOpenSuspensions, onOpenTracks)
+                if (!readOnly) {
+                    SteamAchievementsEntry(achievements, onOpenAchievements)
+                }
                 if (!readOnly && onRefreshProfile != null) {
                     UpdateProfileButton(
                         loading = isRefreshingProfile,
@@ -216,6 +228,123 @@ fun ProfileView(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SteamAchievementsEntry(achievements: SteamAchievements?, onOpen: () -> Unit) {
+    val unlocked = achievements?.unlocked ?: 0
+    val total = achievements?.total ?: 0
+    val progress = achievements?.progress ?: 0f
+    val title = if (total > 0) "$unlocked/$total achievements" else "Steam achievements"
+    val subtitle = if (total > 0) "${(progress * 100f).roundToInt()}% complete" else "Open LMU trophy list"
+    val shape = RoundedCornerShape(14.dp)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val previewCount = when {
+            maxWidth >= 520.dp -> ACHIEVEMENT_ICON_PREVIEW
+            maxWidth >= 420.dp -> 4
+            else -> 0
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 86.dp)
+                .clip(shape)
+                .background(Surface1)
+                .border(1.dp, Amber.copy(alpha = 0.32f), shape)
+                .clickable(onClick = onOpen)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Amber.copy(alpha = 0.13f))
+                    .border(1.dp, Amber.copy(alpha = 0.42f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(IconChampionship, contentDescription = null, tint = Amber, modifier = Modifier.size(28.dp))
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Icon(IconSteam, contentDescription = null, tint = TextMed, modifier = Modifier.size(16.dp))
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TextHigh,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (total > 0) Amber else TextLow,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (total > 0) AchievementsProgress(progress)
+            }
+            AchievementPreviewStrip(achievements, previewCount)
+        }
+    }
+}
+
+@Composable
+private fun AchievementPreviewStrip(achievements: SteamAchievements?, count: Int) {
+    if (count <= 0) return
+    val icons = achievements?.achievements
+        ?.sortedWith(
+            compareBy<com.orioooneee.lmuasister.data.steam.SteamAchievement> { if (it.unlockTime > 0L) 0 else 1 }
+                .thenByDescending { it.unlockTime }
+                .thenBy { it.name.lowercase() },
+        )
+        ?.take(count)
+        .orEmpty()
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        icons.forEach { achievement ->
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Surface3)
+                    .border(1.dp, if (achievement.achieved) Amber.copy(alpha = 0.42f) else Outline, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (!achievement.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = achievement.imageUrl,
+                        contentDescription = achievement.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)),
+                    )
+                } else {
+                    Icon(IconChampionship, contentDescription = null, tint = TextLow, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AchievementsProgress(progress: Float) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(5.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(Surface3),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .height(5.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Amber),
+        )
     }
 }
 

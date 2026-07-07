@@ -20,6 +20,8 @@ import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SteamBackendApi
 import com.orioooneee.lmuasister.data.remote.SteamProfile
 import com.orioooneee.lmuasister.data.steam.SignInOutcome
+import com.orioooneee.lmuasister.data.steam.SteamAchievements
+import com.orioooneee.lmuasister.data.steam.SteamAchievementsClient
 import com.orioooneee.lmuasister.data.steam.SteamAuthEnvironment
 import com.orioooneee.lmuasister.data.steam.SteamAuthEnvironmentUnavailable
 import com.orioooneee.lmuasister.data.steam.SteamGuardKind
@@ -31,6 +33,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
+import kotlin.time.Clock
 
 sealed interface BackendState {
     data object Loading : BackendState
@@ -93,7 +96,17 @@ data class CategoryRacesUi(
     val error: String? = null,
 )
 
+data class AchievementsUi(
+    val data: SteamAchievements? = null,
+    val loading: Boolean = false,
+    val refreshing: Boolean = false,
+    val fromCache: Boolean = false,
+    val error: String? = null,
+)
+
 private const val PROFILE_CACHE_KEY = "steam_profile_v3"
+private const val ACHIEVEMENTS_CACHE_KEY = "steam_achievements_v2"
+private const val ACHIEVEMENTS_PROFILE_REFRESH_COOLDOWN_MS = 60_000L
 
 // App-store-review login: the reviewer types these into the normal form; we route them to
 // /auth/demo (a service-account session) instead of a real Steam sign-in. Configured via
@@ -117,6 +130,7 @@ class SteamLoginViewModel(
     private val authRunner: SteamAuthRunner,
     private val backend: SteamBackendApi,
     private val tokenHolder: AppTokenHolder,
+    private val achievementsClient: SteamAchievementsClient,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<SteamLoginUiState>(SteamLoginUiState.Restoring)
@@ -136,6 +150,12 @@ class SteamLoginViewModel(
 
     private val _categoryRaces = MutableStateFlow(CategoryRacesUi())
     val categoryRacesState: StateFlow<CategoryRacesUi> = _categoryRaces.asStateFlow()
+
+    private val _achievements = MutableStateFlow(
+        loadCachedAchievements()?.let { AchievementsUi(data = it, fromCache = true) } ?: AchievementsUi(),
+    )
+    val achievementsState: StateFlow<AchievementsUi> = _achievements.asStateFlow()
+    private var lastAchievementsRefreshMs = 0L
 
     val guardRequired: Boolean get() = _state.value is SteamLoginUiState.GuardRequired
 
@@ -609,8 +629,11 @@ class SteamLoginViewModel(
         runCatching { LocalCache.removeByPrefix("race_detail_") }
         runCatching { LocalCache.removeByPrefix("race_split_") }
         runCatching { LocalCache.removeByPrefix("track_detail_") }
+        runCatching { LocalCache.remove(ACHIEVEMENTS_CACHE_KEY) }
         _allRaces.value = AllRacesUi()
         _categoryRaces.value = CategoryRacesUi()
+        _achievements.value = AchievementsUi()
+        lastAchievementsRefreshMs = 0L
     }
 
     fun loadMoreAllRaces() {
@@ -672,6 +695,44 @@ class SteamLoginViewModel(
     fun retryCategory() {
         _categoryRaces.value = _categoryRaces.value.copy(error = null)
         loadMoreCategory()
+    }
+
+    fun loadAchievements(force: Boolean = false) {
+        val cur = _achievements.value
+        if (cur.loading || cur.refreshing) return
+        if (!force && cur.data != null && cur.error == null) return
+        lastAchievementsRefreshMs = Clock.System.now().toEpochMilliseconds()
+        _achievements.value = cur.copy(
+            loading = cur.data == null,
+            refreshing = cur.data != null,
+            error = null,
+        )
+        viewModelScope.launch {
+            runCatching { achievementsClient.achievements() }
+                .onSuccess { data ->
+                    saveCachedAchievements(data)
+                    _achievements.value = AchievementsUi(data = data, fromCache = false)
+                }
+                .onFailure { e ->
+                    SteamLog.e("vm: achievements load failed", e)
+                    val cached = loadCachedAchievements()
+                    _achievements.value = AchievementsUi(
+                        data = cached ?: cur.data,
+                        fromCache = cached != null || cur.fromCache,
+                        error = e.message ?: "Couldn't load Steam achievements",
+                    )
+                }
+        }
+    }
+
+    fun refreshAchievementsIfStale() {
+        val now = Clock.System.now().toEpochMilliseconds()
+        if (lastAchievementsRefreshMs > 0L && now - lastAchievementsRefreshMs < ACHIEVEMENTS_PROFILE_REFRESH_COOLDOWN_MS) return
+        loadAchievements(force = true)
+    }
+
+    fun refreshAchievements() {
+        loadAchievements(force = true)
     }
 
     private suspend fun categoryRacesPage(category: String, page: Int): RacesPageDto =
@@ -784,5 +845,13 @@ class SteamLoginViewModel(
 
     private fun saveCachedProfile(p: SteamProfile) {
         runCatching { LocalCache.write(PROFILE_CACHE_KEY, AppJson.encodeToString(p)) }
+    }
+
+    private fun loadCachedAchievements(): SteamAchievements? =
+        LocalCache.read(ACHIEVEMENTS_CACHE_KEY)?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { AppJson.decodeFromString<SteamAchievements>(it) }.getOrNull() }
+
+    private fun saveCachedAchievements(achievements: SteamAchievements) {
+        runCatching { LocalCache.write(ACHIEVEMENTS_CACHE_KEY, AppJson.encodeToString(achievements)) }
     }
 }

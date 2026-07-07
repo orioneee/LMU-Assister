@@ -426,4 +426,6 @@ data class ClassificationRowDto(
     @SerialName("team_icon") val teamIcon: String? = null,
     @SerialName("team_member_count") val teamMemberCount: Int = 0,
     @SerialName("team_members") val teamMembers: List<TeamMemberDto> = emptyList(),
+    @SerialName("team_sr_change") val teamSrChange: Double? = null,
+    @SerialName("team_dr_change") val teamDrChange: Double? = null,
 )

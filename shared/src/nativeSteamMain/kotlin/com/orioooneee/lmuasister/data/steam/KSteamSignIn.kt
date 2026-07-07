@@ -17,6 +17,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import steam.webui.player.CPlayer_GetGameAchievements_Request
+import steam.webui.player.CPlayer_GetUserAchievements_Request
 import kotlin.time.TimeSource
 
 private const val APPROVAL_WAIT_SECONDS = 120
@@ -26,6 +28,7 @@ private const val RESTORE_WAIT_MS = 10_000L
 private const val APPROVAL_WAIT_MS = APPROVAL_WAIT_SECONDS * 1_000L
 private const val QR_STATUS_WAIT_MS = 15_000L
 private const val PROMPT_STATE_WAIT_MS = 2_000L
+private const val STEAM_ACHIEVEMENT_ICON_BASE = "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps"
 
 /**
  * Steam auth through kSteam. The kSteam client is process-scoped and independent of
@@ -35,7 +38,7 @@ internal class KSteamSignIn(
     private val backend: SteamBackendApi,
     private val sessionStore: SteamSessionStore,
     private val clientFactory: () -> SteamClient = ::createKSteamClient,
-) : SteamSignIn {
+) : SteamSignIn, SteamAchievementsClient {
 
     private val mutex = Mutex()
     private var client: SteamClient? = null
@@ -247,6 +250,47 @@ internal class KSteamSignIn(
                 ?.token
         }
 
+    override suspend fun achievements(appId: Int): SteamAchievements =
+        mutex.withLock {
+            val steam = startedClient()
+            ensureSignedInForSteamData(steam)
+            val steamId = currentSteamId(steam)
+            SteamLog.d("ksteam: requesting Steam achievements app=$appId uid=${SteamLog.short(steamId.toString())}")
+            val schema = withTimeout(LOGIN_WAIT_MS) {
+                steam.grpc.player.GetGameAchievements()
+                    .execute(CPlayer_GetGameAchievements_Request(appid = appId, language = "english", hash_only = false))
+            }
+            val user = withTimeout(LOGIN_WAIT_MS) {
+                steam.grpc.player.GetUserAchievements()
+                    .execute(CPlayer_GetUserAchievements_Request(steamid = steamId, appid = appId))
+            }
+            val progressByKey = user.achievements.mapNotNull { progress ->
+                progress.internal_key?.let { it to progress }
+            }.toMap()
+            val achievements = schema.achievements.mapNotNull { item ->
+                if (item.archived == true) return@mapNotNull null
+                val key = item.internal_key ?: return@mapNotNull null
+                val progress = progressByKey[key]
+                val name = item.localized_name?.takeIf { it.isNotBlank() }
+                    ?: item.internal_name.orEmpty().trim()
+                if (name.isBlank()) return@mapNotNull null
+                SteamAchievement(
+                    name = name,
+                    description = item.localized_desc?.takeIf { it.isNotBlank() },
+                    achievedImageUrl = item.icon.steamAchievementIconUrl(appId),
+                    lockedImageUrl = item.icon_gray.steamAchievementIconUrl(appId),
+                    achieved = progress?.unlocked == true,
+                    unlockTime = (progress?.unlock_time ?: 0).toLong(),
+                )
+            }.sortedWith(achievementDateComparator())
+            SteamAchievements(
+                appId = appId,
+                total = achievements.size,
+                unlocked = achievements.count { it.achieved },
+                achievements = achievements,
+            )
+        }
+
     override fun signOut() {
         runCatching {
             client?.let { steam ->
@@ -352,6 +396,49 @@ internal class KSteamSignIn(
             SteamLog.d("ksteam: waitForSignedInAndExchange timed out after ${timeoutMs}ms state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}")
             SignInOutcome.Failure("Steam sign-in timed out. Try again.")
         }
+
+    private suspend fun ensureSignedInForSteamData(steam: SteamClient) {
+        if (steam.account.clientAuthState.value is AuthorizationState.Success) return
+        val saved = sessionStore.load()
+        val restoreStarted = withTimeoutOrNull(RESTORE_WAIT_MS) {
+            tryRestoreStoredSession(steam, saved)
+        } == true
+        if (!restoreStarted && steam.account.clientAuthState.value !is AuthorizationState.Success) {
+            throw IllegalStateException("Steam session expired. Sign in again.")
+        }
+        withTimeout(RESTORE_WAIT_MS) {
+            awaitSignedInWithLogs(steam)
+        }
+    }
+
+    private suspend fun currentSteamId(steam: SteamClient): Long {
+        sessionStore.load()?.steamId?.takeIf { it > 0L }?.let { return it }
+        return steam.configuration.getValidSecureAccountIds()
+            .firstOrNull()
+            ?.toString()
+            ?.toLongOrNull()
+            ?: throw IllegalStateException("Steam account id is missing. Sign in again.")
+    }
+
+    private fun achievementDateComparator(): Comparator<SteamAchievement> =
+        compareBy<SteamAchievement> { if (it.unlockTime > 0L) 0 else 1 }
+            .thenByDescending { it.unlockTime }
+            .thenBy { it.name.lowercase() }
+
+    private fun String?.steamAchievementIconUrl(appId: Int): String? {
+        val value = this?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val httpsValue = value.replace("http://", "https://")
+        return when {
+            httpsValue.startsWith("https://") -> httpsValue
+            httpsValue.startsWith("//") -> "https:$httpsValue"
+            httpsValue.startsWith("/") -> "https://cdn.cloudflare.steamstatic.com$httpsValue"
+            "/" in httpsValue -> "https://cdn.cloudflare.steamstatic.com/${httpsValue.trimStart('/')}"
+            else -> {
+                val file = if (httpsValue.endsWith(".jpg") || httpsValue.endsWith(".png")) httpsValue else "$httpsValue.jpg"
+                "$STEAM_ACHIEVEMENT_ICON_BASE/$appId/$file"
+            }
+        }
+    }
 
     private suspend fun exchangeTicket(steam: SteamClient): SteamAuthResponse {
         SteamLog.d("ksteam: requesting Steam auth session ticket app=$LMU_APP_ID")
