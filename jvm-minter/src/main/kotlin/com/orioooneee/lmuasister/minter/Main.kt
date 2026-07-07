@@ -24,13 +24,18 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.io.Closeable
+import java.net.HttpURLConnection
 import java.net.InetSocketAddress
+import java.net.URI
 import java.net.URLDecoder
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.Security
@@ -44,6 +49,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import `in`.dragonbra.javasteam.types.SteamID
 
 private const val DEFAULT_APP_ID = 2_399_420
 private const val DEFAULT_PORT = 8787
@@ -52,6 +58,8 @@ private const val POLL_REQUEST_WAIT_MS = 15_000L
 private const val STATUS_POLL_REQUEST_WAIT_MS = 2_000L
 private const val APPROVAL_WAIT_SECONDS = 120
 private const val FLOW_TOKEN_BYTES = 32
+private const val STEAM_WEB_API_BASE = "https://api.steampowered.com"
+private const val STEAM_ACHIEVEMENT_ICON_BASE = "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps"
 
 private val json = Json {
     ignoreUnknownKeys = true
@@ -115,6 +123,12 @@ fun main(args: Array<String>) {
             service.mintTicket(req).respond(exchange)
         }
     }
+    server.createContext("/api/achievements") { exchange ->
+        exchange.requirePost {
+            val req = exchange.readJson<AchievementsRequest>()
+            service.achievements(req).respond(exchange)
+        }
+    }
     server.createContext("/api/status") { exchange ->
         val query = exchange.query()
         service.status(
@@ -137,7 +151,7 @@ fun main(args: Array<String>) {
     server.start()
 
     println("jvm-minter listening on http://127.0.0.1:$port/ui/")
-    println("API: POST /api/login, /api/guard, /api/approval, /api/qr/start, /api/qr/status, /api/ticket; GET /api/status?flowId=...")
+    println("API: POST /api/login, /api/guard, /api/approval, /api/qr/start, /api/qr/status, /api/ticket, /api/achievements; GET /api/status?flowId=...")
 }
 
 private fun healthResponse(): ApiResponse =
@@ -197,6 +211,18 @@ private class TicketMinterService {
         val flow = newFlow(req.appId ?: DEFAULT_APP_ID)
         try {
             flow.mintFromSession(session)
+        } finally {
+            flow.close()
+        }
+    }
+
+    fun achievements(req: AchievementsRequest): ApiResponse = runBlocking {
+        cleanup()
+        val session = req.steamSession
+            ?: return@runBlocking ApiResponse(status = "session_invalid", message = "steamSession is required")
+        val flow = newFlow(DEFAULT_APP_ID)
+        try {
+            flow.achievementsFromSession(session)
         } finally {
             flow.close()
         }
@@ -282,6 +308,7 @@ private class AuthFlow(
         ticketHex: String? = null,
         ticketBytes: Int? = null,
         steamSession: SteamSessionPayload? = null,
+        achievements: SteamAchievementsPayload? = null,
     ): ApiResponse =
         ApiResponse(
             status = status,
@@ -297,6 +324,7 @@ private class AuthFlow(
             ticketHex = ticketHex,
             ticketBytes = ticketBytes,
             steamSession = steamSession,
+            achievements = achievements,
         )
 
     private fun closedResponse(): ApiResponse =
@@ -400,6 +428,46 @@ private class AuthFlow(
 
         steamSession = session.copy(steamId = restoredSteamId.toString())
         mintTicket()
+    }
+
+    suspend fun achievementsFromSession(session: SteamSessionPayload): ApiResponse = mutex.withLock {
+        val prepared = prepareSession(session)
+            ?: return@withLock response(status = "session_invalid", message = "Steam session accountName and refreshToken are required")
+        var working = prepared
+        lastMessage = "loading Steam achievements"
+
+        val first = runCatching { fetchAchievements(working, DEFAULT_APP_ID) }
+        val achievements = first.getOrElse { firstError ->
+            if (firstError !is SteamWebApiAuthException) {
+                return@withLock response(
+                    status = "error",
+                    message = firstError.rootMessage("Steam achievements request failed"),
+                    steamSession = working,
+                )
+            }
+            working = refreshAccessToken(working).getOrElse { refreshError ->
+                return@withLock response(
+                    status = "session_invalid",
+                    message = refreshError.rootMessage("Steam refresh session expired. Sign in again."),
+                    steamSession = working,
+                )
+            }
+            runCatching { fetchAchievements(working, DEFAULT_APP_ID) }.getOrElse { retryError ->
+                return@withLock response(
+                    status = if (retryError is SteamWebApiAuthException) "session_invalid" else "error",
+                    message = retryError.rootMessage("Steam achievements request failed"),
+                    steamSession = working,
+                )
+            }
+        }
+
+        finished = true
+        response(
+            status = "success",
+            message = "Steam achievements loaded",
+            steamSession = working,
+            achievements = achievements,
+        )
     }
 
     suspend fun submitGuard(code: String): ApiResponse = mutex.withLock {
@@ -531,6 +599,86 @@ private class AuthFlow(
         return response
     }
 
+    private fun prepareSession(session: SteamSessionPayload): SteamSessionPayload? {
+        val accountName = session.accountName.trim()
+        val refreshToken = session.refreshToken.trim()
+        if (accountName.isBlank() || refreshToken.isBlank()) return null
+        return session.copy(
+            steamId = session.steamId.trim(),
+            accountName = accountName,
+            accessToken = session.accessToken.trim(),
+            refreshToken = refreshToken,
+        )
+    }
+
+    private fun refreshAccessToken(session: SteamSessionPayload): Result<SteamSessionPayload> =
+        runCatching {
+            val client = startedClient()
+            val steamId = session.steamId.toLongOrNull()?.takeIf { it > 0L }
+                ?: client.logOn(session.accountName, session.refreshToken).takeIf { it > 0L }
+                ?: error("Steam account id is missing")
+            val renewed = client.renewAccessToken(steamId, session.refreshToken)
+            session.copy(
+                steamId = steamId.toString(),
+                accessToken = renewed.accessToken,
+                refreshToken = renewed.refreshToken.ifBlank { session.refreshToken },
+            )
+        }
+
+    private fun fetchAchievements(session: SteamSessionPayload, appId: Int): SteamAchievementsPayload {
+        val accessToken = session.accessToken.takeIf { it.isNotBlank() }
+            ?: throw SteamWebApiAuthException("Steam access token is missing")
+        val schemaRaw = steamWebApiGet(
+            path = "/ISteamUserStats/GetSchemaForGame/v2/",
+            params = mapOf(
+                "appid" to appId.toString(),
+                "l" to "english",
+                "access_token" to accessToken,
+            ),
+        )
+        val playerParams = mutableMapOf(
+            "appid" to appId.toString(),
+            "access_token" to accessToken,
+        )
+        session.steamId.takeIf { it.isNotBlank() }?.let { playerParams["steamid"] = it }
+        val userRaw = steamWebApiGet(
+            path = "/ISteamUserStats/GetPlayerAchievements/v1/",
+            params = playerParams,
+        )
+        val schema = json.decodeFromString<SteamSchemaResponse>(schemaRaw)
+        val user = json.decodeFromString<SteamPlayerAchievementsResponse>(userRaw)
+        val userStats = user.playerstats ?: throw SteamWebApiException("Steam achievements response is empty")
+        userStats.error?.takeIf { it.isNotBlank() }?.let { throw steamWebApiError(it) }
+        if (userStats.success == false) throw SteamWebApiException("Steam achievements request failed")
+
+        val progressByName = userStats.achievements.associateBy { it.apiname }
+        val achievements = schema.game
+            ?.availableGameStats
+            ?.achievements
+            .orEmpty()
+            .mapNotNull { item ->
+                val apiName = item.name.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val progress = progressByName[apiName]
+                val displayName = item.displayName.takeIf { it.isNotBlank() } ?: apiName
+                SteamAchievementPayload(
+                    name = displayName,
+                    description = item.description.takeIf { it.isNotBlank() },
+                    achievedImageUrl = item.icon.steamAchievementIconUrl(appId),
+                    lockedImageUrl = item.iconGray.steamAchievementIconUrl(appId),
+                    achieved = progress?.achieved == 1,
+                    unlockTime = progress?.unlockTime ?: 0L,
+                )
+            }
+            .sortedWith(achievementDateComparator())
+
+        return SteamAchievementsPayload(
+            appId = appId,
+            total = achievements.size,
+            unlocked = achievements.count { it.achieved },
+            achievements = achievements,
+        )
+    }
+
     private fun qrResponse(): ApiResponse {
         val url = qrUrl.orEmpty()
         lastMessage = "waiting for Steam QR scan"
@@ -657,6 +805,16 @@ private class SteamCmSession {
         return handler.getAuthSessionTicket(appId).awaitSteam(LOGIN_WAIT_MS).ticket
     }
 
+    fun renewAccessToken(steamId: Long, refreshToken: String): RenewedAccessToken {
+        val res = client.authentication
+            .generateAccessTokenForApp(SteamID(steamId), refreshToken, false)
+            .awaitSteam(LOGIN_WAIT_MS)
+        return RenewedAccessToken(
+            accessToken = res.accessToken,
+            refreshToken = res.refreshToken,
+        )
+    }
+
     fun close() {
         running = false
         subscriptions.forEach { runCatching { it.close() } }
@@ -664,6 +822,11 @@ private class SteamCmSession {
         runCatching { client.disconnect() }
     }
 }
+
+private data class RenewedAccessToken(
+    val accessToken: String,
+    val refreshToken: String,
+)
 
 @Serializable
 private data class LoginRequest(
@@ -706,6 +869,11 @@ private data class TicketRequest(
 )
 
 @Serializable
+private data class AchievementsRequest(
+    val steamSession: SteamSessionPayload? = null,
+)
+
+@Serializable
 private data class FlowRequest(
     val flowId: String = "",
     val flowToken: String = "",
@@ -717,6 +885,24 @@ private data class SteamSessionPayload(
     val accountName: String = "",
     val accessToken: String = "",
     val refreshToken: String = "",
+)
+
+@Serializable
+private data class SteamAchievementsPayload(
+    val appId: Int = DEFAULT_APP_ID,
+    val total: Int = 0,
+    val unlocked: Int = 0,
+    val achievements: List<SteamAchievementPayload> = emptyList(),
+)
+
+@Serializable
+private data class SteamAchievementPayload(
+    val name: String,
+    val description: String? = null,
+    @SerialName("achieved_image_url") val achievedImageUrl: String? = null,
+    @SerialName("locked_image_url") val lockedImageUrl: String? = null,
+    val achieved: Boolean = false,
+    @SerialName("unlock_time") val unlockTime: Long = 0L,
 )
 
 @Serializable
@@ -735,7 +921,119 @@ private data class ApiResponse(
     val ticketHex: String? = null,
     val ticketBytes: Int? = null,
     val steamSession: SteamSessionPayload? = null,
+    val achievements: SteamAchievementsPayload? = null,
 )
+
+@Serializable
+private data class SteamSchemaResponse(
+    val game: SteamSchemaGame? = null,
+)
+
+@Serializable
+private data class SteamSchemaGame(
+    @SerialName("availableGameStats") val availableGameStats: SteamAvailableGameStats? = null,
+)
+
+@Serializable
+private data class SteamAvailableGameStats(
+    val achievements: List<SteamSchemaAchievement> = emptyList(),
+)
+
+@Serializable
+private data class SteamSchemaAchievement(
+    val name: String = "",
+    @SerialName("displayName") val displayName: String = "",
+    val description: String = "",
+    val icon: String = "",
+    @SerialName("icongray") val iconGray: String = "",
+)
+
+@Serializable
+private data class SteamPlayerAchievementsResponse(
+    val playerstats: SteamPlayerStats? = null,
+)
+
+@Serializable
+private data class SteamPlayerStats(
+    @SerialName("steamID") val steamId: String = "",
+    val success: Boolean? = null,
+    val error: String? = null,
+    val achievements: List<SteamPlayerAchievement> = emptyList(),
+)
+
+@Serializable
+private data class SteamPlayerAchievement(
+    val apiname: String = "",
+    val achieved: Int = 0,
+    @SerialName("unlocktime") val unlockTime: Long = 0L,
+)
+
+private fun steamWebApiGet(path: String, params: Map<String, String>): String {
+    val query = params.entries.joinToString("&") { (key, value) ->
+        "${key.urlEncode()}=${value.urlEncode()}"
+    }
+    val url = "$STEAM_WEB_API_BASE$path?$query"
+    val connection = (URI(url).toURL().openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 12_000
+        readTimeout = 20_000
+        setRequestProperty("Accept", "application/json")
+    }
+    return try {
+        val code = connection.responseCode
+        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+        val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        if (code == HttpURLConnection.HTTP_UNAUTHORIZED || code == HttpURLConnection.HTTP_FORBIDDEN) {
+            throw SteamWebApiAuthException(body.ifBlank { "Steam access token was rejected" })
+        }
+        if (code !in 200..299) {
+            throw steamWebApiError(body.ifBlank { "Steam WebAPI failed with HTTP $code" })
+        }
+        if (body.isSteamAccessDenied()) throw SteamWebApiAuthException(body)
+        body
+    } finally {
+        connection.disconnect()
+    }
+}
+
+private fun steamWebApiError(message: String): SteamWebApiException =
+    if (message.isSteamAccessDenied()) SteamWebApiAuthException(message) else SteamWebApiException(message)
+
+private fun String.isSteamAccessDenied(): Boolean {
+    val text = lowercase()
+    return "access is denied" in text ||
+        "access denied" in text ||
+        "invalid access token" in text ||
+        "expired access token" in text ||
+        "token" in text && "invalid" in text
+}
+
+private fun achievementDateComparator(): Comparator<SteamAchievementPayload> =
+    compareBy<SteamAchievementPayload> { if (it.unlockTime > 0L) 0 else 1 }
+        .thenByDescending { it.unlockTime }
+        .thenBy { it.name.lowercase() }
+
+private fun String.steamAchievementIconUrl(appId: Int): String? {
+    val value = trim().takeIf { it.isNotBlank() } ?: return null
+    val httpsValue = value.replace("http://", "https://")
+    return when {
+        httpsValue.startsWith("https://") -> httpsValue
+        httpsValue.startsWith("//") -> "https:$httpsValue"
+        httpsValue.startsWith("/") -> "https://cdn.cloudflare.steamstatic.com$httpsValue"
+        "/" in httpsValue -> "https://cdn.cloudflare.steamstatic.com/${httpsValue.trimStart('/')}"
+        else -> {
+            val file = if (httpsValue.endsWith(".jpg") || httpsValue.endsWith(".png")) httpsValue else "$httpsValue.jpg"
+            "$STEAM_ACHIEVEMENT_ICON_BASE/$appId/$file"
+        }
+    }
+}
+
+private fun String.urlEncode(): String =
+    URLEncoder.encode(this, StandardCharsets.UTF_8.name())
+
+private open class SteamWebApiException(message: String) : RuntimeException(message)
+
+private class SteamWebApiAuthException(message: String) : SteamWebApiException(message)
 
 private fun ApiResponse.respond(exchange: HttpExchange) {
     exchange.respondJson(this, if (status == "error") 400 else 200)

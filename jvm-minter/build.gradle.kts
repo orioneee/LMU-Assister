@@ -7,18 +7,18 @@ plugins {
 val lmuVersionCode = providers.gradleProperty("lmu.versionCode").get().trim().toInt()
 
 val generateMinterBuildConfig by tasks.registering {
-    val outDir = layout.buildDirectory.dir("generated/buildconfig/kotlin")
     inputs.property("versionCode", lmuVersionCode)
-    outputs.dir(outDir)
+    outputs.dir(layout.buildDirectory.dir("generated/buildconfig/kotlin"))
     doLast {
-        val pkgDir = outDir.get().asFile.resolve("com/orioooneee/lmuasister/minter")
+        val versionCode = inputs.properties["versionCode"]
+        val pkgDir = outputs.files.singleFile.resolve("com/orioooneee/lmuasister/minter")
         pkgDir.mkdirs()
         pkgDir.resolve("MinterBuildConfig.kt").writeText(
             """
             |package com.orioooneee.lmuasister.minter
             |
             |internal object MinterBuildConfig {
-            |    const val VERSION_CODE: Int = $lmuVersionCode
+            |    const val VERSION_CODE: Int = $versionCode
             |}
             |
             """.trimMargin(),
