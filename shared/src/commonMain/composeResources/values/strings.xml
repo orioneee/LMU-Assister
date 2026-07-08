@@ -18,9 +18,9 @@
 
     <!-- Profile / Steam login -->
     <string name="profile_login_title">Connect your Steam account</string>
-    <string name="profile_login_subtitle">Use the Steam account linked to Le Mans Ultimate.</string>
-    <string name="profile_field_login">Steam login</string>
-    <string name="profile_field_password">Steam password</string>
+    <string name="profile_login_subtitle">Use account linked to Le Mans Ultimate.</string>
+    <string name="profile_field_login">Login</string>
+    <string name="profile_field_password">Password</string>
     <string name="profile_field_2fa">2FA code</string>
     <string name="profile_sign_in">Connect profile</string>
 
