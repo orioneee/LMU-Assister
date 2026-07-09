@@ -378,6 +378,7 @@ internal object MockData {
             favoriteCars = favoriteCars(),
             syncedAt = syncedIso(),
             lastUpdatedAt = syncedIso(),
+            nextProfileUpdateAt = nextProfileUpdateIso(),
             totalLaps = 1_842,
         ),
     )
@@ -386,6 +387,9 @@ internal object MockData {
 
     private fun syncedIso(): String =
         Instant.fromEpochMilliseconds(Clock.System.now().toEpochMilliseconds() - 42 * 60_000L).toString()
+
+    private fun nextProfileUpdateIso(): String =
+        Instant.fromEpochMilliseconds(Clock.System.now().toEpochMilliseconds() + 18 * 60_000L).toString()
 
     private fun mockRating(kind: String, index: Int): RatingDto {
         val rank = ratingRanks[(index + if (kind == "sr") 1 else 0).mod(ratingRanks.size)]

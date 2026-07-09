@@ -104,7 +104,7 @@ data class AchievementsUi(
     val error: String? = null,
 )
 
-private const val PROFILE_CACHE_KEY = "steam_profile_v3"
+private const val PROFILE_CACHE_KEY = "steam_profile_v4"
 private const val ACHIEVEMENTS_CACHE_KEY = "steam_achievements_v2"
 private const val ACHIEVEMENTS_PROFILE_REFRESH_COOLDOWN_MS = 60_000L
 

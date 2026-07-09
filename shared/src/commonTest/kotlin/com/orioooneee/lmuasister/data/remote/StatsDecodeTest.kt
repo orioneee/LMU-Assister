@@ -14,6 +14,7 @@ class StatsDecodeTest {
         val json = """
             {
               "uid": "abc",
+              "next_profile_update_at": "2026-07-09T16:45:00Z",
               "rating_history": {"dr": [], "sr": []},
               "stats": {
                 "total": {
@@ -25,7 +26,9 @@ class StatsDecodeTest {
             }
         """.trimIndent()
 
-        val total = ProfileJson.decodeFromString<SteamProfile>(json).stats?.total
+        val profile = ProfileJson.decodeFromString<SteamProfile>(json)
+        val total = profile.stats?.total
+        assertEquals("2026-07-09T16:45:00Z", profile.nextProfileUpdateAt)
         assertEquals(169, total?.races)
         assertEquals(15, total?.wins)
         assertEquals(13, total?.polePositions)   // camelCase — the regression-prone one

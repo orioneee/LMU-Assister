@@ -143,6 +143,7 @@ fun ProfileView(
                     enableTrackBreakdown = enableTrackBreakdown,
                     isRefreshingProfile = isRefreshingProfile,
                     canRefreshProfile = canRefreshProfile,
+                    nextProfileUpdateAt = profile.nextProfileUpdateAt,
                     onRefreshProfile = onRefreshProfile,
                     onOpenSuspensions = onOpenSuspensions,
                     onOpenTracks = onOpenTracks,
@@ -159,6 +160,7 @@ fun ProfileView(
                     UpdateProfileButton(
                         loading = isRefreshingProfile,
                         enabled = canRefreshProfile && !isRefreshingProfile,
+                        nextProfileUpdateAt = profile.nextProfileUpdateAt,
                         onClick = onRefreshProfile,
                     )
                 }
@@ -171,7 +173,8 @@ fun ProfileView(
 
             val totals = profile.stats?.total
             val favoriteCars = profile.favoriteCars.take(FAVORITE_CARS_PREVIEW).takeIf { it.isNotEmpty() }
-            if (wide && totals != null && favoriteCars != null) {
+            val hasRecentRaces = profile.recentRaces.isNotEmpty()
+            if (wide && totals != null && hasRecentRaces) {
                 Row(
                     modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -185,9 +188,13 @@ fun ProfileView(
                         hideUnavailableCategories = profile.externalData,
                         onOpenCategory = onOpenCategory,
                     )
-                    FavoriteCarsSection(
-                        favoriteCars,
-                        onOpenCar,
+                    RecentRacesSection(
+                        races = profile.recentRaces,
+                        totalRaces = totals.races,
+                        enableRaceClicks = enableRaceClicks,
+                        enableAllRaces = enableAllRaces,
+                        onOpenRace = onOpenRace,
+                        onSeeAllRaces = onSeeAllRaces,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
@@ -202,30 +209,19 @@ fun ProfileView(
                         onOpenCategory = onOpenCategory,
                     )
                 }
-                favoriteCars?.let {
-                    FavoriteCarsSection(it, onOpenCar)
+                if (hasRecentRaces) {
+                    RecentRacesSection(
+                        races = profile.recentRaces,
+                        totalRaces = profile.stats?.total?.races ?: 0,
+                        enableRaceClicks = enableRaceClicks,
+                        enableAllRaces = enableAllRaces,
+                        onOpenRace = onOpenRace,
+                        onSeeAllRaces = onSeeAllRaces,
+                    )
                 }
             }
-
-            if (profile.recentRaces.isNotEmpty()) {
-                SectionHeader("Recent races")
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    profile.recentRaces.take(RECENT_PREVIEW).forEach { race ->
-                        Box(
-                            Modifier.clip(RoundedCornerShape(12.dp))
-                                .clickable(enabled = enableRaceClicks && race.eventId != null) {
-                                    race.eventId?.let { onOpenRace(it, race.split ?: race.splitNo) }
-                                },
-                        ) {
-                            RaceHistoryRow(race)
-                        }
-                    }
-                    val totalRaces = profile.stats?.total?.races ?: 0
-                    val hasMoreRaces = profile.recentRaces.size > RECENT_PREVIEW || totalRaces > RECENT_PREVIEW
-                    if (enableAllRaces && hasMoreRaces) {
-                        SeeMoreButton(onSeeAllRaces)
-                    }
-                }
+            favoriteCars?.let {
+                FavoriteCarsSection(it, onOpenCar)
             }
         }
     }
@@ -356,6 +352,7 @@ private fun ProfileHeaderWideRow(
     enableTrackBreakdown: Boolean,
     isRefreshingProfile: Boolean,
     canRefreshProfile: Boolean,
+    nextProfileUpdateAt: String?,
     onRefreshProfile: (() -> Unit)?,
     onOpenSuspensions: (active: Boolean) -> Unit,
     onOpenTracks: () -> Unit,
@@ -378,20 +375,28 @@ private fun ProfileHeaderWideRow(
             UpdateProfileButton(
                 loading = isRefreshingProfile,
                 enabled = canRefreshProfile && !isRefreshingProfile,
+                nextProfileUpdateAt = nextProfileUpdateAt,
                 onClick = onRefreshProfile,
-                modifier = Modifier.width(190.dp),
+                modifier = Modifier.widthIn(min = 300.dp, max = 360.dp),
             )
         }
     }
 }
 
 @Composable
-private fun UpdateProfileButton(loading: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun UpdateProfileButton(
+    loading: Boolean,
+    enabled: Boolean,
+    nextProfileUpdateAt: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val alpha = if (enabled) 1f else 0.68f
+    val nextUpdateLabel = formatIsoDateTime(nextProfileUpdateAt)?.let { "Next $it" }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .height(if (nextUpdateLabel == null) 44.dp else 58.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Surface1.copy(alpha = alpha))
             .border(1.dp, Amber.copy(alpha = 0.46f * alpha), RoundedCornerShape(12.dp))
@@ -403,23 +408,57 @@ private fun UpdateProfileButton(loading: Boolean, enabled: Boolean, onClick: () 
         if (loading) {
             CircularProgressIndicator(color = Amber, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             Text(
-                "Updating profile",
+                if (loading) "Updating profile" else "Update my profile",
                 style = MaterialTheme.typography.labelLarge,
                 color = Amber,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        } else {
-            Text(
-                "Update my profile",
-                style = MaterialTheme.typography.labelLarge,
-                color = Amber,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            nextUpdateLabel?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextLow,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentRacesSection(
+    races: List<RecentRaceDto>,
+    totalRaces: Int,
+    enableRaceClicks: Boolean,
+    enableAllRaces: Boolean,
+    onOpenRace: (eventId: String, split: Int?) -> Unit,
+    onSeeAllRaces: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionHeader("Recent races")
+        races.take(RECENT_PREVIEW).forEach { race ->
+            Box(
+                Modifier.clip(RoundedCornerShape(12.dp))
+                    .clickable(enabled = enableRaceClicks && race.eventId != null) {
+                        race.eventId?.let { onOpenRace(it, race.split ?: race.splitNo) }
+                    },
+            ) {
+                RaceHistoryRow(race)
+            }
+        }
+        val hasMoreRaces = races.size > RECENT_PREVIEW || totalRaces > RECENT_PREVIEW
+        if (enableAllRaces && hasMoreRaces) {
+            SeeMoreButton(onSeeAllRaces)
         }
     }
 }

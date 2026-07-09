@@ -52,6 +52,7 @@ data class SteamProfile(
     @SerialName("favorite_cars") val favoriteCars: List<FavoriteCarDto> = emptyList(),
     @SerialName("synced_at") val syncedAt: String? = null,
     @SerialName("last_updated_at") val lastUpdatedAt: String? = null,
+    @SerialName("next_profile_update_at") val nextProfileUpdateAt: String? = null,
     @SerialName("total_laps") val totalLaps: Int = 0,
 )
 
