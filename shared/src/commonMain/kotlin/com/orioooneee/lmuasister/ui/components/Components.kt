@@ -46,7 +46,7 @@ import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.parseHexColor
 
 /** Always the official LMU class colour, mapped from the class id/name. We ignore the
- *  backend's badge colour so badges are consistent across versions (v2 doesn't send one). */
+ *  backend's badge colour so badges are consistent across versions (v3 does not send one). */
 fun ClassInfo.color(): Color = classColorFor("$id $name")
 
 fun classColorFor(key: String): Color {

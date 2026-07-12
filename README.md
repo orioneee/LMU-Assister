@@ -145,26 +145,14 @@ of the default install path.
 
 ## 🚀 Running the apps
 
-### 1. Configure the backend (optional — mock data by default)
+### 1. Configure local options (optional)
 
-**You can run the app with zero setup.** With no `local.properties`, the app boots a
-built-in **mock backend**: a Ktor `MockEngine` serves deterministic, seeded data for
-every screen (schedule, tracks, public drivers, race details, leaderboards, cars,
-and a fully signed-in profile — no Steam login needed), with simulated loading. Great for UI work and for
-contributors without backend access — the real host is never disclosed.
-
-To point at a real backend instead, set its base URL in `local.properties`
-(git-ignored, never committed):
-
-```properties
-backend.url=https://your-backend.example.com/api/v2
-```
+Most builds use the default remote configuration. Developer-only overrides and
+secrets live in `local.properties` (git-ignored, never committed).
 
 Toggles:
 
-- `backend.url` **set** → real backend (mock off).
-- `backend.url` **unset** → mock on (falls back to `http://localhost:8000/api/v2` for the URL, but no network is hit).
-- `backend.mock=true|false` → force mock on/off regardless of `backend.url` (e.g. run the real URL but with mock data, or vice-versa).
+- `backend.mock=true` → force the built-in Ktor `MockEngine` for UI/dev work.
 - `demo.username` / `demo.password` → optional app-review/demo login credentials for `/auth/demo`; leave unset for normal Steam auth.
 - `companion.url` → optional web minter URL; defaults to `http://127.0.0.1:8787`.
 - `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`, `measurementId` → optional Firebase Web Analytics config.

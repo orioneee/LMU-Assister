@@ -10,6 +10,7 @@ import com.orioooneee.lmuasister.data.remote.appTokenAuthPlugin
 import com.orioooneee.lmuasister.analytics.installPerformanceMonitoring
 import com.orioooneee.lmuasister.featureflags.FeatureFlagsRepository
 import com.orioooneee.lmuasister.featureflags.platformFeatureFlagRemoteSource
+import com.orioooneee.lmuasister.data.remote.ApiBaseUrlProvider
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
 import com.orioooneee.lmuasister.ui.profile.SteamAuthRunner
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
@@ -17,7 +18,6 @@ import com.orioooneee.lmuasister.ui.publicusers.PublicUsersViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.api.createClientPlugin
-import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.header
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModelOf
@@ -37,14 +37,24 @@ fun appCheckPlugin(
     }
 }
 val appModule = module {
+    single {
+        val appCheckProvider = get<AppCheckProvider>()
+        ApiBaseUrlProvider(
+            appCheckTokenProvider = { appCheckProvider.provideToken() },
+            fixedBaseUrl = if (BuildConfig.USE_MOCK) "https://mock.local/api/v3" else null,
+        ).also { provider ->
+            if (!BuildConfig.USE_MOCK) provider.warmUp()
+        }
+    }
     single { AppTokenHolder() }
     single {
         val tokenHolder = get<AppTokenHolder>()
         val appCheckProvider: AppCheckProvider = get()
+        val apiBaseUrlProvider = get<ApiBaseUrlProvider>()
         // No real backend configured (or backend.mock=true) → serve bundled mock data.
-        if (BuildConfig.USE_MOCK) mockHttpClient(tokenHolder)
+        if (BuildConfig.USE_MOCK) mockHttpClient()
         else HttpClient {
-            install(appTokenAuthPlugin(tokenHolder))
+            install(appTokenAuthPlugin(tokenHolder, apiBaseUrlProvider))
             installPerformanceMonitoring()
             followRedirects = true
             install(HttpTimeout) {
@@ -54,8 +64,8 @@ val appModule = module {
             install(appCheckPlugin(appCheckProvider))
         }
     }
-    single { BackendApi(get()) }
-    single { SteamBackendApi(get()) }
+    single { BackendApi(get(), get()) }
+    single { SteamBackendApi(get(), get()) }
     single { RaceRepository(get(), get()) }
     single { platformFeatureFlagRemoteSource() }
     single { FeatureFlagsRepository(get()) }

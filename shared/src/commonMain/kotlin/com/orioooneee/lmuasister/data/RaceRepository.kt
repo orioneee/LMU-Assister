@@ -45,9 +45,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 
-// v2 adds exact available-car artwork. Do not revive v1 entries that decoded before
+// Keep this key versioned so older cached payloads do not outlive backend shape changes.
 // the field existed, otherwise race details stay image-less until a manual refresh.
-private const val CACHE_KEY = "schedule_v2"
+private const val CACHE_KEY = "schedule_v3"
 private const val STATUS_READY = "ready"
 private const val HOTLAP_POLLS = 6
 private const val HOTLAP_POLL_DELAY_MS = 1500L
@@ -68,17 +68,17 @@ private data class HlCache(val ts: Long = 0, val data: List<HotlapDto> = emptyLi
 @Serializable
 private data class CarsCache(val ts: Long = 0, val data: List<CarDto> = emptyList())
 
-private const val CARS_KEY = "cars_v2"
+private const val CARS_KEY = "cars_v3"
 
 @Serializable
 private data class DetailedCarsCache(val ts: Long = 0, val data: List<CarDetailedDto> = emptyList())
 
-private const val DETAILED_CARS_KEY = "cars_detailed_v2"
+private const val DETAILED_CARS_KEY = "cars_detailed_v3"
 
 @Serializable
 private data class TracksCache(val ts: Long = 0, val data: List<TrackFullDto> = emptyList())
 
-private const val TRACKS_KEY = "tracks_v2"
+private const val TRACKS_KEY = "tracks_v3"
 
 private fun dedupCars(dtos: List<CarDto>): List<CarModel> =
     dtos.map { CarModel(it.id, it.name, it.manufacturer, it.model, it.carClass, it.series, it.engine) }

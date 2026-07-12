@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonNames
 // Non-null scalars are required (absence/null is a real decode error we want to see); only
 // genuinely-optional data is nullable, and boolean flags keep `false` as "absent == off".
 
-/** Player profile from GET /api/v2/profile. */
+/** Player profile from GET /api/v3/profile. */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class SteamProfile(
@@ -114,7 +114,7 @@ data class FavoriteCarClassInfoDto(
     @SerialName("color_hex") val colorHex: String? = null,
 )
 
-/** GET /api/v2/profile → `stats`. Only the headline `total` block is used by the UI;
+/** GET /api/v3/profile → `stats`. Only the headline `total` block is used by the UI;
  *  the per-class / per-manufacturer breakdowns are kept for future drill-downs. */
 @Serializable
 data class ProfileStatsDto(
@@ -139,7 +139,7 @@ data class StatTotalsDto(
     val winsNoPole: Int = 0,     // won without starting on pole
 )
 
-/** GET /api/v2/profile → `rating_history`: two series of points (driver / safety). */
+/** GET /api/v3/profile → `rating_history`: two series of points (driver / safety). */
 @Serializable
 data class RatingHistoryDto(
     val dr: List<RatingPointDto> = emptyList(),
@@ -265,8 +265,8 @@ data class RecentRaceDto(
 )
 
 /**
- * GET /api/v2/profile/races?page=N — one paginated page (5/page) of the full race history,
- * and GET /api/v2/profile/races/<category>?page=N — a category drill-down (30/page).
+ * GET /api/v3/profile/races?page=N — one paginated page (5/page) of the full race history,
+ * and GET /api/v3/profile/races/<category>?page=N — a category drill-down (30/page).
  * `category` / `total` are only sent by the category endpoint, so both stay optional.
  */
 @Serializable
@@ -280,7 +280,7 @@ data class RacesPageDto(
     val races: List<RecentRaceDto> = emptyList(),
 )
 
-/** GET /api/v2/profile/race/<eventId> — full race page: card meta + per-session tables. */
+/** GET /api/v3/profile/race/<eventId> — full race page: card meta + per-session tables. */
 @Serializable
 data class RaceDetailDto(
     val date: String? = null,
@@ -349,7 +349,7 @@ data class RaceDetailFeaturesDto(
     @SerialName("nakama_detail") val nakamaDetail: Boolean = true,
 )
 
-/** GET /api/v2/profile/race/<eventId>/split/<n> — one foreign split's tables (no `me` row). */
+/** GET /api/v3/profile/race/<eventId>/split/<n> — one foreign split's tables (no `me` row). */
 @Serializable
 data class SplitDetailDto(
     @SerialName("split_no") val splitNo: Int,

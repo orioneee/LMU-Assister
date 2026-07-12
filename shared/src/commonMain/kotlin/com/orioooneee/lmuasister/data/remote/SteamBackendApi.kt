@@ -1,8 +1,8 @@
 package com.orioooneee.lmuasister.data.remote
 
-import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.steam.SteamLog
 import io.ktor.client.HttpClient
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.plugins.timeout
@@ -147,15 +147,18 @@ class BackendUnavailable : Exception("nakama_unavailable")
  */
 
 /**
- * Our stable REST surface (under {BACKEND_URL} = …/api/v2). The backend hides all the
+ * Our stable REST surface. The backend hides all the
  * Nakama/session/refresh machinery; we send a Steam Web API ticket once, get our own
  * token, then call profile endpoints with it as a Bearer.
  */
-class SteamBackendApi(private val client: HttpClient) {
+class SteamBackendApi(
+    private val client: HttpClient,
+    private val apiBaseUrlProvider: ApiBaseUrlProvider,
+) {
 
     /** Exchanges an on-device Steam Web API ticket (hex) for our app token (Android/JVM). */
     suspend fun authSteam(ticketHex: String): SteamAuthResponse {
-        val resp = client.post("$API_BASE/auth/steam") {
+        val resp = postResponse("/auth/steam") {
             contentType(ContentType.Application.Json)
             setBody("""{"ticket":"$ticketHex"}""") // hex is [0-9a-f], no escaping needed
         }
@@ -171,7 +174,7 @@ class SteamBackendApi(private val client: HttpClient) {
      * same {token, uid} shape as [authSteam]; the reviewer then reads /profile* like a real user.
      */
     suspend fun authDemo(username: String, password: String): SteamAuthResponse {
-        val resp = client.post("$API_BASE/auth/demo") {
+        val resp = postResponse("/auth/demo") {
             timeout { requestTimeoutMillis = TICKET_TIMEOUT } // Render cold start
             contentType(ContentType.Application.Json)
             setBody(RequestJson.encodeToString(DemoBody(username, password)))
@@ -183,20 +186,20 @@ class SteamBackendApi(private val client: HttpClient) {
     }
 
     suspend fun profile(token: String): SteamProfile =
-        ProfileJson.decodeFromString(getAuthed("$API_BASE/profile", token))
+        ProfileJson.decodeFromString(getAuthed("/profile", token))
 
-    suspend fun stats(token: String): String = getAuthed("$API_BASE/profile/stats", token)
+    suspend fun stats(token: String): String = getAuthed("/profile/stats", token)
 
     /** Track reference block + the caller's personal record on it. trackId = id / code / base.
      *  All-snake-case payload (no camelCase outlier), so it decodes with [AppJson]. */
     suspend fun trackDetail(token: String, trackId: String, patch: String? = null): TrackDetailResponse {
         val qs = patch?.takeIf { it.isNotBlank() }?.let { "?patch=${it.encodeURLQueryComponent()}" }.orEmpty()
-        return AppJson.decodeFromString(getAuthed("$API_BASE/profile/track/${trackId.encodeURLPathPart()}$qs", token))
+        return AppJson.decodeFromString(getAuthed("/profile/track/${trackId.encodeURLPathPart()}$qs", token))
     }
 
     /** Drops the server-side session. */
     suspend fun signOut(token: String) {
-        val resp = client.post("$API_BASE/auth/sign-out") {
+        val resp = postResponse("/auth/sign-out") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
         SteamLog.d("backend: POST /auth/sign-out -> ${resp.status.value}")
@@ -208,7 +211,7 @@ class SteamBackendApi(private val client: HttpClient) {
      * The backend expects only the Bearer token and no request body.
      */
     suspend fun clearMyData(token: String) {
-        val resp = client.post("$API_BASE/auth/clear-my-data") {
+        val resp = postResponse("/auth/clear-my-data") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
         SteamLog.d("backend: POST /auth/clear-my-data -> ${resp.status.value}")
@@ -217,12 +220,12 @@ class SteamBackendApi(private val client: HttpClient) {
 
     /** One paginated page (5/page) of the player's full race history. */
     suspend fun racesPage(token: String, page: Int): RacesPageDto =
-        ProfileJson.decodeFromString(getAuthed("$API_BASE/profile/races?page=$page", token))
+        ProfileJson.decodeFromString(getAuthed("/profile/races?page=$page", token))
 
     /** One page (30/page) of a single stat category: wins | podiums | poles | fastest_laps | top5. */
     suspend fun categoryRacesPage(token: String, category: String, page: Int): RacesPageDto =
         ProfileJson.decodeFromString(
-            getAuthed("$API_BASE/profile/races/${category.encodeURLPathPart()}?page=$page", token),
+            getAuthed("/profile/races/${category.encodeURLPathPart()}?page=$page", token),
         )
 
     /** Full race-page detail by eventId (split disambiguates which split you raced). */
@@ -231,15 +234,15 @@ class SteamBackendApi(private val client: HttpClient) {
             split?.let { add("split=$it") }
             page?.let { add("page=$it") }
         }.joinToString("&")
-        val url = "$API_BASE/profile/race/${eventId.encodeURLPathPart()}" + if (qs.isEmpty()) "" else "?$qs"
-        return ProfileJson.decodeFromString(getAuthed(url, token))
+        val path = "/profile/race/${eventId.encodeURLPathPart()}" + if (qs.isEmpty()) "" else "?$qs"
+        return ProfileJson.decodeFromString(getAuthed(path, token))
     }
 
     /** One foreign split's classification (lazy, per-tab). `seriesId` lets the backend skip a history re-read. */
     suspend fun raceSplit(token: String, eventId: String, splitNo: Int, seriesId: String?): SplitDetailDto {
         val qs = seriesId?.takeIf { it.isNotBlank() }?.let { "?series_id=${it.encodeURLQueryComponent()}" } ?: ""
-        val url = "$API_BASE/profile/race/${eventId.encodeURLPathPart()}/split/$splitNo$qs"
-        return ProfileJson.decodeFromString(getAuthed(url, token))
+        val path = "/profile/race/${eventId.encodeURLPathPart()}/split/$splitNo$qs"
+        return ProfileJson.decodeFromString(getAuthed(path, token))
     }
 
 
@@ -250,7 +253,7 @@ class SteamBackendApi(private val client: HttpClient) {
      *
      * /** A short-lived token + agent URL for the device to open its egress tunnel. */
      * suspend fun tunnelTicket(): TunnelTicket {
-     *     val resp = client.get("$API_BASE/tunnel/ticket") {
+     *     val resp = client.get(apiUrl("/tunnel/ticket")) {
      *         timeout { requestTimeoutMillis = TICKET_TIMEOUT } // Render cold start
      *     }
      *     SteamLog.d("backend: GET /tunnel/ticket → ${resp.status.value}")
@@ -268,7 +271,7 @@ class SteamBackendApi(private val client: HttpClient) {
      *     guardData: String?,
      *     tunnelKey: String,
      * ): AuthLoginResponse {
-     *     val resp = client.post("$API_BASE/auth/steam/login") {
+     *     val resp = client.post(apiUrl("/auth/steam/login")) {
      *         // Steam login runs through the device tunnel (slow); must outlast the sidecar's
      *         // budget so we don't time out and tear the tunnel down mid-login.
      *         timeout { requestTimeoutMillis = STEAM_TIMEOUT }
@@ -285,7 +288,7 @@ class SteamBackendApi(private val client: HttpClient) {
      *     guardData: String?,
      *     tunnelKey: String,
      * ): AuthLoginStartResponse {
-     *     val resp = client.post("$API_BASE/auth/steam/login/start") {
+     *     val resp = client.post(apiUrl("/auth/steam/login/start")) {
      *         timeout { requestTimeoutMillis = STEAM_TIMEOUT }
      *         contentType(ContentType.Application.Json)
      *         setBody(RequestJson.encodeToString(LoginStartBody(username, password, guardData, tunnelKey)))
@@ -298,7 +301,7 @@ class SteamBackendApi(private val client: HttpClient) {
      *
      * /** Continue a pending Steam mobile approval challenge using a fresh device tunnel. */
      * suspend fun authSteamLoginContinue(challengeId: String, tunnelKey: String): AuthLoginResponse {
-     *     val resp = client.post("$API_BASE/auth/steam/login/continue") {
+     *     val resp = client.post(apiUrl("/auth/steam/login/continue")) {
      *         timeout { requestTimeoutMillis = STEAM_TIMEOUT }
      *         contentType(ContentType.Application.Json)
      *         setBody(RequestJson.encodeToString(LoginContinueBody(challengeId, tunnelKey)))
@@ -308,7 +311,7 @@ class SteamBackendApi(private val client: HttpClient) {
      *
      * /** Silent reauth: device-held Steam refresh → fresh app token. */
      * suspend fun authSteamRefresh(account: String, refresh: String, tunnelKey: String): AuthLoginResponse {
-     *     val resp = client.post("$API_BASE/auth/steam/refresh") {
+     *     val resp = client.post(apiUrl("/auth/steam/refresh")) {
      *         timeout { requestTimeoutMillis = STEAM_TIMEOUT }
      *         contentType(ContentType.Application.Json)
      *         setBody(RequestJson.encodeToString(RefreshBody(account, refresh, tunnelKey)))
@@ -344,14 +347,27 @@ class SteamBackendApi(private val client: HttpClient) {
      * }
      */
 
-    private suspend fun getAuthed(url: String, token: String): String {
-        val resp = client.get(url) { header(HttpHeaders.Authorization, "Bearer $token") }
-        SteamLog.d("backend: GET ${url.substringAfterLast("/api/v2")} -> ${resp.status.value}")
+    private suspend fun getAuthed(pathAndQuery: String, token: String): String {
+        val path = pathAndQuery.withLeadingSlash()
+        val resp = apiBaseUrlProvider.withBaseUrlRetry { baseUrl ->
+            client.get(baseUrl + path) { header(HttpHeaders.Authorization, "Bearer $token") }
+        }
+        SteamLog.d("backend: GET $path -> ${resp.status.value}")
         return when (resp.status.value) {
             in 200..299 -> resp.bodyAsText()
             else -> throw resp.toError()
         }
     }
+
+    private suspend fun postResponse(
+        pathAndQuery: String,
+        block: HttpRequestBuilder.() -> Unit = {},
+    ): HttpResponse =
+        apiBaseUrlProvider.withBaseUrlRetry { baseUrl ->
+            client.post(baseUrl + pathAndQuery.withLeadingSlash()) {
+                block()
+            }
+        }
 
     private suspend fun HttpResponse.toError(): Exception = when (status.value) {
         401 -> BackendReauthRequired()
@@ -373,7 +389,6 @@ class SteamBackendApi(private val client: HttpClient) {
      */
 
     private companion object {
-        val API_BASE = BuildConfig.BACKEND_URL.trimEnd('/') // http://host/api/v2
         const val TICKET_TIMEOUT = 60_000L // /tunnel/ticket — tolerate Render cold start
         /*
          * TUNNEL_DISABLED:
@@ -381,3 +396,6 @@ class SteamBackendApi(private val client: HttpClient) {
          */
     }
 }
+
+private fun String.withLeadingSlash(): String =
+    if (startsWith('/')) this else "/$this"

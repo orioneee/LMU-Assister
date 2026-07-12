@@ -143,28 +143,26 @@ dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
 }
 
-// ── Backend base URL → generated BuildConfig (read from local.properties) ──
+// ── Runtime config → generated BuildConfig (read from local.properties) ──
 val localPropsFile = rootProject.layout.projectDirectory.file("local.properties")
-// Non-secret fallback only — the real (deployed) backend URL lives in local.properties
-// (git-ignored) as `backend.url=…`, so the host is never committed.
-val defaultBackendUrl = "http://localhost:8000/api/v2"
+val defaultAppSite = "https://lmu-assister.com"
 
 val generateBuildConfig by tasks.registering {
     val outDir = layout.buildDirectory.dir("generated/buildconfig/kotlin")
     val lp = localPropsFile.asFile
-    val fallback = defaultBackendUrl
+    val fallback = defaultAppSite
     // Tracked so editing local.properties re-runs the task (configuration cache safe).
     inputs.file(localPropsFile).optional(true).withPropertyName("localProperties")
     outputs.dir(outDir)
     doLast {
         val props = Properties()
         if (lp.exists()) lp.inputStream().use { stream -> props.load(stream) }
-        val rawUrl = props.getProperty("backend.url")
-        val url = (rawUrl ?: fallback).trim().trimEnd('/')
-        // Mock data layer is the default for git checkouts: ON unless a real backend.url
-        // is set, or explicitly toggled via `backend.mock=true|false`.
-        val useMock = props.getProperty("backend.mock")?.trim()?.toBooleanStrictOrNull()
-            ?: (rawUrl == null)
+        val appSite = props.getProperty("app.site")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: fallback
+        // Mock data is opt-in for local UI/dev work.
+        val useMock = props.getProperty("backend.mock")?.trim()?.toBooleanStrictOrNull() ?: false
         // App-store-review demo login — set in local.properties (demo.username /
         // demo.password) to match the backend's DEMO_USERNAME/DEMO_PASSWORD. No defaults:
         // when unset the creds are empty and the demo path simply never triggers.
@@ -193,9 +191,9 @@ val generateBuildConfig by tasks.registering {
             """
             |package com.orioooneee.lmuasister.config
             |
-            |/** Generated from local.properties (backend.url / backend.mock / demo.*) — do not edit. */
+            |/** Generated from local.properties — do not edit. */
             |internal object BuildConfig {
-            |    const val BACKEND_URL: String = "$url"
+            |    const val APP_SITE: String = "${appSite.trimEnd('/')}"
             |    const val USE_MOCK: Boolean = $useMock
             |    const val DEMO_USERNAME: String = "$demoUser"
             |    const val DEMO_PASSWORD: String = "$demoPass"

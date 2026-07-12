@@ -105,7 +105,7 @@ data class AchievementsUi(
 )
 
 private const val PROFILE_CACHE_KEY = "steam_profile_v4"
-private const val ACHIEVEMENTS_CACHE_KEY = "steam_achievements_v2"
+private const val ACHIEVEMENTS_CACHE_KEY = "steam_achievements_v3"
 private const val ACHIEVEMENTS_PROFILE_REFRESH_COOLDOWN_MS = 60_000L
 
 // App-store-review login: the reviewer types these into the normal form; we route them to

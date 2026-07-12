@@ -1,9 +1,9 @@
 package com.orioooneee.lmuasister.data.remote
 
-import com.orioooneee.lmuasister.config.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.encodeURLPathPart
@@ -43,54 +43,57 @@ val ProfileJson: Json = Json {
  *   - GET /race/<id>       → the race plus its fastest-lap leaderboard
  *
  * Images are absolute CDN URLs (R2 / S3) in the payloads — loaded directly, no proxy.
- * Base URL comes from [BuildConfig.BACKEND_URL] (set in local.properties).
+ * Base URL is resolved at runtime and cached locally.
  */
-class BackendApi(private val client: HttpClient) {
+class BackendApi(
+    private val client: HttpClient,
+    private val apiBaseUrlProvider: ApiBaseUrlProvider,
+) {
 
     suspend fun schedule(refresh: Boolean = false): ScheduleResponse {
-        val url = "$API_BASE/schedule" + if (refresh) "?refresh=1" else ""
-        return AppJson.decodeFromString(client.get(url).bodyAsText())
+        val path = "/schedule" + if (refresh) "?refresh=1" else ""
+        return AppJson.decodeFromString(getText(path))
     }
 
     suspend fun race(raceId: String): RaceDetailResponse {
-        val url = "$API_BASE/race/${raceId.encodeURLPathPart()}"
-        return AppJson.decodeFromString(client.get(url).bodyAsText())
+        val path = "/race/${raceId.encodeURLPathPart()}"
+        return AppJson.decodeFromString(getText(path))
     }
 
     /** Hot-laps for the race's track. May be "pending" (still building) — caller polls. */
     suspend fun hotlaps(raceId: String, wait: Boolean = false): HotlapsResponse {
-        val url = "$API_BASE/race/${raceId.encodeURLPathPart()}/hotlaps" + if (wait) "?wait=1" else ""
-        return AppJson.decodeFromString(client.get(url).bodyAsText())
+        val path = "/race/${raceId.encodeURLPathPart()}/hotlaps" + if (wait) "?wait=1" else ""
+        return AppJson.decodeFromString(getText(path))
     }
 
-    /** The full car roster (v2 reference data — static, cache aggressively). */
+    /** The full car roster (v3 reference data — static, cache aggressively). */
     suspend fun cars(): CarsResponse =
-        AppJson.decodeFromString(client.get("$API_BASE/cars").bodyAsText())
+        AppJson.decodeFromString(getText("/cars"))
 
     /** Full car catalogue with artwork, specs and liveries (public/static). */
     suspend fun carsDetailed(): CarsDetailedResponse =
-        AppJson.decodeFromString(client.get("$API_BASE/cars/detailed").bodyAsText())
+        AppJson.decodeFromString(getText("/cars/detailed"))
 
-    /** The full track roster (v2 reference data — static, cache aggressively; public). */
+    /** The full track roster (v3 reference data — static, cache aggressively; public). */
     suspend fun tracks(): TracksResponse =
-        AppJson.decodeFromString(client.get("$API_BASE/tracks").bodyAsText())
+        AppJson.decodeFromString(getText("/tracks"))
 
     /** Privacy policy as plain text — rendered in-app (no auth required). */
-    suspend fun privacy(): String = client.get("$API_BASE/privacy").bodyAsText()
+    suspend fun privacy(): String = getText("/privacy")
 
     /** Public driver directory summary: rating distribution + top safety drivers. */
     suspend fun usersSummary(): UsersSummaryResponse =
-        ProfileJson.decodeFromString(client.get("$API_BASE/users/summary").bodyAsText())
+        ProfileJson.decodeFromString(getText("/users/summary"))
 
     /** Public user search. Empty query intentionally returns an empty page. */
     suspend fun usersSearch(query: String, page: Int = 1): UsersSearchResponse {
-        val url = "$API_BASE/users/search?q=${query.encodeURLQueryComponent()}&page=$page"
-        return ProfileJson.decodeFromString(client.get(url).bodyAsText())
+        val path = "/users/search?q=${query.encodeURLQueryComponent()}&page=$page"
+        return ProfileJson.decodeFromString(getText(path))
     }
 
     /** Public user profile saved in our DB. Does not hit Nakama live. */
     suspend fun publicUser(uid: String): SteamProfile {
-        val resp = client.get("$API_BASE/users/${uid.encodeURLPathPart()}")
+        val resp = getResponse("/users/${uid.encodeURLPathPart()}")
         val text = resp.bodyAsText()
         if (resp.status.value == 404) throw Exception("user_not_found")
         if (resp.status.value !in 200..299) throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
@@ -99,7 +102,7 @@ class BackendApi(private val client: HttpClient) {
 
     /** Public saved race history for a user. Reads our DB only; no Nakama sync/RPC. */
     suspend fun publicUserRaces(uid: String, page: Int = 1): RacesPageDto {
-        val resp = client.get("$API_BASE/users/${uid.encodeURLPathPart()}/races?page=$page")
+        val resp = getResponse("/users/${uid.encodeURLPathPart()}/races?page=$page")
         val text = resp.bodyAsText()
         if (resp.status.value == 404) throw Exception("user_not_found")
         if (resp.status.value !in 200..299) throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
@@ -108,9 +111,7 @@ class BackendApi(private val client: HttpClient) {
 
     /** Public saved race-history category for a user. Same shape as /profile/races/<category>. */
     suspend fun publicUserCategoryRaces(uid: String, category: String, page: Int = 1): RacesPageDto {
-        val resp = client.get(
-            "$API_BASE/users/${uid.encodeURLPathPart()}/races/${category.encodeURLPathPart()}?page=$page",
-        )
+        val resp = getResponse("/users/${uid.encodeURLPathPart()}/races/${category.encodeURLPathPart()}?page=$page")
         val text = resp.bodyAsText()
         if (resp.status.value == 404) throw Exception("user_not_found")
         if (resp.status.value !in 200..299) throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
@@ -120,11 +121,11 @@ class BackendApi(private val client: HttpClient) {
     /** Public race detail for both local saved users and external RaceCenter users. */
     suspend fun publicUserRaceDetail(uid: String, eventId: String, split: Int? = null): RaceDetailDto {
         val path = if (uid.startsWith("racecenter:")) {
-            "$API_BASE/users/${uid.encodeURLPathPart()}/external/race/${eventId.encodeURLPathPart()}"
+            "/users/${uid.encodeURLPathPart()}/external/race/${eventId.encodeURLPathPart()}"
         } else {
-            "$API_BASE/users/${uid.encodeURLPathPart()}/race/${eventId.encodeURLPathPart()}"
+            "/users/${uid.encodeURLPathPart()}/race/${eventId.encodeURLPathPart()}"
         }
-        val resp = client.get(path + split?.let { "?split=$it" }.orEmpty())
+        val resp = getResponse(path + split?.let { "?split=$it" }.orEmpty())
         val text = resp.bodyAsText()
         when (resp.status.value) {
             404 -> throw Exception(text.publicRaceErrorCode() ?: "race_not_found")
@@ -137,7 +138,7 @@ class BackendApi(private val client: HttpClient) {
     /** Public saved track history for a user. Same payload shape as /profile/track/<track_id>. */
     suspend fun publicUserTrack(uid: String, trackId: String, patch: String? = null): TrackDetailResponse {
         val qs = patch?.takeIf { it.isNotBlank() }?.let { "?patch=${it.encodeURLQueryComponent()}" }.orEmpty()
-        val resp = client.get("$API_BASE/users/${uid.encodeURLPathPart()}/track/${trackId.encodeURLPathPart()}$qs")
+        val resp = getResponse("/users/${uid.encodeURLPathPart()}/track/${trackId.encodeURLPathPart()}$qs")
         val text = resp.bodyAsText()
         if (resp.status.value == 404) throw Exception("track_not_found")
         if (resp.status.value !in 200..299) throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
@@ -152,19 +153,34 @@ class BackendApi(private val client: HttpClient) {
         limit: Int = 50,
         token: String? = null,
     ): LeaderboardPageResponse {
-        val url = buildString {
-            append("$API_BASE/leaderboard/${leaderboardId.encodeURLPathPart()}?limit=$limit")
+        val path = buildString {
+            append("/leaderboard/${leaderboardId.encodeURLPathPart()}?limit=$limit")
             if (!cursor.isNullOrBlank()) append("&cursor=${cursor.encodeURLQueryComponent()}")
         }
-        val body = client.get(url) {
+        val body = getText(path) {
             if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
-        }.bodyAsText()
+        }
         return AppJson.decodeFromString(body)
     }
 
-    private companion object {
-        val API_BASE = BuildConfig.BACKEND_URL.trimEnd('/')   // http://host/api/v2
-    }
+    private suspend fun getText(pathAndQuery: String): String =
+        getResponse(pathAndQuery).bodyAsText()
+
+    private suspend fun getText(
+        pathAndQuery: String,
+        block: io.ktor.client.request.HttpRequestBuilder.() -> Unit,
+    ): String =
+        getResponse(pathAndQuery, block).bodyAsText()
+
+    private suspend fun getResponse(
+        pathAndQuery: String,
+        block: io.ktor.client.request.HttpRequestBuilder.() -> Unit = {},
+    ): HttpResponse =
+        apiBaseUrlProvider.withBaseUrlRetry { baseUrl ->
+            client.get(baseUrl + pathAndQuery.withLeadingSlash()) {
+                block()
+            }
+        }
 }
 
 private fun String.publicRaceErrorCode(): String? =
@@ -175,3 +191,6 @@ private fun String.publicRaceErrorCode(): String? =
         "local_user_unsupported",
         "nakama_unavailable",
     ).firstOrNull { contains(it) }
+
+private fun String.withLeadingSlash(): String =
+    if (startsWith('/')) this else "/$this"

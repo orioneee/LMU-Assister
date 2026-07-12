@@ -1,7 +1,5 @@
 package com.orioooneee.lmuasister.data.mock
 
-import com.orioooneee.lmuasister.data.remote.AppTokenHolder
-import com.orioooneee.lmuasister.data.remote.appTokenAuthPlugin
 import com.orioooneee.lmuasister.data.steam.SignInOutcome
 import com.orioooneee.lmuasister.data.steam.SteamSignIn
 import io.ktor.client.HttpClient
@@ -16,8 +14,7 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 
 /**
- * Offline mock backend (enabled when `local.properties` has no `backend.url`, or
- * `backend.mock=true`). Lets anyone build & run the app from git without the real
+ * Offline mock backend (enabled with `backend.mock=true`). Lets anyone build & run the app without the real
  * server: a Ktor [MockEngine] answers every endpoint with deterministic data from
  * [MockData], with simulated latency so loaders behave like the real thing.
  *
@@ -28,13 +25,14 @@ import org.koin.dsl.module
 private val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
 
 /** Drop-in for the real network client — every request is served from [MockData]. */
-fun mockHttpClient(tokenHolder: AppTokenHolder? = null): HttpClient = HttpClient(MockEngine) {
-    if (tokenHolder != null) install(appTokenAuthPlugin(tokenHolder))
+fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
     followRedirects = true
     engine {
         addHandler { request ->
             val full = request.url.encodedPath
-            val path = full.substringAfter("/api/v2", full) // version-agnostic route
+            val path = full
+                .substringAfter("/api/v3", full)
+                .substringAfter("/api/v2", full)
             val params = request.url.parameters
             val authed = request.headers[HttpHeaders.Authorization] != null
 

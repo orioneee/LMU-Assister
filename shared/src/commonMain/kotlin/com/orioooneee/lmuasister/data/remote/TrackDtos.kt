@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 // Kotlin names map automatically; `best_by_class` keys are class names (a Map, untouched by the
 // strategy). The `default_weather` block is intentionally omitted (ignoreUnknownKeys drops it).
 
-/** GET /api/v2/tracks — full reference list of official tracks (public, static). */
+/** GET /api/v3/tracks — full reference list of official tracks (public, static). */
 @Serializable
 data class TracksResponse(
     val count: Int = 0,
@@ -43,7 +43,7 @@ data class TrackAssetsDto(
     val background: String? = null,
 )
 
-/** GET /api/v2/profile/track/<id> — the track block + the caller's personal record on it. */
+/** GET /api/v3/profile/track/<id> — the track block + the caller's personal record on it. */
 @Serializable
 data class TrackDetailResponse(
     val track: TrackFullDto,

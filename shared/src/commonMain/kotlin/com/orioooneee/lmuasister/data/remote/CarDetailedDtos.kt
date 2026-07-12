@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
-/** GET /api/v2/cars/detailed — full public car catalogue with artwork and liveries. */
+/** GET /api/v3/cars/detailed — full public car catalogue with artwork and liveries. */
 @Serializable
 data class CarsDetailedResponse(
     val count: Int = 0,

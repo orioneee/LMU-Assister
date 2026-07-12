@@ -10,7 +10,7 @@ class StatsDecodeTest {
 
     @Test
     fun decodesCamelCaseCareerStats() {
-        // Shape taken verbatim from a live GET /api/v2/profile response.
+        // Shape taken verbatim from a live GET /api/v3/profile response.
         val json = """
             {
               "uid": "abc",

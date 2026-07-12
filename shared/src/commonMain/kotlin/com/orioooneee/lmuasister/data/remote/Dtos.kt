@@ -142,7 +142,7 @@ data class TrackDto(
     @SerialName("simple_name") val simpleName: String? = null,
     val town: String? = null,
     val country: String? = null,
-    // v2 sends length as a string ("13.626"); parsed to Double in the mapper.
+    // v3 sends length as a string ("13.626"); parsed to Double in the mapper.
     @SerialName("length_km") val lengthKm: String? = null,
     @SerialName("num_turns") val numTurns: Int? = null,
     // Absolute CDN (R2) asset URLs — all four sent flat by the backend, loaded directly.
@@ -153,7 +153,7 @@ data class TrackDto(
     @SerialName("country_code") val countryCode: String? = null,
 )
 
-/** GET /cars — the v2 roster (manufacturer / class / model / series). */
+/** GET /cars — the v3 roster (manufacturer / class / model / series). */
 @Serializable
 data class CarsResponse(
     val count: Int = 0,

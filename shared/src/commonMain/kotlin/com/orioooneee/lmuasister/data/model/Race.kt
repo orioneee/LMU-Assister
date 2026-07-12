@@ -61,7 +61,7 @@ data class TrackInfo(
     val countryCode: String? = null,
 )
 
-/** One car from the v2 roster (deduped to distinct models for the carousel). */
+/** One car from the v3 roster (deduped to distinct models for the carousel). */
 data class CarModel(
     val id: String,
     val name: String,
