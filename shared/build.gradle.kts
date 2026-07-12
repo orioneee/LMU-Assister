@@ -185,6 +185,7 @@ val generateBuildConfig by tasks.registering {
                 firebaseProjectId.isNotBlank() &&
                 firebaseAppId.isNotBlank() &&
                 firebaseMeasurementId.isNotBlank()
+        val steamLogs = props.getProperty("steam.logs")?.trim()?.toBooleanStrictOrNull() ?: false
         val pkgDir = outDir.get().asFile.resolve("com/orioooneee/lmuasister/config")
         pkgDir.mkdirs()
         pkgDir.resolve("BuildConfig.kt").writeText(
@@ -195,6 +196,7 @@ val generateBuildConfig by tasks.registering {
             |internal object BuildConfig {
             |    const val APP_SITE: String = "${appSite.trimEnd('/')}"
             |    const val USE_MOCK: Boolean = $useMock
+            |    const val STEAM_LOGS: Boolean = $steamLogs
             |    const val DEMO_USERNAME: String = "$demoUser"
             |    const val DEMO_PASSWORD: String = "$demoPass"
             |    const val COMPANION_URL: String = "$companionUrl"

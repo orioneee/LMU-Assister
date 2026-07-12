@@ -17,7 +17,7 @@ internal class JavaSteamSignIn(
 ) : SteamSignIn {
 
     override suspend fun signIn(username: String, password: String, guardCode: String?): SignInOutcome {
-        SteamLog.d("javasteam: login start (user=$username)")
+        SteamLog.d("javasteam: login start (userLen=${username.trim().length})")
         return when (val r = steam.login(username.trim(), password, guardCode?.takeIf { it.isNotBlank() })) {
             is SteamLoginResult.GuardRequired -> { SteamLog.d("javasteam: Steam Guard required (${r.kind})"); SignInOutcome.GuardRequired(r.kind) }
             is SteamLoginResult.Failure -> { SteamLog.e("javasteam: login failed: ${r.reason}"); SignInOutcome.Failure(r.reason) }
