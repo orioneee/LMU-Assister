@@ -10,6 +10,7 @@ import com.orioooneee.lmuasister.data.image.SvgCssInlineDecoder
 import com.orioooneee.lmuasister.data.mock.mockModule
 import com.orioooneee.lmuasister.data.steam.steamModule
 import com.orioooneee.lmuasister.di.appModule
+import com.orioooneee.lmuasister.di.platformModules
 import com.orioooneee.lmuasister.ui.MainShell
 import com.orioooneee.lmuasister.ui.theme.LmuTheme
 import org.koin.compose.KoinApplication
@@ -27,9 +28,23 @@ fun App() {
             .build()
     }
 
-    // Mock data layer (no real backend) is the default for git checkouts — see BuildConfig.USE_MOCK.
-    val steam = if (BuildConfig.USE_MOCK) mockModule else steamModule()
-    KoinApplication(configuration = koinConfiguration { modules(appModule, steam) }) {
+    val steamModule = if (BuildConfig.USE_MOCK) {
+        mockModule
+    } else {
+        steamModule()
+    }
+
+    val modules = buildList {
+        add(appModule)
+        add(steamModule)
+        addAll(platformModules())
+    }
+
+    KoinApplication(
+        configuration = koinConfiguration {
+            modules(modules)
+        }
+    ) {
         LmuTheme {
             MainShell()
         }

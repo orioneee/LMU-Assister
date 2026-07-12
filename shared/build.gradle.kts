@@ -67,6 +67,7 @@ kotlin {
             dependsOn(nativeSteamMain)
             dependencies {
                 implementation(libs.compose.uiToolingPreview)
+                implementation(libs.firebase.appcheck.playintegrity)
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.bouncycastle.prov)
                 // Encrypted storage for legacy/app-managed Steam session data.
@@ -212,6 +213,75 @@ val generateBuildConfig by tasks.registering {
             """.trimMargin(),
         )
     }
+}
+
+val generateJvmBuildConfig by tasks.registering {
+    val outDir = layout.buildDirectory.dir("generated/jvm-buildconfig/kotlin")
+    val lp = localPropsFile.asFile
+
+    inputs.file(localPropsFile).optional(true)
+    outputs.dir(outDir)
+
+    doLast {
+        val props = Properties()
+        if (lp.exists()) lp.inputStream().use { props.load(it) }
+
+        val debugAppCheck = props.getProperty("debug.app.check")
+            ?.trim()
+            .orEmpty()
+
+        val pkgDir = outDir.get().asFile.resolve("com/orioooneee/lmuasister/config")
+        pkgDir.mkdirs()
+
+        pkgDir.resolve("JvmBuildConfig.kt").writeText(
+            """
+            |package com.orioooneee.lmuasister.config
+            |
+            |internal object JvmBuildConfig {
+            |    const val DEBUG_APP_CHECK: String = "$debugAppCheck"
+            |}
+            |
+            """.trimMargin(),
+        )
+    }
+}
+
+kotlin.sourceSets.named("jvmMain") {
+    kotlin.srcDir(generateJvmBuildConfig)
+}
+
+val generateIosBuildConfig by tasks.registering {
+    val outDir = layout.buildDirectory.dir("generated/ios-buildconfig/kotlin")
+    val lp = localPropsFile.asFile
+
+    inputs.file(localPropsFile).optional(true)
+    outputs.dir(outDir)
+
+    doLast {
+        val props = Properties()
+        if (lp.exists()) lp.inputStream().use { props.load(it) }
+
+        val debugAppCheck = props.getProperty("debug.app.check")
+            ?.trim()
+
+        val pkgDir = outDir.get().asFile.resolve("com/orioooneee/lmuasister/config")
+        pkgDir.mkdirs()
+
+        pkgDir.resolve("IosBuildConfig.kt").writeText(
+            """
+            |package com.orioooneee.lmuasister.config
+            |
+            |internal object IosBuildConfig {
+            |    const val DEBUG_APP_CHECK: String = "$debugAppCheck"
+            |}
+            |
+            """.trimMargin(),
+        )
+    }
+}
+
+kotlin.sourceSets.named("iosMain") {
+    kotlin.srcDir(generateIosBuildConfig)
 }
 
 // Make the generated file part of commonMain (visible to every target) and ensure
