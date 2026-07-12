@@ -11,6 +11,8 @@ import com.orioooneee.lmuasister.analytics.installPerformanceMonitoring
 import com.orioooneee.lmuasister.featureflags.FeatureFlagsRepository
 import com.orioooneee.lmuasister.featureflags.platformFeatureFlagRemoteSource
 import com.orioooneee.lmuasister.data.remote.ApiBaseUrlProvider
+import com.orioooneee.lmuasister.security.SecurityGate
+import com.orioooneee.lmuasister.security.securityGatePlugin
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
 import com.orioooneee.lmuasister.ui.profile.SteamAuthRunner
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
@@ -29,9 +31,7 @@ fun appCheckPlugin(
     provider: AppCheckProvider
 ) = createClientPlugin("AppCheckPlugin") {
     onRequest { request, _ ->
-        println("Request X-Token")
         val token = provider.provideToken()
-        println("Token: $token")
         request.headers.remove("X-Token")
         token?.let { request.headers.append("X-Token", it) }
     }
@@ -41,6 +41,7 @@ val appModule = module {
         val appCheckProvider = get<AppCheckProvider>()
         ApiBaseUrlProvider(
             appCheckTokenProvider = { appCheckProvider.provideToken() },
+            awaitNetworkAllowed = { SecurityGate.awaitAllowed() },
             fixedBaseUrl = if (BuildConfig.USE_MOCK) "https://mock.local/api/v3" else null,
         ).also { provider ->
             if (!BuildConfig.USE_MOCK) provider.warmUp()
@@ -54,6 +55,7 @@ val appModule = module {
         // No real backend configured (or backend.mock=true) → serve bundled mock data.
         if (BuildConfig.USE_MOCK) mockHttpClient()
         else HttpClient {
+            install(securityGatePlugin())
             install(appTokenAuthPlugin(tokenHolder, apiBaseUrlProvider))
             installPerformanceMonitoring()
             followRedirects = true

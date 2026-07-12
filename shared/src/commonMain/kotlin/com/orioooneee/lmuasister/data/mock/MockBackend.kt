@@ -2,6 +2,7 @@ package com.orioooneee.lmuasister.data.mock
 
 import com.orioooneee.lmuasister.data.steam.SignInOutcome
 import com.orioooneee.lmuasister.data.steam.SteamSignIn
+import com.orioooneee.lmuasister.security.securityGatePlugin
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -26,6 +27,7 @@ private val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
 
 /** Drop-in for the real network client — every request is served from [MockData]. */
 fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
+    install(securityGatePlugin())
     followRedirects = true
     engine {
         addHandler { request ->

@@ -20,6 +20,7 @@ import kotlinx.serialization.Serializable
 class ApiBaseUrlProvider(
     private val appSite: String = BuildConfig.APP_SITE,
     private val appCheckTokenProvider: suspend () -> String? = { null },
+    private val awaitNetworkAllowed: suspend () -> Unit = {},
     fixedBaseUrl: String? = null,
 ) {
     private val cacheKey = "bootstrap.api_base_url"
@@ -92,6 +93,7 @@ class ApiBaseUrlProvider(
     }
 
     private suspend fun fetchBootstrapBaseUrl(): String {
+        awaitNetworkAllowed()
         val site = appSite.trim().trimEnd('/')
         val text = bootstrapClient.get("$site/bootstrap") {
             appCheckTokenProvider()?.takeIf { it.isNotBlank() }?.let { token ->

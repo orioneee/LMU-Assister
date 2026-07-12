@@ -7,6 +7,7 @@ import bruhcollective.itaysonlab.ksteam.models.enums.EOSType
 import bruhcollective.itaysonlab.ksteam.persistence.MemoryPersistenceDriver
 import bruhcollective.itaysonlab.ksteam.platform.DeviceInformation
 import com.orioooneee.lmuasister.analytics.installPerformanceMonitoring
+import com.orioooneee.lmuasister.security.securityGatePlugin
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import okio.Path.Companion.toPath
@@ -29,6 +30,7 @@ internal actual fun createKSteamClient(): SteamClient {
         )
         ktor {
             HttpClient(OkHttp) {
+                install(securityGatePlugin())
                 installPerformanceMonitoring()
             }
         }

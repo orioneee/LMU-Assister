@@ -49,6 +49,7 @@ kotlin {
 dependencies {
     implementation(libs.firebase.appcheck.debug)
     implementation(projects.shared)
+    implementation(libs.talsec.security)
 
     implementation(libs.androidx.activity.compose)
 

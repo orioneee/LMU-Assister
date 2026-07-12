@@ -33,6 +33,7 @@ firebasePerfPlugin = "2.0.2"
 firebaseBom = "34.15.0"
 firebaseAppcheckKtx = "19.2.0"
 firebaseAppcheckDebug = "19.2.0"
+talsec = "18.0.2"
 
 [libraries]
 firebase-appcheck-playintegrity = { module = "com.google.firebase:firebase-appcheck-playintegrity" }
@@ -108,6 +109,7 @@ firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-config = { module = "com.google.firebase:firebase-config" }
 firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 firebase-performance = { module = "com.google.firebase:firebase-perf" }
+talsec-security = { module = "com.aheaditec.talsec.security:TalsecSecurity-Community", version.ref = "talsec" }
 firebase-appcheck-ktx = { group = "com.google.firebase", name = "firebase-appcheck-ktx", version.ref = "firebaseAppcheckKtx" }
 firebase-appcheck-debug = { group = "com.google.firebase", name = "firebase-appcheck-debug", version.ref = "firebaseAppcheckDebug" }
 
