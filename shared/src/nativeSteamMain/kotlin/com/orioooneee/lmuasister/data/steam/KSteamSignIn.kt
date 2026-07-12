@@ -84,6 +84,11 @@ internal class KSteamSignIn(
             }
 
             val awaiting = awaitGuardPrompt(steam) ?: return@withLock finishSignedIn(steam)
+            if (code.isNotBlank()) {
+                SteamLog.d("ksteam: submitting typed guard code after credential login reached 2FA")
+                return@withLock submitGuardCode(steam, code)
+            }
+
             val hasApproval = awaiting.supportedConfirmationMethods.any { it.isApprovalBased() }
             val codeKind = awaiting.supportedConfirmationMethods.firstNotNullOfOrNull { it.codeKindOrNull() }
 

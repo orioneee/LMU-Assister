@@ -167,15 +167,21 @@ fun ProfileScreen(
         pendingQr != null ||
         checkingAuthEnvironment ||
         requestingLocalNetworkPermission
-    val guardRequired = state is SteamLoginUiState.GuardRequired
     val waitingForGuardApproval = pendingApproval != null
     val waitingForQr = pendingQr != null
-    val canSubmitGuardCodeDuringApproval = pendingApproval != null && code.isNotBlank()
-    val credentialFieldsVisible = !authEnvironmentBlocked && pendingQr == null && !startingQr && !loadingProfileAfterAuth
-    val cancellableCredentialFlow = pendingApproval != null || guardRequired
     val currentAuthStage = authStageFor(state, code)
     var lastVisibleAuthStage by remember { mutableStateOf<AuthStage?>(null) }
     val visibleAuthStage = if (state is SteamLoginUiState.Error) lastVisibleAuthStage else currentAuthStage
+    val guardCodeEntryVisible = state is SteamLoginUiState.GuardRequired
+    val guardCodeChecking = currentAuthStage == AuthStage.GuardCheck
+    val credentialFieldsVisible = !authEnvironmentBlocked &&
+        pendingQr == null &&
+        pendingApproval == null &&
+        !startingQr &&
+        !loadingProfileAfterAuth &&
+        !guardCodeEntryVisible &&
+        !guardCodeChecking
+    val cancellableCredentialFlow = pendingApproval != null || guardCodeEntryVisible || guardCodeChecking
     val authSteps = visibleAuthStage?.steps(markCurrentError = state is SteamLoginUiState.Error)
     val qrNoticeText = when {
         pendingQr != null || startingQr -> null
@@ -407,13 +413,16 @@ fun ProfileScreen(
                         onPasswordVisibilityChange = { passwordVisible = it },
                         enabled = !loading,
                     )
+                }
+
+                if (guardCodeEntryVisible) {
                     Spacer(Modifier.height(14.dp))
                     Field(
                         value = code,
-                        onValueChange = { code = it },
+                        onValueChange = { raw -> code = raw.filterNot { it.isWhitespace() }.uppercase() },
                         label = stringResource(Res.string.profile_field_2fa),
-                        keyboardType = KeyboardType.Number,
-                        enabled = guardRequired || pendingApproval != null,
+                        keyboardType = KeyboardType.Text,
+                        enabled = !loading,
                     )
                 }
 
@@ -437,14 +446,20 @@ fun ProfileScreen(
                     QrCodePanel(pendingQr)
                 }
 
-                if (credentialFieldsVisible) {
+                if (credentialFieldsVisible || guardCodeEntryVisible) {
                     Spacer(Modifier.height(16.dp))
                     SignInButton(
-                        loading = (restoring || state is SteamLoginUiState.Loading || pendingApproval != null) &&
-                            !canSubmitGuardCodeDuringApproval,
-                        enabled = privacyAccepted && (!loading || canSubmitGuardCodeDuringApproval),
+                        text = if (guardCodeEntryVisible) "Submit code" else stringResource(Res.string.profile_sign_in),
+                        loading = restoring || state is SteamLoginUiState.Loading,
+                        enabled = if (guardCodeEntryVisible) code.isNotBlank() && !loading else privacyAccepted && !loading,
                         waitingForGuardApproval = waitingForGuardApproval,
-                        onClick = { viewModel.login(login, password, code) },
+                        onClick = {
+                            if (guardCodeEntryVisible) viewModel.submitGuardCode(code)
+                            else {
+                                code = ""
+                                viewModel.login(login, password, null)
+                            }
+                        },
                     )
                 }
 
@@ -453,7 +468,7 @@ fun ProfileScreen(
                     CancelAuthButton(onClick = viewModel::cancelAuthFlow)
                 }
 
-                if (!credentialFieldsVisible && !loadingProfileAfterAuth) {
+                if (!credentialFieldsVisible && !loadingProfileAfterAuth && !cancellableCredentialFlow) {
                     Spacer(Modifier.height(10.dp))
                     CancelAuthButton(onClick = viewModel::cancelAuthFlow)
                 }
@@ -1066,12 +1081,12 @@ private fun StatusLine(
                 AuthAccent
         }
         is SteamLoginUiState.GuardRequired -> {
-            when (state.kind) {
+            state.message?.let { it to ClassHyper } ?: (when (state.kind) {
                 SteamGuardKind.EMAIL -> "Enter the Steam Guard code from your email."
                 SteamGuardKind.DEVICE ->
                     if (supportsGuardApproval) "Enter the Steam Guard code from your Steam app."
                     else "Open Steam Guard and enter the current code."
-            } to AuthAccent
+            } to AuthAccent)
         }
         is SteamLoginUiState.SignedIn -> {
             if (state.backend != BackendState.Loading) return
@@ -1347,6 +1362,7 @@ private fun CancelAuthButton(onClick: () -> Unit) {
 
 @Composable
 private fun SignInButton(
+    text: String,
     loading: Boolean,
     enabled: Boolean,
     waitingForGuardApproval: Boolean,
@@ -1378,7 +1394,7 @@ private fun SignInButton(
             }
         } else {
             Text(
-                stringResource(Res.string.profile_sign_in),
+                text,
                 style = MaterialTheme.typography.titleSmall,
                 color = TextHigh.copy(alpha = alpha),
                 fontWeight = FontWeight.Bold,

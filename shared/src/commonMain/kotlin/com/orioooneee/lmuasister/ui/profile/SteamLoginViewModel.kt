@@ -53,7 +53,7 @@ sealed interface SteamLoginUiState {
     data object Loading : SteamLoginUiState
     data object QrCodeStarting : SteamLoginUiState
 
-    data class GuardRequired(val kind: SteamGuardKind) : SteamLoginUiState
+    data class GuardRequired(val kind: SteamGuardKind, val message: String? = null) : SteamLoginUiState
     data class DeviceConfirmationPending(
         val challengeId: String,
         val expiresIn: Int,
@@ -166,6 +166,10 @@ class SteamLoginViewModel(
         }
     private var restoreFinished = false
     private var handledAuthResultId = 0L
+    private var pendingGuardUsername: String? = null
+    private var pendingGuardPassword: String? = null
+    private var pendingGuardKind: SteamGuardKind? = null
+    private var lastSubmittedGuardCode = false
 
     init {
         val cached = loadCachedProfile()
@@ -251,29 +255,55 @@ class SteamLoginViewModel(
     fun login(username: String, password: String, guardCode: String?) {
         val currentState = _state.value
         val code = guardCode?.trim().orEmpty()
+        val authUsername = username.trim().ifBlank { pendingGuardUsername.orEmpty() }
+        val authPassword = password.ifEmpty { pendingGuardPassword.orEmpty() }
         if (currentState is SteamLoginUiState.DeviceConfirmationPending && code.isNotBlank()) {
             SteamLog.d("vm: typed guard code submitted while approval pending")
+            if (authUsername.isBlank() || authPassword.isBlank()) {
+                _state.value = SteamLoginUiState.Error("Sign in again to enter a Steam Guard code.")
+                return
+            }
             _state.value = SteamLoginUiState.Loading
             authRunner.cancelRunning("typed_guard_code_while_approval_pending")
-            authRunner.startSignIn(username, password, code)
+            pendingGuardUsername = authUsername
+            pendingGuardPassword = authPassword
+            lastSubmittedGuardCode = true
+            authRunner.startSignIn(authUsername, authPassword, code)
             return
         }
         if (currentState is SteamLoginUiState.Loading ||
             currentState is SteamLoginUiState.QrCodeStarting ||
             authRunner.state.value is SteamAuthRunnerState.Running
         ) return
-        if (username.isBlank() || password.isBlank()) {
+        if (currentState is SteamLoginUiState.GuardRequired && code.isBlank()) {
+            _state.value = currentState.copy(message = "Enter the Steam Guard code.")
+            return
+        }
+        if (authUsername.isBlank() || authPassword.isBlank()) {
             _state.value = SteamLoginUiState.Error("Enter your login and password.")
             return
         }
-        if (username == DEMO_USERNAME && password == DEMO_PASSWORD) {
+        if (authUsername == DEMO_USERNAME && authPassword == DEMO_PASSWORD) {
             loginDemo()
             return
         }
         SteamLog.d("vm: login submitted has2fa=${code.isNotBlank()}")
         _state.value = SteamLoginUiState.Loading
         Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = code.isNotBlank()))
-        authRunner.startSignIn(username, password, code)
+        pendingGuardUsername = authUsername
+        pendingGuardPassword = authPassword
+        lastSubmittedGuardCode = code.isNotBlank()
+        authRunner.startSignIn(authUsername, authPassword, code)
+    }
+
+    fun submitGuardCode(guardCode: String) {
+        val username = pendingGuardUsername
+        val password = pendingGuardPassword
+        if (username.isNullOrBlank() || password.isNullOrBlank()) {
+            _state.value = SteamLoginUiState.Error("Sign in again to enter a Steam Guard code.")
+            return
+        }
+        login(username, password, guardCode)
     }
 
     fun loginWithQr() {
@@ -283,6 +313,7 @@ class SteamLoginViewModel(
             authRunner.state.value is SteamAuthRunnerState.Running
         ) return
         SteamLog.d("vm: QR login submitted")
+        clearPendingGuardCredentials()
         _state.value = SteamLoginUiState.QrCodeStarting
         Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = false))
         val started = authRunner.startQrSignIn()
@@ -295,6 +326,7 @@ class SteamLoginViewModel(
         val pending = _state.value as? SteamLoginUiState.DeviceConfirmationPending ?: return
         SteamLog.d("vm: approval timer expired challenge=${SteamLog.short(pending.challengeId)}")
         authRunner.cancelRunning("approval_timer_expired")
+        clearPendingGuardCredentials()
         _state.value = SteamLoginUiState.Error("Steam Guard approval timed out. Try again or enter the Steam Guard code.")
     }
 
@@ -320,6 +352,7 @@ class SteamLoginViewModel(
     fun cancelAuthFlow() {
         SteamLog.d("vm: auth flow cancelled by user")
         authRunner.cancelRunning("user_cancelled_auth")
+        clearPendingGuardCredentials()
         _state.value = SteamLoginUiState.Idle
     }
 
@@ -327,6 +360,7 @@ class SteamLoginViewModel(
         val pending = _state.value as? SteamLoginUiState.QrCodePending ?: return
         SteamLog.d("vm: QR timer expired flow=${SteamLog.short(pending.flowId)}")
         authRunner.cancelRunning("qr_timer_expired")
+        clearPendingGuardCredentials()
         _state.value = SteamLoginUiState.Error("Steam QR sign-in timed out. Generate a new code and try again.")
     }
 
@@ -417,6 +451,7 @@ class SteamLoginViewModel(
         when (r) {
             is SignInOutcome.Success -> {
                 SteamLog.d("vm: login success uid=${r.uid}")
+                clearPendingGuardCredentials()
                 appToken = r.appToken
                 Telemetry.log(AnalyticsEvent.LoginSuccess(restored = false))
                 Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
@@ -426,6 +461,7 @@ class SteamLoginViewModel(
             }
             is SignInOutcome.GuardRequired -> {
                 SteamLog.d("vm: guard code required kind=${r.kind}")
+                pendingGuardKind = r.kind
                 Telemetry.log(AnalyticsEvent.Login2faRequired(r.kind.name.lowercase()))
                 _state.value = SteamLoginUiState.GuardRequired(r.kind)
                 return null
@@ -474,12 +510,29 @@ class SteamLoginViewModel(
              */
             is SignInOutcome.Failure -> {
                 SteamLog.d("vm: login failed stage=$stage reason=${r.reason}")
-                Telemetry.log(AnalyticsEvent.LoginFailed(loginFailReason(r.reason)))
-                Telemetry.recordError(TelemetryError("login_failed: ${loginFailReason(r.reason)}"), "stage" to stage)
-                _state.value = SteamLoginUiState.Error(r.reason)
+                val failReason = loginFailReason(r.reason)
+                Telemetry.log(AnalyticsEvent.LoginFailed(failReason))
+                Telemetry.recordError(TelemetryError("login_failed: $failReason"), "stage" to stage)
+                val guardKind = pendingGuardKind
+                if (lastSubmittedGuardCode && failReason == "guard_invalid" && guardKind != null) {
+                    _state.value = SteamLoginUiState.GuardRequired(
+                        guardKind,
+                        r.reason.ifBlank { "Steam Guard code was rejected. Enter the current code and try again." },
+                    )
+                } else {
+                    clearPendingGuardCredentials()
+                    _state.value = SteamLoginUiState.Error(r.reason)
+                }
                 return null
             }
         }
+    }
+
+    private fun clearPendingGuardCredentials() {
+        pendingGuardUsername = null
+        pendingGuardPassword = null
+        pendingGuardKind = null
+        lastSubmittedGuardCode = false
     }
 
     /** App-store-review path: no Steam, just exchange the demo creds for a service-account token. */
