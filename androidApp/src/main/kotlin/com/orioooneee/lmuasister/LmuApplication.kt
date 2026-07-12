@@ -51,9 +51,7 @@ class LmuApplication: Application() {
                 if (!BuildConfig.DEBUG) closeForSecurity()
             }
 
-            override fun onMalwareDetected(suspiciousApps: List<SuspiciousAppInfo>) {
-                if (suspiciousApps.isNotEmpty()) closeForSecurity()
-            }
+            override fun onMalwareDetected(suspiciousApps: List<SuspiciousAppInfo>) = Unit
 
             override fun onObfuscationIssuesDetected() {
                 if (!BuildConfig.DEBUG) closeForSecurity()
