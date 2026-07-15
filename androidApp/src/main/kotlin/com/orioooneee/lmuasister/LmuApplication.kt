@@ -14,6 +14,7 @@ import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import com.google.firebase.initialize
 import com.orioooneee.lmuasister.security.SecurityGate
+import kotlin.time.Duration.Companion.seconds
 
 class LmuApplication: Application() {
     private val securityGateHandler = Handler(Looper.getMainLooper())
@@ -71,7 +72,7 @@ class LmuApplication: Application() {
             Talsec.start(this, config, TalsecMode.BACKGROUND)
             securityGateHandler.postDelayed(
                 { SecurityGate.allow() },
-                RASP_STARTUP_GRACE_MS,
+                RASP_STARTUP_GRACE_MS.inWholeMilliseconds,
             )
         }.onFailure {
             if (BuildConfig.DEBUG) {
@@ -87,7 +88,7 @@ class LmuApplication: Application() {
     }
 
     private companion object {
-        private const val RASP_STARTUP_GRACE_MS = 2_500L
+        private val RASP_STARTUP_GRACE_MS = 1.5.seconds
         private const val EXPECTED_PACKAGE_NAME = "com.orioooneee.lmuasister"
         private val EXPECTED_SIGNING_CERTIFICATE_HASHES_BASE64 = arrayOf(
             "BMkxr7/lYtlnEfWhizdSYVk6S7uuPzJLhMbPVGPDwiQ=",
