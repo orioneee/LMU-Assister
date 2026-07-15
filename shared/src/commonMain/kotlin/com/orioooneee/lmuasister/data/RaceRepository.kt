@@ -13,6 +13,9 @@ import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.Schedule
+import com.orioooneee.lmuasister.data.model.ScheduleCategory
+import com.orioooneee.lmuasister.data.model.SchedulePeriod
+import com.orioooneee.lmuasister.data.model.ScheduleSlice
 import com.orioooneee.lmuasister.data.model.ScheduleWeek
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
@@ -45,15 +48,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 
-// Keep this key versioned so older cached payloads do not outlive backend shape changes.
-// the field existed, otherwise race details stay image-less until a manual refresh.
-private const val CACHE_KEY = "schedule_v3"
+// Keep schedule cache keys versioned so older full-schedule payloads do not masquerade
+// as the new per-week/per-tab slices.
+private const val SCHEDULE_CACHE_PREFIX = "schedule_v4"
 private const val STATUS_READY = "ready"
 private const val HOTLAP_POLLS = 6
 private const val HOTLAP_POLL_DELAY_MS = 1500L
 
 @Serializable
-private data class CachedSchedule(val ts: Long = 0, val data: ScheduleResponse = ScheduleResponse())
+private data class CachedScheduleSlice(val ts: Long = 0, val data: ScheduleResponse = ScheduleResponse())
 
 @Serializable
 private data class LbCache(
@@ -85,48 +88,66 @@ private fun dedupCars(dtos: List<CarDto>): List<CarModel> =
         .distinctBy { "${it.manufacturer}|${it.model}|${it.carClass}" }
         .sortedWith(compareBy({ it.carClass }, { it.manufacturer ?: "" }, { it.model }))
 
+private data class ScheduleKey(
+    val period: SchedulePeriod,
+    val category: ScheduleCategory,
+)
+
 /**
  * Thin client over the LmuAssister backend. The backend already merges every
- * source into the unified race model, so this just fetches, caches the one
- * `/schedule` payload, and maps DTOs → [Race]/[Schedule].
+ * source into the unified race model, so this fetches schedule slices on demand
+ * and maps DTOs → [Race]/[Schedule].
  */
 class RaceRepository(
     private val api: BackendApi,
     private val tokenHolder: AppTokenHolder,
 ) {
 
-    private var mem: ScheduleResponse? = null
+    private val scheduleMem = mutableMapOf<ScheduleKey, ScheduleResponse>()
 
-    private fun disk(): ScheduleResponse? = runCatching {
-        LocalCache.read(CACHE_KEY)?.let { AppJson.decodeFromString<CachedSchedule>(it).data }
+    fun cachedSchedule(period: SchedulePeriod, category: ScheduleCategory): ScheduleSlice? {
+        val key = ScheduleKey(period, category)
+        return cachedSlice(key)
+    }
+
+    suspend fun loadSchedule(
+        period: SchedulePeriod,
+        category: ScheduleCategory,
+        refresh: Boolean = false,
+    ): Result<ScheduleSlice> = runCatching {
+        val key = ScheduleKey(period, category)
+        if (refresh) {
+            network(key, refresh = true).toSlice()
+        } else {
+            cachedSlice(key) ?: network(key, refresh = false).toSlice()
+        }
+    }
+
+    private fun cached(key: ScheduleKey): ScheduleResponse? =
+        scheduleMem[key] ?: disk(key)?.also { scheduleMem[key] = it }
+
+    private fun cachedSlice(key: ScheduleKey): ScheduleSlice? =
+        cached(key)?.let { resp ->
+            runCatching { resp.toSlice() }
+                .onFailure { scheduleMem.remove(key) }
+                .getOrNull()
+        }
+
+    private fun disk(key: ScheduleKey): ScheduleResponse? = runCatching {
+        LocalCache.read(key.cacheKey)?.let { AppJson.decodeFromString<CachedScheduleSlice>(it).data }
     }.getOrNull()
 
-    private fun cached(): ScheduleResponse? = mem ?: disk()?.also { mem = it }
-
-    private suspend fun network(refresh: Boolean): ScheduleResponse =
-        api.schedule(refresh = refresh).also { resp ->
-            mem = resp
+    private suspend fun network(key: ScheduleKey, refresh: Boolean): ScheduleResponse =
+        api.schedule(key.period, key.category, refresh = refresh).also { resp ->
+            scheduleMem[key] = resp
             runCatching {
-                val wrapped = CachedSchedule(Clock.System.now().toEpochMilliseconds(), resp)
-                LocalCache.write(CACHE_KEY, AppJson.encodeToString(wrapped))
+                val wrapped = CachedScheduleSlice(Clock.System.now().toEpochMilliseconds(), resp)
+                LocalCache.write(key.cacheKey, AppJson.encodeToString(wrapped))
             }
         }
 
-    private suspend fun full(refresh: Boolean): ScheduleResponse =
-        if (refresh) network(refresh = true) else cached() ?: network(refresh = false)
-
-    fun cachedWeeks(): List<ScheduleWeek>? = cached()?.weeks?.map { ScheduleWeek(it.key, it.label) }
-
-    suspend fun refreshSchedule(): Result<Unit> = runCatching { network(refresh = true) }.map { }
-
-    suspend fun availableWeeks(refresh: Boolean = false): List<ScheduleWeek> =
-        runCatching { full(refresh).weeks.map { ScheduleWeek(it.key, it.label) } }.getOrDefault(emptyList())
-
-    suspend fun load(weekKeyOverride: String? = null, refresh: Boolean = false): Result<Schedule> = runCatching {
-        val resp = full(refresh)
-        val key = weekKeyOverride ?: resp.weeks.firstOrNull()?.key ?: error("No race weeks available")
-        Schedule(resp.schedules[key].orEmpty().map { it.toModel() })
-    }
+    private val ScheduleKey.cacheKey: String
+        get() = "${SCHEDULE_CACHE_PREFIX}_${period.name.lowercase()}_${category.name.lowercase()}"
 
     private val lbMem = mutableMapOf<String, RaceLeaderboards>()
     private val hlMem = mutableMapOf<String, List<Hotlap>>()
@@ -294,6 +315,17 @@ private class LeaderboardPagingSource(
 
 private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
 
+private fun ScheduleResponse.toSlice(): ScheduleSlice {
+    val weekDto = weeks.firstOrNull()
+    val weekKey = weekDto?.key?.takeIf { it.isNotBlank() }
+        ?: schedules.keys.firstOrNull()
+        ?: error("No race weeks available")
+    val label = weekDto?.label?.takeIf { it.isNotBlank() } ?: weekKey
+    return ScheduleSlice(
+        week = ScheduleWeek(weekKey, label),
+        schedule = Schedule(schedules[weekKey].orEmpty().map { it.toModel() }),
+    )
+}
 
 private fun RaceDto.toModel(): Race = Race(
     id = id,

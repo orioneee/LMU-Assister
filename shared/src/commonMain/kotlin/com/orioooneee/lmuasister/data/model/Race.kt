@@ -7,6 +7,22 @@ data class ScheduleWeek(
     val label: String,
 )
 
+enum class SchedulePeriod {
+    CURRENT,
+    NEXT,
+}
+
+enum class ScheduleCategory {
+    RACES,
+    SPECIAL,
+    CHAMPIONSHIP,
+}
+
+data class ScheduleSlice(
+    val week: ScheduleWeek,
+    val schedule: Schedule,
+)
+
 enum class RaceType(val label: String) {
     DAILY("Daily"),
     WEEKLY("Weekly"),

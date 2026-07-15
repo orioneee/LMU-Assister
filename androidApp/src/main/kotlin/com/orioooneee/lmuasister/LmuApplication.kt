@@ -18,7 +18,6 @@ class LmuApplication: Application() {
         super.onCreate()
 
         SecurityShutdown.install(this)
-        startRuntimeProtection()
 
         Firebase.initialize(this)
         Firebase.appCheck.installAppCheckProviderFactory(
@@ -28,16 +27,21 @@ class LmuApplication: Application() {
                 PlayIntegrityAppCheckProviderFactory.getInstance()
             },
         )
+
+        startRuntimeProtection()
     }
 
     private fun startRuntimeProtection() {
-        SecurityGate.resetForChecks()
+        SecurityGate.allow()
 
         val config = TalsecConfig.Builder(
             EXPECTED_PACKAGE_NAME,
             EXPECTED_SIGNING_CERTIFICATE_HASHES_BASE64,
         )
             .supportedAlternativeStores(SUPPORTED_ALTERNATIVE_STORES)
+            .blacklistedPackageNames(NO_BLACKLISTED_PACKAGES)
+            .blacklistedHashes(NO_BLACKLISTED_HASHES)
+            .suspiciousPermissions(NO_SUSPICIOUS_PERMISSIONS)
             .prod(!BuildConfig.DEBUG)
             .killOnBypass(true)
             .build()
@@ -58,14 +62,8 @@ class LmuApplication: Application() {
             }
         }
 
-        val executionListener = object : ThreatListener.RaspExecutionState() {
-            override fun onAllChecksFinished() {
-                SecurityGate.allow()
-            }
-        }
-
         runCatching {
-            ThreatListener(threatListener, null, executionListener).registerListener(this)
+            ThreatListener(threatListener).registerListener(this)
             Talsec.start(this, config, TalsecMode.BACKGROUND)
         }.onFailure {
             if (BuildConfig.DEBUG) {
@@ -87,5 +85,8 @@ class LmuApplication: Application() {
             "OREZ2ytaIhLxhvlOt+VtwyLrkYdiW/Tcc3snGf3GIDY=",
         )
         private val SUPPORTED_ALTERNATIVE_STORES = emptyArray<String>()
+        private val NO_BLACKLISTED_PACKAGES = emptyArray<String>()
+        private val NO_BLACKLISTED_HASHES = emptyArray<String>()
+        private val NO_SUSPICIOUS_PERMISSIONS = emptyArray<Array<String>>()
     }
 }

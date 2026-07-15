@@ -1,5 +1,7 @@
 package com.orioooneee.lmuasister.data.remote
 
+import com.orioooneee.lmuasister.data.model.ScheduleCategory
+import com.orioooneee.lmuasister.data.model.SchedulePeriod
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -52,7 +54,21 @@ class BackendApi(
 
     suspend fun schedule(refresh: Boolean = false): ScheduleResponse {
         val path = "/schedule" + if (refresh) "?refresh=1" else ""
-        return AppJson.decodeFromString(getText(path))
+        return getSchedule(path)
+    }
+
+    suspend fun schedule(
+        period: SchedulePeriod,
+        category: ScheduleCategory,
+        refresh: Boolean = false,
+    ): ScheduleResponse {
+        val path = buildString {
+            append("/schedule/")
+            if (period == SchedulePeriod.NEXT) append("nextweek/")
+            append(category.pathSegment)
+            if (refresh) append("?refresh=1")
+        }
+        return getSchedule(path)
     }
 
     suspend fun race(raceId: String): RaceDetailResponse {
@@ -163,6 +179,18 @@ class BackendApi(
         return AppJson.decodeFromString(body)
     }
 
+    private suspend fun getSchedule(pathAndQuery: String): ScheduleResponse {
+        val resp = getResponse(pathAndQuery)
+        val text = resp.bodyAsText()
+        if (resp.status.value !in 200..299) {
+            val upstreamError = runCatching {
+                AppJson.decodeFromString<BackendErrorResponse>(text).error
+            }.getOrNull()
+            throw Exception(upstreamError?.takeIf { it.isNotBlank() } ?: "HTTP ${resp.status.value}: ${text.take(200)}")
+        }
+        return AppJson.decodeFromString(text)
+    }
+
     private suspend fun getText(pathAndQuery: String): String =
         getResponse(pathAndQuery).bodyAsText()
 
@@ -182,6 +210,16 @@ class BackendApi(
             }
         }
 }
+
+@kotlinx.serialization.Serializable
+private data class BackendErrorResponse(val error: String? = null)
+
+private val ScheduleCategory.pathSegment: String
+    get() = when (this) {
+        ScheduleCategory.RACES -> "daily-weekly"
+        ScheduleCategory.SPECIAL -> "special"
+        ScheduleCategory.CHAMPIONSHIP -> "championship"
+    }
 
 private fun String.publicRaceErrorCode(): String? =
     listOf(

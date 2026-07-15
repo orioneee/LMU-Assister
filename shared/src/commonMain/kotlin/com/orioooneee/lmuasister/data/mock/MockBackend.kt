@@ -43,6 +43,10 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
             fun json(body: String) = respond(body, HttpStatusCode.OK, jsonHeaders)
 
             when {
+                path.startsWith("/schedule/nextweek/") ->
+                    json(MockData.scheduleSlice(nextWeek = true, category = path.removePrefix("/schedule/nextweek/")))
+                path.startsWith("/schedule/") ->
+                    json(MockData.scheduleSlice(nextWeek = false, category = path.removePrefix("/schedule/")))
                 path == "/schedule" -> json(MockData.schedule())
                 path == "/cars" -> json(MockData.cars())
                 path == "/tracks" -> json(MockData.tracks())

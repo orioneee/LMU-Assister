@@ -20,18 +20,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,8 +48,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import com.orioooneee.lmuasister.data.model.CarModel
 import com.orioooneee.lmuasister.data.model.Race
-import com.orioooneee.lmuasister.data.model.RaceType
 import com.orioooneee.lmuasister.data.model.Schedule
+import com.orioooneee.lmuasister.data.model.ScheduleCategory
 import com.orioooneee.lmuasister.ui.IconCoffee
 import com.orioooneee.lmuasister.ui.IconGithub
 import com.orioooneee.lmuasister.ui.WeekTab
@@ -70,11 +67,12 @@ import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.rememberNow
 import kotlin.time.Instant
-import kotlinx.coroutines.launch
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.action_refresh
 import lmuassister.shared.generated.resources.empty_subtitle
 import lmuassister.shared.generated.resources.empty_title
+import lmuassister.shared.generated.resources.error_title
+import lmuassister.shared.generated.resources.retry
 import lmuassister.shared.generated.resources.section_daily
 import lmuassister.shared.generated.resources.section_weekly
 import lmuassister.shared.generated.resources.tab_championship
@@ -90,8 +88,12 @@ fun HomeScreen(
     schedule: Schedule,
     weeks: List<WeekTab>,
     selectedWeek: String,
+    selectedCategory: ScheduleCategory,
+    loading: Boolean,
+    errorMessage: String?,
     insets: PaddingValues,
     onSelectWeek: (String) -> Unit,
+    onSelectCategory: (ScheduleCategory) -> Unit,
     onOpenRace: (Race) -> Unit,
     onRefresh: () -> Unit = {},
     cars: List<CarModel> = emptyList(),
@@ -100,7 +102,6 @@ fun HomeScreen(
     val topInset = insets.calculateTopPadding()
     val bottomInset = insets.calculateBottomPadding()
     val now = rememberNow()
-    val tabs = remember(schedule) { buildTabs(schedule) }
 
     val density = LocalDensity.current
     val windowInfo = LocalWindowInfo.current
@@ -109,22 +110,6 @@ fun HomeScreen(
     val openRepo = { uriHandler.openUri(REPO_URL) }
     val openJar = { uriHandler.openUri(JAR_URL) }
 
-    if (tabs.isEmpty()) {
-        Column(Modifier.fillMaxSize().background(Carbon)) {
-            Spacer(Modifier.height(topInset + 12.dp))
-            if (weeks.size > 1) {
-                WeekPillsRow(weeks, selectedWeek, onSelectWeek)
-                Spacer(Modifier.height(8.dp))
-            }
-            SupportRow(openRepo, openJar)
-            Spacer(Modifier.height(12.dp))
-            NoRaces(Modifier.weight(1f), onRefresh)
-        }
-        return
-    }
-
-    val pager = rememberPagerState(pageCount = { tabs.size })
-    val scope = rememberCoroutineScope()
     val isCurrentWeek = weeks.isEmpty() || selectedWeek == weeks.first().key
 
     val headerHeight = remember { mutableStateOf(0f) }
@@ -144,10 +129,13 @@ fun HomeScreen(
 
     Box(Modifier.fillMaxSize().clipToBounds().background(Carbon).nestedScroll(connection)) {
         Box(Modifier.fillMaxSize().offset { IntOffset(0, (headerHeight.value + headerOffset.value).roundToInt()) }) {
-            HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+            if (loading) {
+                LoadingScheduleContent(bottomInset)
+            } else {
                 TabContent(
-                    tabs[page],
+                    selectedCategory,
                     schedule,
+                    errorMessage,
                     heroHeight,
                     isCurrentWeek,
                     now,
@@ -171,12 +159,8 @@ fun HomeScreen(
                 WeekPillsRow(weeks, selectedWeek, onSelectWeek)
                 Spacer(Modifier.height(12.dp))
             }
-            if (tabs.size > 1) {
-                TierTabsRow(tabs, pager.currentPage) { i ->
-                    scope.launch { pager.animateScrollToPage(i) }
-                }
-                Spacer(Modifier.height(8.dp))
-            }
+            TierTabsRow(ScheduleCategory.entries.toList(), selectedCategory, onSelectCategory)
+            Spacer(Modifier.height(8.dp))
             SupportRow(openRepo, openJar)
             Spacer(Modifier.height(8.dp))
         }
@@ -228,13 +212,17 @@ private fun SupportCluster(onOpenRepo: () -> Unit, onOpenJar: () -> Unit) {
 }
 
 @Composable
-private fun TierTabsRow(tabs: List<HomeTab>, currentPage: Int, onSelect: (Int) -> Unit) {
+private fun TierTabsRow(
+    tabs: List<ScheduleCategory>,
+    selectedCategory: ScheduleCategory,
+    onSelect: (ScheduleCategory) -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        tabs.forEachIndexed { i, tab ->
-            TierTab(tab.label(), currentPage == i) { onSelect(i) }
+        tabs.forEach { tab ->
+            TierTab(tab.label(), selectedCategory == tab) { onSelect(tab) }
         }
     }
 }
@@ -249,25 +237,11 @@ private fun WeekPillsRow(weeks: List<WeekTab>, selectedWeek: String, onSelectWee
     }
 }
 
-private sealed interface HomeTab
-private data object MainTab : HomeTab
-private data object SpecialTab : HomeTab
-private data object ChampTab : HomeTab
-
 @Composable
-private fun HomeTab.label(): String = when (this) {
-    MainTab -> stringResource(Res.string.tab_races)
-    SpecialTab -> stringResource(Res.string.tab_special)
-    ChampTab -> stringResource(Res.string.tab_championship)
-}
-
-private fun buildTabs(schedule: Schedule): List<HomeTab> = buildList {
-    val hasMain = schedule.races.any {
-        it.type == RaceType.DAILY || it.type == RaceType.WEEKLY
-    }
-    if (hasMain) add(MainTab)
-    if (schedule.special.isNotEmpty()) add(SpecialTab)
-    if (schedule.championship.isNotEmpty()) add(ChampTab)
+private fun ScheduleCategory.label(): String = when (this) {
+    ScheduleCategory.RACES -> stringResource(Res.string.tab_races)
+    ScheduleCategory.SPECIAL -> stringResource(Res.string.tab_special)
+    ScheduleCategory.CHAMPIONSHIP -> stringResource(Res.string.tab_championship)
 }
 
 private fun srRank(sr: String?): Int = when (sr?.trim()?.firstOrNull()?.lowercaseChar()) {
@@ -282,8 +256,9 @@ private data class Section(val label: String?, val races: List<Race>)
 
 @Composable
 private fun TabContent(
-    tab: HomeTab,
+    tab: ScheduleCategory,
     schedule: Schedule,
+    errorMessage: String?,
     heroHeight: Dp,
     isCurrentWeek: Boolean,
     now: Instant,
@@ -293,12 +268,12 @@ private fun TabContent(
     showTimerInScheduleCard: Boolean,
 ) {
     val sections: List<Section> = when (tab) {
-        MainTab -> listOf(
+        ScheduleCategory.RACES -> listOf(
             Section(stringResource(Res.string.section_daily), schedule.daily),
             Section(stringResource(Res.string.section_weekly), schedule.weekly),
         )
-        SpecialTab -> listOf(Section(null, schedule.special))
-        ChampTab -> listOf(Section(null, schedule.championship))
+        ScheduleCategory.SPECIAL -> listOf(Section(null, schedule.special))
+        ScheduleCategory.CHAMPIONSHIP -> listOf(Section(null, schedule.championship))
     }
         .filter { it.races.isNotEmpty() }
 
@@ -312,6 +287,8 @@ private fun TabContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         when {
+            errorMessage != null -> item { ScheduleError(Modifier.fillParentMaxSize(), errorMessage, onRefresh) }
+
             all.isEmpty() -> item { NoRaces(Modifier.fillParentMaxSize(), onRefresh) }
 
             all.size == 1 -> {
@@ -346,6 +323,28 @@ private fun TabContent(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ScheduleError(modifier: Modifier = Modifier, message: String, onRefresh: () -> Unit) {
+    EmptyState(
+        title = stringResource(Res.string.error_title),
+        subtitle = message,
+        accent = MaterialTheme.colorScheme.error,
+        actionLabel = stringResource(Res.string.retry),
+        onAction = onRefresh,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun LoadingScheduleContent(bottomInset: Dp) {
+    Box(
+        Modifier.fillMaxSize().padding(bottom = bottomInset),
+        contentAlignment = Alignment.Center,
+    ) {
+        CircularProgressIndicator()
     }
 }
 

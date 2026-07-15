@@ -24,6 +24,7 @@ import io.ktor.client.request.header
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
+import kotlin.time.Clock
 
 expect fun platformModules(): List<Module>
 
@@ -31,7 +32,9 @@ fun appCheckPlugin(
     provider: AppCheckProvider
 ) = createClientPlugin("AppCheckPlugin") {
     onRequest { request, _ ->
+        val start = Clock.System.now()
         val token = provider.provideToken()
+        println("Total fetch token took: ${Clock.System.now().minus(start).inWholeMilliseconds} ms")
         request.headers.remove("X-Token")
         token?.let { request.headers.append("X-Token", it) }
     }

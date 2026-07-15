@@ -185,6 +185,26 @@ internal object MockData {
 
     fun schedule(): String = scheduleJson
 
+    fun scheduleSlice(nextWeek: Boolean, category: String): String {
+        val (key, label) = weekOrder[if (nextWeek) 1 else 0]
+        val races = weekSpecs(key)
+            .filter { it.matchesScheduleCategory(category) }
+            .map { raceIndex.getValue(it.id) }
+        return AppJson.encodeToString(
+            com.orioooneee.lmuasister.data.remote.ScheduleResponse(
+                weeks = listOf(com.orioooneee.lmuasister.data.remote.WeekDto(key, label)),
+                schedules = mapOf(key to races),
+            ),
+        )
+    }
+
+    private fun Spec.matchesScheduleCategory(category: String): Boolean = when (category) {
+        "daily-weekly" -> type.equals("Daily", ignoreCase = true) || type.equals("Weekly", ignoreCase = true)
+        "special" -> type.equals("Special", ignoreCase = true)
+        "championship" -> type.equals("Championship", ignoreCase = true)
+        else -> false
+    }
+
     private fun buildRace(spec: Spec, weekIdx: Int, raceIdx: Int): RaceDto {
         val t = tracks[spec.track]
         // First few races of the current week start soon (live countdowns); later ones space out.
@@ -996,7 +1016,7 @@ internal object MockData {
 
     /** Simulated network latency per endpoint family — keeps the loaders visible. */
     fun latencyFor(path: String): Long = when {
-        path == "/schedule" -> 700
+        path == "/schedule" || path.startsWith("/schedule/") -> 700
         path.endsWith("/hotlaps") -> 1_200
         path.startsWith("/leaderboard/") -> 450
         path.startsWith("/race/") -> 550
