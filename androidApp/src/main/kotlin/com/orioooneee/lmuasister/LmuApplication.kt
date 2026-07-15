@@ -1,6 +1,8 @@
 package com.orioooneee.lmuasister
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import com.aheaditec.talsec_security.security.api.SuspiciousAppInfo
 import com.aheaditec.talsec_security.security.api.Talsec
 import com.aheaditec.talsec_security.security.api.TalsecConfig
@@ -14,6 +16,8 @@ import com.google.firebase.initialize
 import com.orioooneee.lmuasister.security.SecurityGate
 
 class LmuApplication: Application() {
+    private val securityGateHandler = Handler(Looper.getMainLooper())
+
     override fun onCreate() {
         super.onCreate()
 
@@ -32,7 +36,7 @@ class LmuApplication: Application() {
     }
 
     private fun startRuntimeProtection() {
-        SecurityGate.allow()
+        SecurityGate.resetForChecks()
 
         val config = TalsecConfig.Builder(
             EXPECTED_PACKAGE_NAME,
@@ -65,6 +69,10 @@ class LmuApplication: Application() {
         runCatching {
             ThreatListener(threatListener).registerListener(this)
             Talsec.start(this, config, TalsecMode.BACKGROUND)
+            securityGateHandler.postDelayed(
+                { SecurityGate.allow() },
+                RASP_STARTUP_GRACE_MS,
+            )
         }.onFailure {
             if (BuildConfig.DEBUG) {
                 SecurityGate.allow()
@@ -79,6 +87,7 @@ class LmuApplication: Application() {
     }
 
     private companion object {
+        private const val RASP_STARTUP_GRACE_MS = 2_500L
         private const val EXPECTED_PACKAGE_NAME = "com.orioooneee.lmuasister"
         private val EXPECTED_SIGNING_CERTIFICATE_HASHES_BASE64 = arrayOf(
             "BMkxr7/lYtlnEfWhizdSYVk6S7uuPzJLhMbPVGPDwiQ=",
