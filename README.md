@@ -81,11 +81,19 @@ of the default install path.
 
 <table>
 <tr>
-<td align="center" width="20%"><img src="shot_schedule_v3.jpg" alt="Schedule" width="180"><br><sub><b>Schedule</b></sub></td>
-<td align="center" width="20%"><img src="shot_tracks_v3.jpg" alt="Tracks" width="180"><br><sub><b>Tracks</b></sub></td>
-<td align="center" width="20%"><img src="shot_track_detail_v3.jpg" alt="Track detail" width="180"><br><sub><b>Track detail</b></sub></td>
-<td align="center" width="20%"><img src="shot_profile_v3.jpg" alt="Profile" width="180"><br><sub><b>Profile</b></sub></td>
-<td align="center" width="20%"><img src="shot_race_detail_v3.jpg" alt="Race detail" width="180"><br><sub><b>Your race result</b></sub></td>
+<td align="center" width="33%"><img src="screenshots/shot_schedule.jpg" alt="Schedule" width="220"><br><sub><b>Schedule</b></sub></td>
+<td align="center" width="33%"><img src="screenshots/shot_tracks.jpg" alt="Tracks" width="220"><br><sub><b>Tracks</b></sub></td>
+<td align="center" width="33%"><img src="screenshots/shot_track_detail.jpg" alt="Track detail" width="220"><br><sub><b>Track detail</b></sub></td>
+</tr>
+<tr>
+<td align="center" width="33%"><img src="screenshots/shot_cars.jpg" alt="Cars" width="220"><br><sub><b>Cars</b></sub></td>
+<td align="center" width="33%"><img src="screenshots/shot_profile.jpg" alt="Profile" width="220"><br><sub><b>Profile</b></sub></td>
+<td align="center" width="33%"><img src="screenshots/shot_driver_stats.jpg" alt="Driver stats" width="220"><br><sub><b>Driver stats</b></sub></td>
+</tr>
+<tr>
+<td align="center" width="33%"><img src="screenshots/shot_favorite_cars.jpg" alt="Favorite cars" width="220"><br><sub><b>Favorite cars</b></sub></td>
+<td align="center" width="33%"><img src="screenshots/shot_race_detail.jpg" alt="Race detail" width="220"><br><sub><b>Your race result</b></sub></td>
+<td align="center" width="33%"><img src="screenshots/shot_track_breakdown.jpg" alt="Track breakdown" width="220"><br><sub><b>Track breakdown</b></sub></td>
 </tr>
 </table>
 
