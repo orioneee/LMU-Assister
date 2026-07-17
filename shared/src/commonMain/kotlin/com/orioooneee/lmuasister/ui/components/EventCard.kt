@@ -60,6 +60,8 @@ import org.jetbrains.compose.resources.stringResource
 
 private fun Race.trackLabel(): String = track?.shortName?.takeIf { it.isNotBlank() } ?: circuit
 private fun Race.durationLabel(): String = if (raceLength > 0) "${raceLength}m" else ""
+private fun Race.scheduleCoverUrl(useTrackBackgroundCover: Boolean): String? =
+    if (useTrackBackgroundCover) track?.backgroundUrl?.takeIf { it.isNotBlank() } ?: imageUrl else imageUrl
 
 private val CARD_TEXT_SHADOW = Shadow(color = Color.Black.copy(alpha = 0.7f), offset = Offset(0f, 2f), blurRadius = 6f)
 
@@ -77,9 +79,11 @@ fun RaceCard(
     showCountdown: Boolean = true,
     showTimer: Boolean = true,
     timeColumns: Int = 3,
+    useTrackBackgroundCover: Boolean = false,
     onClick: () -> Unit = {},
 ) {
     val diff = difficultyColor(race.difficulty)
+    val coverUrl = race.scheduleCoverUrl(useTrackBackgroundCover)
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -90,7 +94,7 @@ fun RaceCard(
             .clickable(onClick = onClick),
     ) {
         Box(Modifier.fillMaxWidth().height(175.dp).background(Surface2)) {
-            CoverImage(race.imageUrl, Modifier.fillMaxSize(), race.title)
+            CoverImage(coverUrl, Modifier.fillMaxSize(), race.title)
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.horizontalGradient(
@@ -260,6 +264,7 @@ fun HeroRaceTimesCard(
     heroHeight: Dp,
     showCountdown: Boolean = true,
     showTimer: Boolean = true,
+    useTrackBackgroundCover: Boolean = false,
     onClick: () -> Unit = {},
 ) {
     val accent = race.accentColor()
@@ -275,6 +280,7 @@ fun HeroRaceTimesCard(
             race = race,
             showLabel = false,
             showCountdown = showCountdown && showTimer,
+            useTrackBackgroundCover = useTrackBackgroundCover,
             modifier = Modifier.fillMaxWidth().height(heroHeight),
         )
         if (race.times.isNotEmpty()) {
@@ -296,12 +302,13 @@ private fun HeroContent(
     race: Race,
     showLabel: Boolean,
     showCountdown: Boolean,
+    useTrackBackgroundCover: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val accent = race.accentColor()
     Box(modifier) {
         CoverImage(
-            url = race.imageUrl,
+            url = race.scheduleCoverUrl(useTrackBackgroundCover),
             contentDescription = race.title,
             modifier = Modifier.fillMaxSize().background(Surface2),
         )

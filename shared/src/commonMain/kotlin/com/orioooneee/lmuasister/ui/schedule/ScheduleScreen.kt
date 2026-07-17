@@ -67,6 +67,7 @@ fun ScheduleScreen(
 ) {
     var category by remember { mutableStateOf(RaceType.DAILY) }
     val now = rememberNow()
+    val useTrackBackgroundCover = weeks.size > 1 && selectedWeek != weeks.first().key
 
     val races = when (category) {
         RaceType.DAILY -> schedule.daily
@@ -118,7 +119,13 @@ fun ScheduleScreen(
         groups.forEach { (tier, list) ->
             item { TierHeader(tier, list.size) }
             items(list.chunked(cols)) { row ->
-                EqualHeightRaceRow(row, cols, onOpenRace, showTimer = showTimerInScheduleCard)
+                EqualHeightRaceRow(
+                    row,
+                    cols,
+                    onOpenRace,
+                    showTimer = showTimerInScheduleCard,
+                    useTrackBackgroundCover = useTrackBackgroundCover,
+                )
             }
         }
 

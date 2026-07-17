@@ -111,6 +111,7 @@ fun HomeScreen(
     val openJar = { uriHandler.openUri(JAR_URL) }
 
     val isCurrentWeek = weeks.isEmpty() || selectedWeek == weeks.first().key
+    val useTrackBackgroundCover = !isCurrentWeek
 
     val headerHeight = remember { mutableStateOf(0f) }
     val headerOffset = remember { mutableStateOf(0f) }
@@ -143,6 +144,7 @@ fun HomeScreen(
                     onOpenRace,
                     onRefresh,
                     showTimerInScheduleCard,
+                    useTrackBackgroundCover,
                 )
             }
         }
@@ -266,6 +268,7 @@ private fun TabContent(
     onOpenRace: (Race) -> Unit,
     onRefresh: () -> Unit,
     showTimerInScheduleCard: Boolean,
+    useTrackBackgroundCover: Boolean,
 ) {
     val sections: List<Section> = when (tab) {
         ScheduleCategory.RACES -> listOf(
@@ -299,6 +302,7 @@ private fun TabContent(
                         heroHeight = heroHeight,
                         showCountdown = isCurrentWeek,
                         showTimer = showTimerInScheduleCard,
+                        useTrackBackgroundCover = useTrackBackgroundCover,
                     ) {
                         onOpenRace(race)
                     }
@@ -318,6 +322,7 @@ private fun TabContent(
                             onOpenRace,
                             showCountdown = isCurrentWeek,
                             showTimer = showTimerInScheduleCard,
+                            useTrackBackgroundCover = useTrackBackgroundCover,
                         )
                     }
                 }

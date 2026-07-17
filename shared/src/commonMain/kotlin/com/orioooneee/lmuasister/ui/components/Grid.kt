@@ -30,6 +30,7 @@ fun EqualHeightRaceRow(
     spacing: Dp = 12.dp,
     showCountdown: Boolean = true,
     showTimer: Boolean = true,
+    useTrackBackgroundCover: Boolean = false,
     contentPadding: Dp = 32.dp, // LazyColumn horizontal padding (16dp each side)
 ) {
     // Compute the time-grid column count from each card's width here — the cards live
@@ -46,6 +47,7 @@ fun EqualHeightRaceRow(
                 showCountdown = showCountdown,
                 showTimer = showTimer,
                 timeColumns = timeColumns,
+                useTrackBackgroundCover = useTrackBackgroundCover,
             ) { onOpenRace(race) }
         }
         repeat(columns - races.size) { Spacer(Modifier.weight(1f)) }
