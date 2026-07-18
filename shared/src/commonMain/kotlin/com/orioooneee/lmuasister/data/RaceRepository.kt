@@ -19,6 +19,12 @@ import com.orioooneee.lmuasister.data.model.ScheduleSlice
 import com.orioooneee.lmuasister.data.model.ScheduleWeek
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
+import com.orioooneee.lmuasister.data.model.TopCar
+import com.orioooneee.lmuasister.data.model.TopCarLivery
+import com.orioooneee.lmuasister.data.model.TopCarsAvailableClass
+import com.orioooneee.lmuasister.data.model.TopCarsCache
+import com.orioooneee.lmuasister.data.model.TopCarsResult
+import com.orioooneee.lmuasister.data.model.TopCarsScope
 import com.orioooneee.lmuasister.data.model.WeatherSegment
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -40,6 +46,12 @@ import com.orioooneee.lmuasister.data.remote.ScheduleResponse
 import com.orioooneee.lmuasister.data.remote.SessionWeatherDto
 import com.orioooneee.lmuasister.data.remote.SettingsDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
+import com.orioooneee.lmuasister.data.remote.TopCarDto
+import com.orioooneee.lmuasister.data.remote.TopCarLiveryDto
+import com.orioooneee.lmuasister.data.remote.TopCarsAvailableClassDto
+import com.orioooneee.lmuasister.data.remote.TopCarsCacheDto
+import com.orioooneee.lmuasister.data.remote.TopCarsResponse
+import com.orioooneee.lmuasister.data.remote.TopCarsScopeDto
 import com.orioooneee.lmuasister.data.remote.WeatherDto
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -67,6 +79,9 @@ private data class LbCache(
 
 @Serializable
 private data class HlCache(val ts: Long = 0, val data: List<HotlapDto> = emptyList())
+
+@Serializable
+private data class TcCache(val ts: Long = 0, val data: TopCarsResponse = TopCarsResponse())
 
 @Serializable
 private data class CarsCache(val ts: Long = 0, val data: List<CarDto> = emptyList())
@@ -151,9 +166,12 @@ class RaceRepository(
 
     private val lbMem = mutableMapOf<String, RaceLeaderboards>()
     private val hlMem = mutableMapOf<String, List<Hotlap>>()
+    private val tcMem = mutableMapOf<String, TopCarsResult>()
 
     fun peekLeaderboards(raceId: String): RaceLeaderboards? = lbMem[raceId]
     fun peekHotlaps(raceId: String): List<Hotlap>? = hlMem[raceId]
+    fun peekTopCars(raceId: String, carClass: String? = null): TopCarsResult? =
+        tcMem[topCarsCacheKey(raceId, carClass)]
 
     fun cachedLeaderboards(raceId: String): RaceLeaderboards? =
         lbMem[raceId] ?: diskList<LbCache>("lb_$raceId")?.let { c ->
@@ -163,6 +181,13 @@ class RaceRepository(
     fun cachedHotlaps(raceId: String): List<Hotlap>? =
         hlMem[raceId] ?: diskList<HlCache>("hl_$raceId")?.data?.map { it.toModel() }?.also { hlMem[raceId] = it }
 
+    fun cachedTopCars(raceId: String, carClass: String? = null): TopCarsResult? {
+        val key = topCarsCacheKey(raceId, carClass)
+        return tcMem[key] ?: diskList<TcCache>(key)?.data?.toModel()
+            ?.takeIf { it.isReady }
+            ?.also { tcMem[key] = it }
+    }
+
     suspend fun leaderboards(raceId: String): Result<RaceLeaderboards> = runCatching {
         val resp = api.race(raceId)
         val overall = resp.leaderboards?.overall
@@ -171,6 +196,17 @@ class RaceRepository(
         lbMem[raceId] = RaceLeaderboards(overall.toModel(), byClass.map { it.toModel() })
         runCatching { LocalCache.write("lb_$raceId", AppJson.encodeToString(LbCache(nowMs(), overall, byClass))) }
         lbMem.getValue(raceId)
+    }
+
+    suspend fun topCars(raceId: String, carClass: String? = null, fetch: Boolean = false): Result<TopCarsResult> = runCatching {
+        val resp = api.topCars(raceId, carClass = carClass, fetch = fetch)
+        val result = resp.toModel()
+        if (result.isReady) {
+            val key = topCarsCacheKey(raceId, carClass)
+            tcMem[key] = result
+            runCatching { LocalCache.write(key, AppJson.encodeToString(TcCache(nowMs(), resp))) }
+        }
+        result
     }
 
     suspend fun hotlaps(raceId: String): Result<List<Hotlap>> = runCatching {
@@ -294,6 +330,16 @@ private const val LB_PAGE_SIZE = 100
 
 private const val LB_TOKEN_WAIT_MS = 2500L
 
+private fun topCarsCacheKey(raceId: String, carClass: String?): String =
+    "topcars_v3_${raceId}_${topCarsScopeKey(carClass)}"
+
+private fun topCarsScopeKey(carClass: String?): String =
+    carClass?.takeIf { it.isNotBlank() }
+        ?.lowercase()
+        ?.filter { it.isLetterOrDigit() }
+        ?.takeIf { it.isNotBlank() }
+        ?: "overall"
+
 private class LeaderboardPagingSource(
     private val api: BackendApi,
     private val leaderboardId: String,
@@ -408,6 +454,66 @@ private fun ClassLeaderboardDto.toModel() = ClassLeaderboard(
     carClass = carClass ?: classId ?: "-",
     leaderboardId = leaderboardId,
     entries = entries.map { it.toModel() },
+)
+
+private fun TopCarsResponse.toModel() = TopCarsResult(
+    status = status,
+    eventId = eventId,
+    reason = reason,
+    message = message,
+    leaderboardLimit = leaderboardLimit,
+    leaderboardRecords = leaderboardRecords,
+    cachedAt = cachedAt,
+    expiresAt = expiresAt,
+    scope = scope?.toModel(),
+    classes = classes.map { it.toModel() },
+    cache = cache.toModel(),
+    topCars = topcars.map { it.toModel() },
+)
+
+private fun TopCarsScopeDto.toModel() = TopCarsScope(
+    type = type,
+    carClass = carClass,
+    classKey = classKey,
+)
+
+private fun TopCarsAvailableClassDto.toModel() = TopCarsAvailableClass(
+    carClass = carClass,
+    classKey = classKey,
+    leaderboardId = leaderboardId,
+)
+
+private fun TopCarsCacheDto.toModel() = TopCarsCache(
+    hit = hit,
+    ttlSeconds = ttlSeconds,
+    cachedAt = cachedAt,
+    expiresAt = expiresAt,
+)
+
+private fun TopCarDto.toModel() = TopCar(
+    rank = rank,
+    car = car,
+    model = model,
+    manufacturer = manufacturer,
+    manufacturerLogoUrl = manufacturerLogoUrl,
+    carClass = carClass,
+    count = count,
+    bestRank = bestRank,
+    topLapMs = topLapMs,
+    bestLapMs = bestLapMs,
+    firstLiveryName = firstLiveryName,
+    firstLivery = firstLivery?.toModel(),
+)
+
+private fun TopCarLiveryDto.toModel() = TopCarLivery(
+    id = id,
+    name = name,
+    series = series,
+    imageUrl = imageUrl.takeIf { it.isNotBlank() } ?: url.takeIf { it.isNotBlank() },
+    model = model,
+    manufacturer = manufacturer,
+    manufacturerLogoUrl = manufacturerLogoUrl,
+    carClass = carClass,
 )
 
 private fun LeaderboardEntryDto.toModel() = LapEntry(

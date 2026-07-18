@@ -15,13 +15,13 @@ fun appTokenAuthPlugin(
         if (request.headers.contains(HttpHeaders.Authorization)) return@onRequest
         val backend = apiBaseUrlProvider.currentBaseUrl()?.let { Url(it) } ?: return@onRequest
         val backendPath = backend.encodedPath.trimEnd('/')
-        if (!request.url.isBackendV2Request(backend, backendPath)) return@onRequest
+        if (!request.url.isBackendApiRequest(backend, backendPath)) return@onRequest
 
         request.header(HttpHeaders.Authorization, "Bearer $token")
     }
 }
 
-private fun io.ktor.http.URLBuilder.isBackendV2Request(backend: Url, backendPath: String): Boolean {
+private fun io.ktor.http.URLBuilder.isBackendApiRequest(backend: Url, backendPath: String): Boolean {
     if (protocol.name != backend.protocol.name || host != backend.host || port != backend.port) return false
 
     val path = encodedPath

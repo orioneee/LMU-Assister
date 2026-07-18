@@ -115,11 +115,7 @@ class ApiBaseUrlProvider(
         require(base.startsWith("https://") || base.startsWith("http://")) {
             "Resolved API URL must be absolute."
         }
-        val versionless = when {
-            base.endsWith(API_V2_PATH) -> base.removeSuffix(API_V2_PATH)
-            base.endsWith(API_V3_PATH) -> base.removeSuffix(API_V3_PATH)
-            else -> base
-        }
+        val versionless = base.replace(API_VERSION_SUFFIX, "")
         return "$versionless$API_V3_PATH"
     }
 
@@ -133,5 +129,5 @@ private data class BootstrapResponse(
     val apiBaseUrl: String,
 )
 
-private const val API_V2_PATH = "/api/v2"
 private const val API_V3_PATH = "/api/v3"
+private val API_VERSION_SUFFIX = Regex("/api/v[0-9]+$")

@@ -179,6 +179,69 @@ data class RaceLeaderboards(
     }
 }
 
+data class TopCarsResult(
+    val status: String,
+    val eventId: String,
+    val reason: String?,
+    val message: String?,
+    val leaderboardLimit: Int,
+    val leaderboardRecords: Int,
+    val cachedAt: String?,
+    val expiresAt: String?,
+    val scope: TopCarsScope?,
+    val classes: List<TopCarsAvailableClass>,
+    val cache: TopCarsCache,
+    val topCars: List<TopCar>,
+) {
+    val isReady: Boolean get() = status.equals("ready", ignoreCase = true) && topCars.isNotEmpty()
+    val isNoData: Boolean get() = status.equals("no_data", ignoreCase = true)
+}
+
+data class TopCarsScope(
+    val type: String,
+    val carClass: String?,
+    val classKey: String?,
+)
+
+data class TopCarsAvailableClass(
+    val carClass: String,
+    val classKey: String,
+    val leaderboardId: String?,
+)
+
+data class TopCarsCache(
+    val hit: Boolean,
+    val ttlSeconds: Long?,
+    val cachedAt: String?,
+    val expiresAt: String?,
+)
+
+data class TopCar(
+    val rank: Int,
+    val car: String,
+    val model: String,
+    val manufacturer: String?,
+    val manufacturerLogoUrl: String?,
+    val carClass: String?,
+    val count: Int,
+    val bestRank: Int,
+    val topLapMs: Long,
+    val bestLapMs: Long,
+    val firstLiveryName: String?,
+    val firstLivery: TopCarLivery?,
+)
+
+data class TopCarLivery(
+    val id: String,
+    val name: String,
+    val series: String,
+    val imageUrl: String?,
+    val model: String,
+    val manufacturer: String,
+    val manufacturerLogoUrl: String,
+    val carClass: String,
+)
+
 data class LapEntry(
     val rank: Int,
     val initials: String,

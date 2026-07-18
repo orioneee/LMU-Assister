@@ -8,6 +8,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,11 +31,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +66,8 @@ import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
+import com.orioooneee.lmuasister.data.model.TopCar
+import com.orioooneee.lmuasister.data.model.TopCarsResult
 import com.orioooneee.lmuasister.ui.IconBolt
 import com.orioooneee.lmuasister.ui.profile.stripCarClass
 import com.orioooneee.lmuasister.ui.tracks.TrackPreview
@@ -72,7 +76,6 @@ import com.orioooneee.lmuasister.ui.components.carClassColor
 import com.orioooneee.lmuasister.ui.components.CoverImage
 import com.orioooneee.lmuasister.ui.components.MetaChip
 import com.orioooneee.lmuasister.ui.components.onBadgeText
-import com.orioooneee.lmuasister.ui.components.SkillBadge
 import com.orioooneee.lmuasister.ui.components.ShimmerBar
 import com.orioooneee.lmuasister.ui.components.SrBadge
 import com.orioooneee.lmuasister.ui.components.TimesGrid
@@ -98,6 +101,7 @@ import com.orioooneee.lmuasister.ui.util.skyColor
 import com.orioooneee.lmuasister.ui.util.skyEmoji
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 import coil3.compose.AsyncImage
 import lmuassister.shared.generated.resources.Res
@@ -165,7 +169,7 @@ fun RaceDetailsScreen(
             return@produceState
         }
         if (value == null) repo.cachedLeaderboards(race.id)?.let { value = it }
-        val fresh = repo.leaderboards(race.id).getOrNull()
+        val fresh = withTimeoutOrNull(LEADERBOARDS_TIMEOUT_MS) { repo.leaderboards(race.id).getOrNull() }
         if (fresh != null) value = fresh else if (value == null) value = RaceLeaderboards.EMPTY
     }
     val hotlaps by produceState<List<Hotlap>?>(repo.peekHotlaps(race.id), race.id) {
@@ -240,7 +244,13 @@ fun RaceDetailsScreen(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 val lbs = leaderboards
                 if (lbs == null) LeaderboardSkeletonCard()
-                else LeaderboardCard(lbs, raceTitle = race.title, onOpenFull = onOpenLeaderboard)
+                else LeaderboardWithTopCars(
+                    lbs = lbs,
+                    raceId = race.id,
+                    raceClasses = race.carClasses,
+                    raceTitle = race.title,
+                    onOpenFull = onOpenLeaderboard,
+                )
             }
         }
         race.track?.let {
@@ -709,35 +719,99 @@ internal fun gapLabel(deltaMs: Long): String =
 private val POS_COL_W = 44.dp
 
 private const val LB_PREVIEW = 5
+private const val LEADERBOARDS_TIMEOUT_MS = 20_000L
+private const val TOPCARS_CACHE_CHECK_TIMEOUT_MS = 5_000L
+private const val TOPCARS_FETCH_TIMEOUT_MS = 30_000L
 
 @Composable
-private fun LeaderboardCard(
+private fun LeaderboardWithTopCars(
     lbs: RaceLeaderboards,
+    raceId: String,
+    raceClasses: List<String>,
     raceTitle: String,
     onOpenFull: (leaderboardId: String, title: String) -> Unit,
 ) {
-    // One tab per class when the backend splits the board; otherwise the single overall board.
-    val tabs = remember(lbs) {
-        (lbs.byClass.takeIf { it.isNotEmpty() } ?: listOfNotNull(lbs.overall))
-            .filter { it.entries.isNotEmpty() || it.leaderboardId != null }
+    val classBoards = remember(lbs, raceClasses) {
+        leaderboardClassBoards(lbs, raceClasses)
     }
-    Card(stringResource(Res.string.fastest_laps)) {
-        if (tabs.isEmpty()) {
+    if (classBoards.isEmpty()) {
+        lbs.overall?.let { board ->
+            LeaderboardCard(board = board, raceTitle = raceTitle, onOpenFull = onOpenFull)
+        } ?: Card(stringResource(Res.string.fastest_laps)) {
             Text(stringResource(Res.string.no_lap_times), style = MaterialTheme.typography.bodyMedium, color = TextLow)
-            return@Card
         }
-        // Key on the class set (not the whole data) so a cache→fresh refresh keeps the
-        // user's selected class instead of snapping back to the first tab.
-        var selected by remember(tabs.map { it.carClass }) { mutableStateOf(0) }
-        val board = tabs[selected.coerceIn(0, tabs.lastIndex)]
-        Column(Modifier.fillMaxWidth()) {
-            when {
-                tabs.size > 1 -> {
-                    LeaderboardTabs(tabs, selected) { selected = it }
-                    Spacer(Modifier.height(10.dp))
+        return
+    }
+
+    var selected by remember(classBoards.map { it.carClass }) { mutableStateOf(0) }
+    val selectedIndex = selected.coerceIn(0, classBoards.lastIndex)
+    val selectedBoard = classBoards[selectedIndex]
+    val topCarsClass = selectedBoard.carClass.takeUnless { isMonoClassRace(raceClasses) }
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        ClassScopeSelector(classBoards, selectedIndex) { selected = it }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            if (maxWidth >= 760.dp) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    LeaderboardCard(
+                        board = selectedBoard,
+                        raceTitle = raceTitle,
+                        onOpenFull = onOpenFull,
+                        modifier = Modifier.weight(1.15f),
+                    )
+                    TopCarsCard(
+                        raceId = raceId,
+                        displayClass = selectedBoard.carClass,
+                        queryClass = topCarsClass,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
-                isUsableClassLabel(board.carClass) -> ClassSectionHeader(board.carClass)
+            } else {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LeaderboardCard(
+                        board = selectedBoard,
+                        raceTitle = raceTitle,
+                        onOpenFull = onOpenFull,
+                    )
+                    TopCarsCard(
+                        raceId = raceId,
+                        displayClass = selectedBoard.carClass,
+                        queryClass = topCarsClass,
+                    )
+                }
             }
+        }
+    }
+}
+
+private fun leaderboardClassBoards(lbs: RaceLeaderboards, raceClasses: List<String>): List<ClassLeaderboard> {
+    val singleClass = raceClasses
+        .firstOrNull { isUsableClassLabel(it) }
+        ?.takeIf { isMonoClassRace(raceClasses) }
+    val overall = lbs.overall
+    if (singleClass != null && overall != null) return listOf(overall.copy(carClass = singleClass))
+
+    val fromBackend = lbs.byClass
+        .filter { isUsableClassLabel(it.carClass) && (it.entries.isNotEmpty() || it.leaderboardId != null) }
+    return fromBackend
+}
+
+private fun isMonoClassRace(raceClasses: List<String>): Boolean =
+    raceClasses.count(::isUsableClassLabel) == 1
+
+@Composable
+private fun LeaderboardCard(
+    board: ClassLeaderboard,
+    raceTitle: String,
+    onOpenFull: (leaderboardId: String, title: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(stringResource(Res.string.fastest_laps), modifier = modifier) {
+        Column(Modifier.fillMaxWidth()) {
             val leader = board.entries.firstOrNull()?.bestLapMs ?: 0L
             // Where the signed-in player sits on this class's board (token-gated; waits
             // briefly for the token, null when not signed in / no entry).
@@ -791,6 +865,520 @@ private fun LeaderboardCard(
             }
         }
     }
+}
+
+@Composable
+private fun TopCarsCard(
+    raceId: String,
+    displayClass: String,
+    queryClass: String?,
+    modifier: Modifier = Modifier,
+) {
+    val repo = koinInject<RaceRepository>()
+    val classQuery = remember(queryClass) { queryClass?.let(::topCarsClassQuery) }
+    val scopeKey = classQuery ?: "overall"
+    var topCarsLoadKey by remember(raceId, scopeKey) { mutableStateOf(0) }
+    var fetchTopCars by remember(raceId, scopeKey) { mutableStateOf(false) }
+    val initialTopCars = remember(raceId, scopeKey) {
+        repo.peekTopCars(raceId, carClass = classQuery) ?: repo.cachedTopCars(raceId, carClass = classQuery)
+    }
+    val topCarsState by produceState<TopCarsUiState>(
+        initialTopCars?.let { TopCarsUiState.Ready(it) } ?: TopCarsUiState.NoData,
+        raceId,
+        scopeKey,
+        topCarsLoadKey,
+    ) {
+        val shouldFetch = fetchTopCars
+        repo.cachedTopCars(raceId, carClass = classQuery)?.let { value = TopCarsUiState.Ready(it) }
+        val hadReadyCache = value is TopCarsUiState.Ready
+        if (shouldFetch && !hadReadyCache) value = TopCarsUiState.Fetching
+        val timeoutMs = if (shouldFetch) TOPCARS_FETCH_TIMEOUT_MS else TOPCARS_CACHE_CHECK_TIMEOUT_MS
+        val response = withTimeoutOrNull(timeoutMs) { repo.topCars(raceId, carClass = classQuery, fetch = shouldFetch) }
+        value = response?.fold(
+            onSuccess = { result ->
+                when {
+                    result.isReady -> TopCarsUiState.Ready(result)
+                    hadReadyCache -> value
+                    else -> TopCarsUiState.NoData
+                }
+            },
+            onFailure = {
+                when {
+                    hadReadyCache -> value
+                    shouldFetch -> TopCarsUiState.Error(it.topCarsErrorMessage())
+                    else -> TopCarsUiState.NoData
+                }
+            },
+        ) ?: if (shouldFetch) {
+            if (hadReadyCache) value else TopCarsUiState.Error("Top cars are taking too long to load.")
+        } else {
+            if (hadReadyCache) value else TopCarsUiState.NoData
+        }
+    }
+    Card(modifier = modifier) {
+        TopCarsPanel(
+            carClass = displayClass,
+            state = topCarsState,
+            onFetch = {
+                fetchTopCars = true
+                topCarsLoadKey += 1
+            },
+        )
+    }
+}
+
+private sealed interface TopCarsUiState {
+    data object Fetching : TopCarsUiState
+
+    data object NoData : TopCarsUiState
+
+    data class Ready(
+        val result: TopCarsResult,
+    ) : TopCarsUiState
+
+    data class Error(
+        val message: String,
+    ) : TopCarsUiState
+}
+
+@Composable
+private fun TopCarsPanel(carClass: String, state: TopCarsUiState, onFetch: () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        TopCarsHeader(carClass, topCarsLimitLabel(state, carClass))
+        when (state) {
+            TopCarsUiState.Fetching -> TopCarsSkeleton(building = true)
+            TopCarsUiState.NoData -> TopCarsPrompt(carClass, onFetch)
+            is TopCarsUiState.Error -> TopCarsError(state.message, onFetch)
+            is TopCarsUiState.Ready -> {
+                val cars = remember(state.result.topCars) {
+                    state.result.topCars.sortedWith(
+                        compareBy<TopCar> { it.bestLapMs.takeIf { ms -> ms > 0 } ?: Long.MAX_VALUE }
+                            .thenBy { it.rank },
+                    )
+                }
+                val leaderMs = cars.firstOrNull { it.bestLapMs > 0 }?.bestLapMs ?: 0L
+                val limit = state.result.leaderboardLimit.takeIf { it > 0 } ?: 100
+                cars.forEachIndexed { index, car ->
+                    TopCarCard(
+                        displayRank = index + 1,
+                        car = car,
+                        leaderMs = leaderMs,
+                        leaderboardLimit = limit,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopCarsHeader(carClass: String, limitLabel: String) {
+    val accent = carClassColor(carClass)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "TOP CARS",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextLow,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "· ${classLabelFull(carClass)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = accent,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(Modifier.weight(1f).height(1.dp).background(Outline))
+        }
+        Text(
+            limitLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextLow,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun topCarsLimitLabel(state: TopCarsUiState, carClass: String): String {
+    val limit = (state as? TopCarsUiState.Ready)?.result?.leaderboardLimit?.takeIf { it > 0 } ?: 100
+    return "based on top $limit ${classLabelFull(carClass)} entries"
+}
+
+@Composable
+private fun TopCarsPrompt(carClass: String, onFetch: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Surface2)
+            .border(1.dp, Outline, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        TopCarsEmptyMark()
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                "No top cars yet",
+                style = MaterialTheme.typography.labelLarge,
+                color = TextHigh,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "Build ${classLabelFull(carClass)} from the leaderboard",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextLow,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        TopCarsActionButton("Build", onFetch, compact = true)
+    }
+}
+
+@Composable
+private fun TopCarsError(message: String, onFetch: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Surface2)
+            .border(1.dp, Outline, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        TopCarsEmptyMark()
+        Text(
+            message,
+            style = MaterialTheme.typography.labelMedium,
+            color = TextLow,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        TopCarsActionButton("Retry", onFetch, compact = true)
+    }
+}
+
+@Composable
+private fun TopCarsEmptyMark() {
+    val accent = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier.size(34.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(Surface1)
+            .border(1.dp, Outline, RoundedCornerShape(9.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            "LB",
+            style = MaterialTheme.typography.labelSmall,
+            color = accent,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun TopCarsActionButton(label: String, onClick: () -> Unit, compact: Boolean = false) {
+    val accent = MaterialTheme.colorScheme.primary
+    val minWidth = if (compact) 72.dp else 156.dp
+    val maxWidth = if (compact) 120.dp else 240.dp
+    val horizontalPadding = if (compact) 12.dp else 16.dp
+    val verticalPadding = if (compact) 7.dp else 11.dp
+    val textStyle = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
+    Box(
+        Modifier.widthIn(min = minWidth, max = maxWidth)
+            .clip(RoundedCornerShape(8.dp))
+            .background(accent.copy(alpha = 0.14f))
+            .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = textStyle, color = accent, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun TopCarsSkeleton(building: Boolean) {
+    val brush = shimmerBrush()
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (building) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Surface2)
+                    .border(1.dp, Outline, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    "Building top cars from leaderboard",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextMed,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+        repeat(if (building) 3 else 1) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .height(94.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Surface2)
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ShimmerBar(Modifier.size(42.dp), brush, corner = 10.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ShimmerBar(Modifier.fillMaxWidth(0.45f).height(12.dp), brush)
+                    ShimmerBar(Modifier.fillMaxWidth(0.75f).height(16.dp), brush)
+                    ShimmerBar(Modifier.fillMaxWidth(0.55f).height(10.dp), brush)
+                }
+                Spacer(Modifier.width(10.dp))
+                ShimmerBar(Modifier.width(96.dp).height(58.dp), brush, corner = 6.dp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopCarCard(
+    displayRank: Int,
+    car: TopCar,
+    leaderMs: Long,
+    leaderboardLimit: Int,
+) {
+    val carClass = car.carClass?.takeIf { it.isNotBlank() } ?: car.firstLivery?.carClass?.takeIf { it.isNotBlank() }
+    val manufacturer = car.manufacturer?.takeIf { it.isNotBlank() }
+        ?: car.firstLivery?.manufacturer?.takeIf { it.isNotBlank() }
+    val logo = car.manufacturerLogoUrl?.takeIf { it.isNotBlank() }
+        ?: car.firstLivery?.manufacturerLogoUrl?.takeIf { it.isNotBlank() }
+    val image = car.firstLivery?.imageUrl?.takeIf { it.isNotBlank() }
+    val model = car.model.ifBlank { car.firstLivery?.model.orEmpty() }.ifBlank { car.car }
+    val accent = carClass?.let { carClassColor(it) } ?: Outline
+    val deltaMs = (car.bestLapMs - leaderMs).takeIf { car.bestLapMs > 0 && leaderMs > 0 } ?: 0L
+
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .heightIn(min = 76.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Surface2)
+            .border(1.dp, Outline, RoundedCornerShape(10.dp))
+            .padding(horizontal = 9.dp, vertical = 7.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TopCarManufacturerMark(manufacturer, logo)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        topCarLapLabel(car.bestLapMs),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TextHigh,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                    )
+                    TopCarDeltaBadge(deltaMs, accent)
+                }
+                Text(
+                    stripCarClass(model),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextHigh,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.fillMaxWidth().basicMarquee(),
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    TopCarRankBadge(displayRank, accent)
+                    carClass?.let { TopCarClassPill(it) }
+                    TopCarLbRankBadge(car.bestRank, accent)
+                    TopCarEntriesShare(car.count, leaderboardLimit, TextMed)
+                }
+            }
+            TopCarImageBox(image, model)
+        }
+    }
+}
+
+@Composable
+private fun TopCarManufacturerMark(manufacturer: String?, logoUrl: String?) {
+    val shape = RoundedCornerShape(10.dp)
+    Box(
+        modifier = Modifier.size(34.dp)
+            .clip(shape)
+            .background(Surface1)
+            .border(1.dp, Outline, shape)
+            .padding(5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!logoUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = logoUrl,
+                contentDescription = manufacturer,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth().height(22.dp),
+            )
+        } else {
+            Text(
+                manufacturer?.firstOrNull()?.uppercaseChar()?.toString() ?: "-",
+                style = MaterialTheme.typography.titleSmall,
+                color = TextMed,
+                fontWeight = FontWeight.Black,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TopCarRankBadge(rank: Int, color: Color) {
+    Box(
+        modifier = Modifier.clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.14f))
+            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Text(
+            topCarRankLabel(rank),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun TopCarClassPill(carClass: String) {
+    val c = carClassColor(carClass)
+    Box(
+        modifier = Modifier.clip(RoundedCornerShape(6.dp))
+            .background(c.copy(alpha = 0.14f))
+            .border(1.dp, c.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+    ) {
+        Text(
+            classLabelFull(carClass),
+            style = MaterialTheme.typography.labelSmall,
+            color = c,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun TopCarDeltaBadge(deltaMs: Long, color: Color) {
+    val isLeader = deltaMs <= 0
+    val label = if (isLeader) "Leader" else gapLabel(deltaMs)
+    Box(
+        modifier = Modifier.clip(RoundedCornerShape(6.dp))
+            .background(if (isLeader) color.copy(alpha = 0.14f) else Surface1)
+            .border(1.dp, if (isLeader) color.copy(alpha = 0.45f) else Outline, RoundedCornerShape(6.dp))
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isLeader) color else TextMed,
+            fontFamily = if (isLeader) FontFamily.Default else FontFamily.Monospace,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun TopCarLbRankBadge(rank: Int, color: Color) {
+    Box(
+        modifier = Modifier.clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.11f))
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+    ) {
+        Text(
+            "LB ${topCarRankLabel(rank)}",
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun TopCarEntriesShare(count: Int, limit: Int, color: Color) {
+    val safeLimit = limit.coerceAtLeast(1)
+    Row(
+        modifier = Modifier.clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.11f))
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("$count/$safeLimit", style = MaterialTheme.typography.labelSmall, color = TextHigh, fontWeight = FontWeight.Black, maxLines = 1)
+        Text("ENTRIES", style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun TopCarImageBox(imageUrl: String?, model: String) {
+    Box(
+        modifier = Modifier.width(96.dp)
+            .height(48.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(Surface1),
+        contentAlignment = Alignment.Center,
+    ) {
+        imageUrl?.let {
+            AsyncImage(
+                model = it,
+                contentDescription = model,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().padding(4.dp),
+            )
+        }
+    }
+}
+
+private fun topCarRankLabel(rank: Int): String =
+    rank.takeIf { it > 0 }?.let { "#$it" } ?: "-"
+
+private fun topCarLapLabel(ms: Long): String =
+    ms.takeIf { it > 0 }?.let { formatLap(it) } ?: "-"
+
+private fun Throwable.topCarsErrorMessage(): String = when (message) {
+    "app_check_required" -> "Could not verify the app token."
+    "event_not_found" -> "This event is no longer available."
+    "class_leaderboard_not_found" -> "Top cars are not available for this class yet."
+    "leaderboard_unavailable" -> "Could not build top cars right now."
+    "topcars_build_error" -> "Could not build top cars right now."
+    else -> "Could not load top cars."
 }
 
 private sealed interface MeRow {
@@ -910,28 +1498,41 @@ private fun YourPositionRow(entry: LapEntry, leader: Long, liveryToModel: Map<St
 }
 
 @Composable
-private fun LeaderboardTabs(tabs: List<ClassLeaderboard>, selected: Int, onSelect: (Int) -> Unit) {
+private fun ClassScopeSelector(tabs: List<ClassLeaderboard>, selected: Int, onSelect: (Int) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        tabs.forEachIndexed { i, b ->
-            val active = i == selected
-            val c = carClassColor(b.carClass)
-            Box(
-                Modifier.clip(RoundedCornerShape(8.dp))
-                    .background(if (active) c else Surface2)
-                    .border(1.dp, if (active) c else Outline, RoundedCornerShape(8.dp))
-                    .clickable { onSelect(i) }
-                    .padding(horizontal = 14.dp, vertical = 7.dp),
-            ) {
-                Text(
-                    classLabelFull(b.carClass),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (active) onBadgeText(c) else TextMed,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                )
+        Text(
+            "CLASS",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextLow,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+        Row(
+            Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            tabs.forEachIndexed { i, b ->
+                val active = i == selected
+                val c = carClassColor(b.carClass)
+                Box(
+                    Modifier.clip(RoundedCornerShape(8.dp))
+                        .background(if (active) c else Surface2)
+                        .border(1.dp, if (active) c else Outline, RoundedCornerShape(8.dp))
+                        .clickable { onSelect(i) }
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                ) {
+                    Text(
+                        classLabelFull(b.carClass),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (active) onBadgeText(c) else TextMed,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }
@@ -970,11 +1571,25 @@ private fun classLabelFull(carClass: String): String {
     val c = carClass.lowercase()
     return when {
         "hyper" in c -> "HYPERCAR"
+        "lmgt3" in c -> "LMGT3"
         "gt3" in c -> "GT3"
         "gte" in c -> "GTE"
         "lmp2" in c -> "LMP2"
         "lmp3" in c -> "LMP3"
         else -> carClass.uppercase()
+    }
+}
+
+private fun topCarsClassQuery(carClass: String): String {
+    val c = carClass.lowercase()
+    return when {
+        "hyper" in c -> "Hypercar"
+        "lmgt3" in c -> "LMGT3"
+        "gt3" in c -> "GT3"
+        "gte" in c -> "GTE"
+        "lmp2" in c -> "LMP2"
+        "lmp3" in c -> "LMP3"
+        else -> carClass
     }
 }
 
@@ -1089,9 +1704,14 @@ private fun settingRows(s: RaceSettings): List<Pair<String, String>> = listOfNot
 )
 
 @Composable
-private fun Card(title: String? = null, leading: (@Composable () -> Unit)? = null, content: @Composable () -> Unit) {
+private fun Card(
+    title: String? = null,
+    leading: (@Composable () -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
     Column(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(Surface1)
+        modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(Surface1)
             .border(1.dp, Outline, MaterialTheme.shapes.large).padding(16.dp),
     ) {
         if (title != null || leading != null) {

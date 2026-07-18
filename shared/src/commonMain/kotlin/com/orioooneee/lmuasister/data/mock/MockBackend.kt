@@ -34,7 +34,6 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
             val full = request.url.encodedPath
             val path = full
                 .substringAfter("/api/v3", full)
-                .substringAfter("/api/v2", full)
             val params = request.url.parameters
             val authed = request.headers[HttpHeaders.Authorization] != null
 
@@ -43,6 +42,14 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
             fun json(body: String) = respond(body, HttpStatusCode.OK, jsonHeaders)
 
             when {
+                path.startsWith("/schedule/") && path.endsWith("/topcars") ->
+                    json(
+                        MockData.topCars(
+                            raceId = path.removePrefix("/schedule/").removeSuffix("/topcars").trim('/'),
+                            carClass = params["class"],
+                            fetch = params["fetch"] in setOf("1", "true", "yes", "on"),
+                        ),
+                    )
                 path.startsWith("/schedule/nextweek/") ->
                     json(MockData.scheduleSlice(nextWeek = true, category = path.removePrefix("/schedule/nextweek/")))
                 path.startsWith("/schedule/") ->

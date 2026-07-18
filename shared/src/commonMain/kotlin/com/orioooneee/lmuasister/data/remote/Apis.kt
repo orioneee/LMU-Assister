@@ -76,6 +76,33 @@ class BackendApi(
         return AppJson.decodeFromString(getText(path))
     }
 
+    /** Top car models for an event class. Default reads only the backend cache; [fetch] may build it. */
+    suspend fun topCars(eventId: String, carClass: String? = null, fetch: Boolean = false): TopCarsResponse {
+        val query = buildList {
+            carClass?.takeIf { it.isNotBlank() }?.let { add("class=${it.encodeURLQueryComponent()}") }
+            if (fetch) add("fetch=1")
+        }
+        val path = buildString {
+            append("/schedule/${eventId.encodeURLPathPart()}/topcars")
+            if (query.isNotEmpty()) append("?${query.joinToString("&")}")
+        }
+        val resp = getResponse(path)
+        val text = resp.bodyAsText()
+        when (resp.status.value) {
+            in 200..299 -> return AppJson.decodeFromString(text)
+            403 -> throw Exception("app_check_required")
+            404 -> {
+                val error = runCatching { AppJson.decodeFromString<TopCarsResponse>(text) }.getOrNull()
+                val isClassMiss = error?.reason.orEmpty().contains("class", ignoreCase = true) ||
+                    error?.message.orEmpty().contains("class leaderboard", ignoreCase = true)
+                throw Exception(if (isClassMiss) "class_leaderboard_not_found" else "event_not_found")
+            }
+            502 -> throw Exception("topcars_build_error")
+            503 -> throw Exception("leaderboard_unavailable")
+            else -> throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
+        }
+    }
+
     /** Hot-laps for the race's track. May be "pending" (still building) — caller polls. */
     suspend fun hotlaps(raceId: String, wait: Boolean = false): HotlapsResponse {
         val path = "/race/${raceId.encodeURLPathPart()}/hotlaps" + if (wait) "?wait=1" else ""

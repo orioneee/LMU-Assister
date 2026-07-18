@@ -233,3 +233,88 @@ data class LeaderboardPageResponse(
     // The caller's own row + rank — present only when a valid app token was sent.
     val me: LeaderboardEntryDto? = null,
 )
+
+/** GET /schedule/<event_id>/topcars — cache-only by default, ?fetch=1 builds from top 100. */
+@Serializable
+data class TopCarsResponse(
+    val status: String = "no_data",
+    val eventId: String = "",
+    val reason: String? = null,
+    val message: String? = null,
+    val race: TopCarsRaceDto? = null,
+    val leaderboardId: String? = null,
+    val resolvedLeaderboardId: String? = null,
+    val leaderboardLimit: Int = 100,
+    val leaderboardRecords: Int = 0,
+    val cachedAt: String? = null,
+    val expiresAt: String? = null,
+    val scope: TopCarsScopeDto? = null,
+    val classes: List<TopCarsAvailableClassDto> = emptyList(),
+    val cache: TopCarsCacheDto = TopCarsCacheDto(),
+    val topcars: List<TopCarDto> = emptyList(),
+)
+
+@Serializable
+data class TopCarsRaceDto(
+    val id: String = "",
+    val type: String = "",
+    val series: String = "",
+    val trackName: String = "",
+)
+
+@Serializable
+data class TopCarsScopeDto(
+    val type: String = "",
+    @SerialName("class") val carClass: String? = null,
+    val classKey: String? = null,
+)
+
+@Serializable
+data class TopCarsAvailableClassDto(
+    @SerialName("class") val carClass: String = "",
+    val classKey: String = "",
+    val leaderboardId: String? = null,
+)
+
+@Serializable
+data class TopCarsCacheDto(
+    val hit: Boolean = false,
+    val ttlSeconds: Long? = null,
+    val cachedAt: String? = null,
+    val expiresAt: String? = null,
+)
+
+@Serializable
+data class TopCarDto(
+    val rank: Int = 0,
+    val car: String = "",
+    val model: String = "",
+    val manufacturer: String? = null,
+    val manufacturerLogoUrl: String? = null,
+    val carClass: String? = null,
+    val count: Int = 0,
+    val bestRank: Int = 0,
+    val topLapMs: Long = 0,
+    val bestLapMs: Long = 0,
+    val firstLiveryName: String? = null,
+    val firstLivery: TopCarLiveryDto? = null,
+)
+
+@Serializable
+data class TopCarLiveryDto(
+    val id: String = "",
+    val name: String = "",
+    val series: String = "",
+    val vehicleCode: String = "",
+    val vehicleVersion: String = "",
+    val vehFile: String = "",
+    val dlcAppId: Long? = null,
+    val owned: Boolean = false,
+    val mappedAssetName: String = "",
+    val imageUrl: String = "",
+    val url: String = "",
+    val model: String = "",
+    val manufacturer: String = "",
+    val manufacturerLogoUrl: String = "",
+    val carClass: String = "",
+)

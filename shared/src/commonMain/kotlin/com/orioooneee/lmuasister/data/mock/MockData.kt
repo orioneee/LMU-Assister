@@ -45,6 +45,12 @@ import com.orioooneee.lmuasister.data.remote.TrackDto
 import com.orioooneee.lmuasister.data.remote.TrackFullDto
 import com.orioooneee.lmuasister.data.remote.TrackPatchOptionDto
 import com.orioooneee.lmuasister.data.remote.TrackPersonalDto
+import com.orioooneee.lmuasister.data.remote.TopCarDto
+import com.orioooneee.lmuasister.data.remote.TopCarLiveryDto
+import com.orioooneee.lmuasister.data.remote.TopCarsAvailableClassDto
+import com.orioooneee.lmuasister.data.remote.TopCarsCacheDto
+import com.orioooneee.lmuasister.data.remote.TopCarsResponse
+import com.orioooneee.lmuasister.data.remote.TopCarsScopeDto
 import com.orioooneee.lmuasister.data.remote.TracksResponse
 import com.orioooneee.lmuasister.data.remote.UsersDistributionDto
 import com.orioooneee.lmuasister.data.remote.UsersSearchResponse
@@ -282,6 +288,96 @@ internal object MockData {
         )
     }
 
+    fun topCars(raceId: String, carClass: String?, fetch: Boolean): String {
+        val race = raceIndex[raceId]
+        val raceClasses = race?.carClasses?.takeIf { it.isNotEmpty() } ?: listOf("LMGT3")
+        val selectedClass = carClass?.takeIf { it.isNotBlank() } ?: raceClasses.first()
+        val availableClasses = raceClasses.map { cls ->
+            TopCarsAvailableClassDto(
+                carClass = cls,
+                classKey = cls.classKey(),
+                leaderboardId = "lb-$raceId-$cls",
+            )
+        }
+        val scope = TopCarsScopeDto(
+            type = "class",
+            carClass = selectedClass,
+            classKey = selectedClass.classKey(),
+        )
+        if (!fetch) {
+            return AppJson.encodeToString(
+                TopCarsResponse(
+                    status = "no_data",
+                    eventId = raceId,
+                    reason = "cache_missing",
+                    message = "Interested in the top cars on this leaderboard?",
+                    scope = scope,
+                    classes = availableClasses,
+                    cache = TopCarsCacheDto(hit = false),
+                    topcars = emptyList(),
+                ),
+            )
+        }
+        val entries = classBoard(raceId, selectedClass, listOf(selectedClass), size = 100).entries
+        val topCars = entries.groupBy { it.car.orEmpty().ifBlank { "Unknown car" } }
+            .map { (carName, carEntries) ->
+                val best = carEntries.minWith(compareBy({ it.rank }, { it.bestLapMs }))
+                val cls = best.carClass.orEmpty()
+                val manufacturer = manufacturerFor(carName)
+                TopCarDto(
+                    car = carName,
+                    model = carName,
+                    manufacturer = manufacturer,
+                    manufacturerLogoUrl = null,
+                    carClass = cls,
+                    count = carEntries.size,
+                    bestRank = best.rank,
+                    topLapMs = best.bestLapMs,
+                    bestLapMs = best.bestLapMs,
+                    firstLiveryName = "$carName Mock #${best.rank}",
+                    firstLivery = TopCarLiveryDto(
+                        id = carName.slugId(),
+                        name = "$carName Mock #${best.rank}",
+                        series = race?.series.orEmpty(),
+                        model = carName,
+                        manufacturer = manufacturer,
+                        carClass = cls,
+                    ),
+                )
+            }
+            .sortedWith(compareByDescending<TopCarDto> { it.count }
+                .thenBy { it.bestRank }
+                .thenBy { it.bestLapMs }
+                .thenBy { it.model })
+            .take(5)
+            .mapIndexed { index, car -> car.copy(rank = index + 1) }
+        val now = Clock.System.now()
+        return AppJson.encodeToString(
+            TopCarsResponse(
+                status = "ready",
+                eventId = raceId,
+                race = race?.let {
+                    com.orioooneee.lmuasister.data.remote.TopCarsRaceDto(
+                        id = it.id,
+                        type = it.type,
+                        series = it.series,
+                        trackName = it.track?.shortName ?: it.circuit,
+                    )
+                },
+                leaderboardId = "lb-$raceId-$selectedClass",
+                resolvedLeaderboardId = "lb-$raceId-$selectedClass",
+                leaderboardLimit = 100,
+                leaderboardRecords = entries.size,
+                cachedAt = now.toString(),
+                expiresAt = Instant.fromEpochSeconds(now.epochSeconds + 48 * 60 * 60).toString(),
+                scope = scope,
+                classes = availableClasses,
+                cache = TopCarsCacheDto(hit = false, ttlSeconds = 48 * 60 * 60),
+                topcars = topCars,
+            ),
+        )
+    }
+
     /** A board for one class (or "overall" mixing all classes in the race). */
     private fun classBoard(raceId: String, slug: String, classes: List<String>, size: Int): ClassLeaderboardDto {
         val r = rng("board", raceId, slug)
@@ -296,6 +392,32 @@ internal object MockData {
             entries = entries,
         )
     }
+
+    private fun manufacturerFor(car: String): String = when {
+        car.startsWith("Aston Martin") -> "Aston Martin"
+        car.startsWith("BMW") -> "BMW"
+        car.startsWith("Cadillac") -> "Cadillac"
+        car.startsWith("Corvette") -> "Chevrolet"
+        car.startsWith("Duqueine") -> "Duqueine"
+        car.startsWith("Ferrari") -> "Ferrari"
+        car.startsWith("Ford") -> "Ford"
+        car.startsWith("Lamborghini") -> "Lamborghini"
+        car.startsWith("Ligier") -> "Ligier"
+        car.startsWith("McLaren") -> "McLaren"
+        car.startsWith("Oreca") -> "Oreca"
+        car.startsWith("Peugeot") -> "Peugeot"
+        car.startsWith("Porsche") -> "Porsche"
+        car.startsWith("Toyota") -> "Toyota"
+        else -> car.substringBefore(' ').ifBlank { "LMU" }
+    }
+
+    private fun String.slugId(): String =
+        lowercase().map { if (it.isLetterOrDigit()) it else '-' }.joinToString("")
+            .replace(Regex("-+"), "-")
+            .trim('-')
+
+    private fun String.classKey(): String =
+        lowercase().filter { it.isLetterOrDigit() }
 
     private fun entry(r: Random, rank: Int, cls: String): LeaderboardEntryDto {
         val d = drivers[r.nextInt(drivers.size)]
