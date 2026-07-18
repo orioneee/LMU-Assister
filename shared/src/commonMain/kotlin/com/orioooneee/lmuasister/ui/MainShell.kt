@@ -503,11 +503,13 @@ fun MainShell(
             composable<DetailsRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val id = entry.toRoute<DetailsRoute>().raceId
                 val state by viewModel.state.collectAsStateWithLifecycle()
+                val profileState by profileViewModel.state.collectAsStateWithLifecycle()
                 val race = (state as? ScheduleUiState.Success)?.data?.schedule?.races?.firstOrNull { it.id == id }
                 if (race != null) {
                     RaceDetailsScreen(
                         race,
                         insets = insets,
+                        authState = profileState,
                         onBack = { nav.popBackStack() },
                         onOpenLeaderboard = { lbId, title ->
                             Telemetry.log(AnalyticsEvent.LeaderboardOpened(lbId))

@@ -33,6 +33,7 @@ import androidx.paging.PagingState
 import com.orioooneee.lmuasister.data.cache.LocalCache
 import com.orioooneee.lmuasister.data.remote.AppJson
 import com.orioooneee.lmuasister.data.remote.AppTokenHolder
+import com.orioooneee.lmuasister.data.remote.BackendApiException
 import com.orioooneee.lmuasister.data.remote.BackendApi
 import com.orioooneee.lmuasister.data.remote.CarDetailedDto
 import com.orioooneee.lmuasister.data.remote.CarDto
@@ -43,6 +44,7 @@ import com.orioooneee.lmuasister.data.remote.HotlapDto
 import com.orioooneee.lmuasister.data.remote.LeaderboardEntryDto
 import com.orioooneee.lmuasister.data.remote.RaceDto
 import com.orioooneee.lmuasister.data.remote.ScheduleResponse
+import com.orioooneee.lmuasister.data.remote.ScheduleNotificationResponse
 import com.orioooneee.lmuasister.data.remote.SessionWeatherDto
 import com.orioooneee.lmuasister.data.remote.SettingsDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
@@ -318,6 +320,28 @@ class RaceRepository(
 
     val appToken: StateFlow<String?> get() = tokenHolder.token
 
+    suspend fun registerFcmToken(uuid: String, token: String): Result<Unit> =
+        runCatching { api.registerFcmToken(uuid, token) }
+
+    suspend fun createDevicePushScheduleNotification(
+        deviceId: String,
+        eventName: String,
+        notifInSeconds: Int,
+        notifTime: String,
+    ): Result<ScheduleNotificationResponse> = runCatching {
+        api.createDevicePushScheduleNotification(deviceId, eventName, notifInSeconds, notifTime)
+    }
+
+    suspend fun createEmailScheduleNotification(
+        eventName: String,
+        notifInSeconds: Int,
+        notifTime: String,
+    ): Result<ScheduleNotificationResponse> = runCatching {
+        val token = tokenHolder.await(NOTIFICATION_TOKEN_WAIT_MS)
+            ?: throw BackendApiException(401, "unauthorized", "Session token is not ready.")
+        api.createEmailScheduleNotification(token, eventName, notifInSeconds, notifTime)
+    }
+
     suspend fun leaderboardMe(leaderboardId: String): LapEntry? {
         val token = tokenHolder.await(LB_TOKEN_WAIT_MS) ?: return null
         return runCatching {
@@ -329,6 +353,8 @@ class RaceRepository(
 private const val LB_PAGE_SIZE = 100
 
 private const val LB_TOKEN_WAIT_MS = 2500L
+
+private const val NOTIFICATION_TOKEN_WAIT_MS = 10_000L
 
 private fun topCarsCacheKey(raceId: String, carClass: String?): String =
     "topcars_v3_${raceId}_${topCarsScopeKey(carClass)}"

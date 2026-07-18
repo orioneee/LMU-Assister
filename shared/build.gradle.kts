@@ -67,6 +67,7 @@ kotlin {
             dependsOn(nativeSteamMain)
             dependencies {
                 implementation(libs.compose.uiToolingPreview)
+                implementation(libs.androidx.activity.compose)
                 implementation(libs.firebase.appcheck.playintegrity)
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.bouncycastle.prov)
@@ -80,6 +81,7 @@ kotlin {
                 api(libs.firebase.config)
                 api(libs.firebase.crashlytics)
                 api(libs.firebase.performance)
+                api(libs.firebase.messaging)
             }
         }
         commonMain {

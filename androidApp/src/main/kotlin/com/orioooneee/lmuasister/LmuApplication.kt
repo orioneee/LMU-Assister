@@ -1,6 +1,10 @@
 package com.orioooneee.lmuasister
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.aheaditec.talsec_security.security.api.SuspiciousAppInfo
@@ -23,6 +27,7 @@ class LmuApplication: Application() {
         super.onCreate()
 
         SecurityShutdown.install(this)
+        createScheduleNotificationChannel()
 
         Firebase.initialize(this)
         Firebase.appCheck.installAppCheckProviderFactory(
@@ -85,6 +90,20 @@ class LmuApplication: Application() {
 
     private fun closeForSecurity() {
         SecurityShutdown.close(this)
+    }
+
+    private fun createScheduleNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+
+        val channel = NotificationChannel(
+            getString(R.string.schedule_notification_channel_id),
+            getString(R.string.schedule_notification_channel_name),
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            enableVibration(true)
+        }
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
     }
 
     private companion object {

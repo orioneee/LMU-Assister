@@ -5,7 +5,10 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,10 +23,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -31,30 +36,52 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.orioooneee.lmuasister.data.RaceRepository
+import com.orioooneee.lmuasister.data.remote.BackendApiException
 import com.orioooneee.lmuasister.data.model.CarGroup
 import com.orioooneee.lmuasister.data.model.AvailableCar
 import com.orioooneee.lmuasister.data.model.ClassLeaderboard
@@ -68,7 +95,11 @@ import com.orioooneee.lmuasister.data.model.SessionWeather
 import com.orioooneee.lmuasister.data.model.TrackInfo
 import com.orioooneee.lmuasister.data.model.TopCar
 import com.orioooneee.lmuasister.data.model.TopCarsResult
+import com.orioooneee.lmuasister.notifications.DevicePushPermissionState
+import com.orioooneee.lmuasister.notifications.DevicePushNotificationsController
+import com.orioooneee.lmuasister.notifications.rememberDevicePushNotificationsController
 import com.orioooneee.lmuasister.ui.IconBolt
+import com.orioooneee.lmuasister.ui.profile.SteamLoginUiState
 import com.orioooneee.lmuasister.ui.profile.stripCarClass
 import com.orioooneee.lmuasister.ui.tracks.TrackPreview
 import com.orioooneee.lmuasister.ui.components.ClassChip
@@ -101,8 +132,14 @@ import com.orioooneee.lmuasister.ui.util.skyColor
 import com.orioooneee.lmuasister.ui.util.skyEmoji
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import coil3.compose.AsyncImage
 import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.cars_section
@@ -145,18 +182,26 @@ import lmuassister.shared.generated.resources.yes
 import lmuassister.shared.generated.resources.your_position
 import lmuassister.shared.generated.resources.your_position_none
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun RaceDetailsScreen(
     race: Race,
     insets: PaddingValues,
+    authState: SteamLoginUiState,
     onBack: () -> Unit,
     onOpenLeaderboard: (leaderboardId: String, title: String) -> Unit = { _, _ -> },
 ) {
     val now = rememberNow()
-    val upcoming = remember(race, now) { race.times.filter { it >= now } }
+    val upcoming = remember(race, now) { race.times.filter { it >= now }.sorted() }
+    val notificationSlots = remember(upcoming) { upcoming.take(10) }
 
     val repo = koinInject<RaceRepository>()
+    val appToken by repo.appToken.collectAsState()
+    val emailAuthState = remember(authState, appToken) { notificationEmailAuthState(authState, appToken) }
+    val devicePushController = rememberDevicePushNotificationsController()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    var showNotificationSheet by remember { mutableStateOf(false) }
     // Leaderboard (fast) and hot-laps (async build) load in parallel — each resolves
     // its own skeleton independently. Offline-first: paint cached (memory/disk) instantly,
     // then refresh from the network. null = nothing cached yet → skeleton.
@@ -183,99 +228,725 @@ fun RaceDetailsScreen(
         value = runCatching { repo.liveryToModel() }.getOrDefault(emptyMap())
     }
 
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 320.dp),
-        modifier = Modifier.fillMaxSize().background(Carbon),
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            top = 16.dp + insets.calculateTopPadding(),
-            end = 16.dp,
-            bottom = 16.dp + insets.calculateBottomPadding(),
-        ),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Box(Modifier.fillMaxWidth().height(220.dp).clip(MaterialTheme.shapes.large)) {
-                CoverImage(
-                    url = race.imageUrl,
-                    contentDescription = race.title,
-                    modifier = Modifier.fillMaxSize().background(Surface2),
-                )
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(
-                            0f to Carbon.copy(alpha = 0.35f),
-                            0.5f to Color.Transparent,
-                            1f to Carbon.copy(alpha = 0.95f),
+    Box(Modifier.fillMaxSize().background(Carbon)) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 320.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 16.dp + insets.calculateTopPadding(),
+                end = 16.dp,
+                bottom = 16.dp + insets.calculateBottomPadding(),
+            ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(Modifier.fillMaxWidth().height(220.dp).clip(MaterialTheme.shapes.large)) {
+                    CoverImage(
+                        url = race.imageUrl,
+                        contentDescription = race.title,
+                        modifier = Modifier.fillMaxSize().background(Surface2),
+                    )
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(
+                                0f to Carbon.copy(alpha = 0.35f),
+                                0.5f to Color.Transparent,
+                                1f to Carbon.copy(alpha = 0.95f),
+                            ),
                         ),
-                    ),
-                )
-                CircleButton(Modifier.align(Alignment.TopStart).padding(12.dp), onBack)
-                Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
-                    Text(race.type.label.uppercase(), style = MaterialTheme.typography.labelMedium, color = race.accentColor())
-                    Spacer(Modifier.height(6.dp))
-                    Text(race.title, style = MaterialTheme.typography.headlineMedium, color = TextHigh, fontWeight = FontWeight.Black)
+                    )
+                    CircleButton(Modifier.align(Alignment.TopStart).padding(12.dp), onBack)
+                    Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
+                        Text(race.type.label.uppercase(), style = MaterialTheme.typography.labelMedium, color = race.accentColor())
+                        Spacer(Modifier.height(6.dp))
+                        Text(race.title, style = MaterialTheme.typography.headlineMedium, color = TextHigh, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                ) {
+                    race.classInfos.take(6).forEach { ClassChip(it) }
+                    if (race.raceLength > 0) MetaChip(stringResource(Res.string.duration_race, race.raceLength))
+                    race.settings.safetyRank?.let { SrBadge(it) }
+                }
+            }
+
+            if (notificationSlots.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    NotifyMeCta {
+                        coroutineScope.launch {
+                            devicePushController.requestPermission()
+                            showNotificationSheet = true
+                        }
+                    }
+                }
+            }
+
+            if (race.availableCars.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    AvailableCarsSection(race.availableCars, liveryToModel)
+                }
+            } else if (race.carsByClass.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) { CarsTicker(race.carsByClass) }
+            }
+
+            if (race.leaderboardId != null) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    val lbs = leaderboards
+                    if (lbs == null) LeaderboardSkeletonCard()
+                    else LeaderboardWithTopCars(
+                        lbs = lbs,
+                        raceId = race.id,
+                        raceClasses = race.carClasses,
+                        raceTitle = race.title,
+                        onOpenFull = onOpenLeaderboard,
+                    )
+                }
+            }
+            race.track?.let {
+                item {
+                    TrackCard(
+                        it,
+                        hotlaps.orEmpty(),
+                        hotlapsLoading = hotlaps == null,
+                        hotlapsSkeletonCount = (race.carClasses.size * 2).coerceAtLeast(2),
+                    )
+                }
+            }
+            race.weather?.let { item { WeatherCard(it) } }
+            item {
+                Card(stringResource(Res.string.format)) { DetailRows(settingRows(race.settings)) }
+            }
+            if (upcoming.isNotEmpty()) {
+                item {
+                    Card(stringResource(Res.string.next_start_times)) {
+                        TimesGrid(race.times)
+                    }
                 }
             }
         }
 
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                itemVerticalAlignment = Alignment.CenterVertically,
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp + insets.calculateBottomPadding()),
+        )
+
+        if (showNotificationSheet) {
+            ScheduleNotificationSheet(
+                race = race,
+                slots = notificationSlots,
+                repository = repo,
+                emailAuthState = emailAuthState,
+                devicePushController = devicePushController,
+                onDismiss = { showNotificationSheet = false },
+                onScheduled = { message ->
+                    showNotificationSheet = false
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(message)
+                    }
+                },
+                onError = { message ->
+                    showNotificationSheet = false
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(message)
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotifyMeCta(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.42f), RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(Icons.Filled.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Column(Modifier.weight(1f)) {
+            Text("Notify me", style = MaterialTheme.typography.titleSmall, color = TextHigh, fontWeight = FontWeight.Bold)
+            Text("Schedule a reminder for one of the next starts", style = MaterialTheme.typography.bodySmall, color = TextMed)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun ScheduleNotificationSheet(
+    race: Race,
+    slots: List<Instant>,
+    repository: RaceRepository,
+    emailAuthState: NotificationEmailAuthState,
+    devicePushController: DevicePushNotificationsController,
+    onDismiss: () -> Unit,
+    onScheduled: (String) -> Unit,
+    onError: (String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val devicePermission = devicePushController.state
+    val deviceId = devicePushController.deviceId
+    val canUseDevicePush = devicePermission == DevicePushPermissionState.Granted && !deviceId.isNullOrBlank()
+    val canUseEmail = emailAuthState == NotificationEmailAuthState.Available
+    val emailAuthLoading = emailAuthState == NotificationEmailAuthState.Pending
+    var selectedSlot by remember(slots) { mutableStateOf(slots.firstOrNull()) }
+    var minutesText by remember { mutableStateOf("10") }
+    var devicePushChecked by remember(canUseDevicePush) { mutableStateOf(canUseDevicePush) }
+    var emailChecked by remember { mutableStateOf(false) }
+    var submitting by remember { mutableStateOf(false) }
+    val sheetScrollState = rememberScrollState()
+    val minutesBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val now = rememberNow()
+
+    LaunchedEffect(canUseEmail) {
+        if (!canUseEmail) emailChecked = false
+    }
+
+    val minutes = minutesText.trim().toIntOrNull()?.takeIf { it > 0 }
+    val notificationTime = remember(selectedSlot, minutes) {
+        selectedSlot?.let { slot -> minutes?.let { offset -> slot - offset.minutes } }
+    }
+    val timingError = notificationTimingError(notificationTime, now)
+    val sendDevicePush = devicePushChecked && canUseDevicePush
+    val sendEmail = emailChecked && canUseEmail
+    val doneEnabled = selectedSlot != null &&
+        minutes != null &&
+        timingError == null &&
+        (sendDevicePush || sendEmail) &&
+        !submitting
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Surface1,
+        contentColor = TextHigh,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.8f)
+                .imePadding(),
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(sheetScrollState)
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                race.classInfos.take(6).forEach { ClassChip(it) }
-                if (race.raceLength > 0) MetaChip(stringResource(Res.string.duration_race, race.raceLength))
-                race.settings.safetyRank?.let { SrBadge(it) }
-            }
-        }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Notify me", style = MaterialTheme.typography.titleLarge, color = TextHigh, fontWeight = FontWeight.Black)
+                    Text(race.title, style = MaterialTheme.typography.bodyMedium, color = TextMed, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
 
-        if (race.availableCars.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                AvailableCarsSection(race.availableCars, liveryToModel)
-            }
-        } else if (race.carsByClass.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) { CarsTicker(race.carsByClass) }
-        }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Start slot", style = MaterialTheme.typography.labelLarge, color = TextMed, fontWeight = FontWeight.SemiBold)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        slots.forEach { slot ->
+                            NotificationSlotChip(
+                                label = slot.notificationSlotLabel(),
+                                selected = selectedSlot == slot,
+                                onClick = { selectedSlot = slot },
+                            )
+                        }
+                    }
+                }
 
-        if (race.leaderboardId != null) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                val lbs = leaderboards
-                if (lbs == null) LeaderboardSkeletonCard()
-                else LeaderboardWithTopCars(
-                    lbs = lbs,
-                    raceId = race.id,
-                    raceClasses = race.carClasses,
-                    raceTitle = race.title,
-                    onOpenFull = onOpenLeaderboard,
+                OutlinedTextField(
+                    value = minutesText,
+                    onValueChange = { raw -> minutesText = raw.filter { it.isDigit() }.take(4) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .bringIntoViewRequester(minutesBringIntoViewRequester)
+                        .onFocusEvent { focusState ->
+                            if (focusState.isFocused) {
+                                scope.launch {
+                                    delay(180)
+                                    minutesBringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        },
+                    label = { Text("Minutes before start") },
+                    singleLine = true,
+                    isError = (minutesText.isNotBlank() && minutes == null) || timingError != null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    NOTIFICATION_MINUTE_PRESETS.forEach { preset ->
+                        NotificationMinuteChip(
+                            minutes = preset,
+                            selected = minutes == preset,
+                            onClick = { minutesText = preset.toString() },
+                        )
+                    }
+                }
+
+                if (timingError != null) {
+                    NotificationTimingError(timingError)
+                }
+
+                NotificationChannelsPicker(
+                    devicePushChecked = sendDevicePush,
+                    devicePushEnabled = canUseDevicePush,
+                    devicePushMessage = if (canUseDevicePush) {
+                        "Push reminder on this device"
+                    } else {
+                        devicePushController.unavailableMessage
+                            ?: "Enable notification permission in Android settings."
+                    },
+                    onDevicePushCheckedChange = { devicePushChecked = it },
+                    emailChecked = sendEmail,
+                    emailEnabled = canUseEmail,
+                    emailLoading = emailAuthLoading,
+                    emailMessage = when (emailAuthState) {
+                        NotificationEmailAuthState.Available -> "Send reminder to your account email"
+                        NotificationEmailAuthState.Pending -> "Checking sign-in session..."
+                        NotificationEmailAuthState.SignedOut -> "Sign in to enable email reminders."
+                    },
+                    onEmailCheckedChange = { emailChecked = it },
                 )
             }
-        }
-        race.track?.let {
-            item {
-                TrackCard(
-                    it,
-                    hotlaps.orEmpty(),
-                    hotlapsLoading = hotlaps == null,
-                    hotlapsSkeletonCount = (race.carClasses.size * 2).coerceAtLeast(2),
-                )
-            }
-        }
-        race.weather?.let { item { WeatherCard(it) } }
-        item {
-            Card(stringResource(Res.string.format)) { DetailRows(settingRows(race.settings)) }
-        }
-        if (upcoming.isNotEmpty()) {
-            item {
-                Card(stringResource(Res.string.next_start_times)) {
-                    TimesGrid(race.times)
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Surface1)
+                    .padding(start = 18.dp, top = 8.dp, end = 18.dp, bottom = 20.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onDismiss, enabled = !submitting) {
+                    Text("Cancel")
+                }
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        val slot = selectedSlot ?: return@Button
+                        val offsetMinutes = minutes ?: return@Button
+                        val triggerAt = slot - offsetMinutes.minutes
+                        if (notificationTimingError(triggerAt, now) != null) return@Button
+                        scope.launch {
+                            submitting = true
+                            val eventName = race.notificationEventName(offsetMinutes)
+                            val notifInSeconds = offsetMinutes * 60
+                            val notifTime = triggerAt.toString()
+                            val deviceResult = if (sendDevicePush) {
+                                repository.createDevicePushScheduleNotification(
+                                    deviceId = deviceId.orEmpty(),
+                                    eventName = eventName,
+                                    notifInSeconds = notifInSeconds,
+                                    notifTime = notifTime,
+                                )
+                            } else {
+                                Result.success(null)
+                            }
+                            val emailResult = if (sendEmail) {
+                                repository.createEmailScheduleNotification(
+                                    eventName = eventName,
+                                    notifInSeconds = notifInSeconds,
+                                    notifTime = notifTime,
+                                )
+                            } else {
+                                Result.success(null)
+                            }
+                            submitting = false
+
+                            val message = scheduleNotificationResultMessage(
+                                deviceSelected = sendDevicePush,
+                                emailSelected = sendEmail,
+                                deviceError = deviceResult.exceptionOrNull(),
+                                emailError = emailResult.exceptionOrNull(),
+                            )
+                            if (deviceResult.isSuccess && emailResult.isSuccess) onScheduled(message) else onError(message)
+                        }
+                    },
+                    enabled = doneEnabled,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                ) {
+                    if (submitting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = TextHigh,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text("Done", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun NotificationSlotChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Text(label, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
+        },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = Surface2,
+            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+            labelColor = TextMed,
+            selectedLabelColor = TextHigh,
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            borderColor = Outline,
+            selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+        ),
+    )
+}
+
+@Composable
+private fun NotificationMinuteChip(minutes: Int, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text("${minutes}m", fontWeight = FontWeight.SemiBold) },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = Surface2,
+            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+            labelColor = TextMed,
+            selectedLabelColor = TextHigh,
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            borderColor = Outline,
+            selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+        ),
+    )
+}
+
+@Composable
+private fun NotificationTimingError(message: String) {
+    val error = MaterialTheme.colorScheme.error
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(error.copy(alpha = 0.12f))
+            .border(1.dp, error.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(error.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Warning,
+                contentDescription = null,
+                tint = error,
+                modifier = Modifier.size(19.dp),
+            )
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                "Too soon",
+                style = MaterialTheme.typography.bodyMedium,
+                color = error,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMed,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationChannelsPicker(
+    devicePushChecked: Boolean,
+    devicePushEnabled: Boolean,
+    devicePushMessage: String,
+    onDevicePushCheckedChange: (Boolean) -> Unit,
+    emailChecked: Boolean,
+    emailEnabled: Boolean,
+    emailLoading: Boolean,
+    emailMessage: String,
+    onEmailCheckedChange: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+            Text("Notify via", style = MaterialTheme.typography.labelLarge, color = TextMed, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Text("Choose one or both", style = MaterialTheme.typography.labelSmall, color = TextLow)
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val twoColumns = maxWidth >= 520.dp
+            if (twoColumns) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    NotificationChannelCard(
+                        title = "Device Push",
+                        message = devicePushMessage,
+                        icon = Icons.Filled.Notifications,
+                        checked = devicePushChecked,
+                        enabled = devicePushEnabled,
+                        onCheckedChange = onDevicePushCheckedChange,
+                        modifier = Modifier.weight(1f),
+                    )
+                    NotificationChannelCard(
+                        title = "Email",
+                        message = emailMessage,
+                        icon = Icons.Filled.Email,
+                        checked = emailChecked,
+                        enabled = emailEnabled,
+                        loading = emailLoading,
+                        onCheckedChange = onEmailCheckedChange,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            } else {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    NotificationChannelCard(
+                        title = "Device Push",
+                        message = devicePushMessage,
+                        icon = Icons.Filled.Notifications,
+                        checked = devicePushChecked,
+                        enabled = devicePushEnabled,
+                        onCheckedChange = onDevicePushCheckedChange,
+                    )
+                    NotificationChannelCard(
+                        title = "Email",
+                        message = emailMessage,
+                        icon = Icons.Filled.Email,
+                        checked = emailChecked,
+                        enabled = emailEnabled,
+                        loading = emailLoading,
+                        onCheckedChange = onEmailCheckedChange,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationChannelCard(
+    title: String,
+    message: String,
+    icon: ImageVector,
+    checked: Boolean,
+    enabled: Boolean,
+    loading: Boolean = false,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactive = enabled && !loading
+    val selected = checked && interactive
+    val accent = MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(8.dp)
+    val borderColor = when {
+        selected -> accent.copy(alpha = 0.72f)
+        loading -> accent.copy(alpha = 0.42f)
+        enabled -> Outline
+        else -> Outline.copy(alpha = 0.45f)
+    }
+    val bg = when {
+        selected -> accent.copy(alpha = 0.14f)
+        loading -> accent.copy(alpha = 0.08f)
+        enabled -> Surface2
+        else -> Surface2.copy(alpha = 0.58f)
+    }
+    val contentAlpha = if (enabled || loading) 1f else 0.58f
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(bg)
+            .border(1.dp, borderColor, shape)
+            .clickable(enabled = interactive) { onCheckedChange(!checked) }
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (selected) accent.copy(alpha = 0.22f) else Carbon.copy(alpha = 0.42f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (selected) accent else TextMed.copy(alpha = contentAlpha),
+                modifier = Modifier.size(21.dp),
+            )
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextHigh.copy(alpha = contentAlpha),
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextLow.copy(alpha = if (enabled || loading) 0.9f else 0.72f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                color = accent,
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Checkbox(
+                checked = selected,
+                onCheckedChange = if (interactive) onCheckedChange else null,
+                enabled = interactive,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = accent,
+                    uncheckedColor = TextLow,
+                    disabledCheckedColor = TextLow.copy(alpha = 0.32f),
+                    disabledUncheckedColor = TextLow.copy(alpha = 0.32f),
+                    checkmarkColor = Carbon,
+                ),
+            )
+        }
+    }
+}
+
+private val NOTIFICATION_MINUTE_PRESETS = listOf(5, 10, 15, 20, 30, 60)
+
+private const val MIN_NOTIFICATION_LEAD_MINUTES = 10
+
+private fun notificationTimingError(notificationTime: Instant?, now: Instant): String? {
+    if (notificationTime == null) return null
+    val minAllowedTime = now + MIN_NOTIFICATION_LEAD_MINUTES.minutes
+    return if (notificationTime < minAllowedTime) {
+        "Pick a later start or reduce the reminder offset. Notifications need at least 10 minutes of lead time."
+    } else {
+        null
+    }
+}
+
+private enum class NotificationEmailAuthState {
+    Pending,
+    Available,
+    SignedOut,
+}
+
+private fun notificationEmailAuthState(
+    authState: SteamLoginUiState,
+    appToken: String?,
+): NotificationEmailAuthState = when {
+    !appToken.isNullOrBlank() -> NotificationEmailAuthState.Available
+    authState.isEmailAuthPending() -> NotificationEmailAuthState.Pending
+    else -> NotificationEmailAuthState.SignedOut
+}
+
+private fun SteamLoginUiState.isEmailAuthPending(): Boolean = when (this) {
+    SteamLoginUiState.Restoring,
+    SteamLoginUiState.CheckingAuthEnvironment,
+    SteamLoginUiState.RequestingLocalNetworkPermission,
+    SteamLoginUiState.Loading,
+    SteamLoginUiState.QrCodeStarting,
+    is SteamLoginUiState.DeviceConfirmationPending,
+    is SteamLoginUiState.QrCodePending,
+    is SteamLoginUiState.SignedIn -> true
+    SteamLoginUiState.Idle,
+    is SteamLoginUiState.LocalNetworkPermissionRequired,
+    is SteamLoginUiState.MinterUnavailable,
+    is SteamLoginUiState.Error,
+    is SteamLoginUiState.GuardRequired -> false
+}
+
+private fun scheduleNotificationResultMessage(
+    deviceSelected: Boolean,
+    emailSelected: Boolean,
+    deviceError: Throwable?,
+    emailError: Throwable?,
+): String = when {
+    deviceError == null && emailError == null && deviceSelected && emailSelected ->
+        "Device push and email notifications scheduled"
+    deviceError == null && emailError == null && deviceSelected ->
+        "Device push notification scheduled"
+    deviceError == null && emailError == null && emailSelected ->
+        "Email notification scheduled"
+    deviceSelected && emailSelected && deviceError == null ->
+        "Device push scheduled. Email failed: ${emailError.userNotificationMessage()}"
+    deviceSelected && emailSelected && emailError == null ->
+        "Email scheduled. Device push failed: ${deviceError.userNotificationMessage()}"
+    deviceError != null -> "Couldn't schedule device push: ${deviceError.userNotificationMessage()}"
+    emailError != null -> "Couldn't schedule email: ${emailError.userNotificationMessage()}"
+    else -> "Choose at least one notification method"
+}
+
+private fun Throwable?.userNotificationMessage(): String = when (val error = this) {
+    is BackendApiException -> when (error.code) {
+        "unauthorized" -> "sign in again and try once more"
+        "forbidden" -> "app check failed"
+        "user_not_found" -> "profile was not found"
+        "email_required" -> "add an email to your account"
+        "bad_json" -> "request payload was rejected"
+        "device_id_required" -> "device id is missing"
+        "device_id_invalid" -> "device id is invalid"
+        "event_name_required" -> "event name is missing"
+        "notif_in_seconds_required" -> "reminder offset is missing"
+        "notif_in_seconds_invalid" -> "reminder offset is invalid"
+        "notif_time_required" -> "start time is missing"
+        else -> error.code
+    }
+    null -> "unknown error"
+    else -> error.message?.takeIf { it.isNotBlank() } ?: "unknown error"
+}
+
+private fun Race.notificationEventName(minutes: Int): String {
+    val trackName = track?.simpleName?.takeIf { it.isNotBlank() }
+        ?: track?.name?.takeIf { it.isNotBlank() }
+        ?: circuit
+    return "$trackName - $title Starts in $minutes minutes"
+}
+
+private fun Instant.notificationSlotLabel(): String {
+    val local = toLocalDateTime(TimeZone.currentSystemDefault())
+    return "${local.day.twoDigits()}.${(local.month.ordinal + 1).twoDigits()} ${local.hour.twoDigits()}:${local.minute.twoDigits()}"
+}
+
+private fun Int.twoDigits(): String = toString().padStart(2, '0')
 
 @Composable
 private fun TrackCard(

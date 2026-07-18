@@ -58,6 +58,34 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
                 path == "/cars" -> json(MockData.cars())
                 path == "/tracks" -> json(MockData.tracks())
                 path == "/privacy" -> respond(MockData.privacy(), HttpStatusCode.OK)
+                path == "/schedule/notifications/devicepush" -> json(
+                    """
+                    {
+                      "ok": true,
+                      "id": 123,
+                      "event_name": "Mock device notification",
+                      "notif_in_seconds": 600,
+                      "notif_time": "2026-07-18T18:30:00Z",
+                      "notif_type": "device_push",
+                      "device_id": "mock-device",
+                      "email": null
+                    }
+                    """.trimIndent(),
+                )
+                path == "/schedule/notifications/email" -> json(
+                    """
+                    {
+                      "ok": true,
+                      "id": 124,
+                      "event_name": "Mock email notification",
+                      "notif_in_seconds": 600,
+                      "notif_time": "2026-07-18T18:30:00Z",
+                      "notif_type": "email",
+                      "device_id": null,
+                      "email": "driver@example.com"
+                    }
+                    """.trimIndent(),
+                )
 
                 path == "/users/summary" -> json(MockData.usersSummary())
                 path == "/users/search" -> json(MockData.usersSearch(params["q"].orEmpty(), params["page"]?.toIntOrNull() ?: 1))

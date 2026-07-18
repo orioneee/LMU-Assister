@@ -17,8 +17,7 @@ import org.koin.compose.KoinApplication
 import org.koin.dsl.koinConfiguration
 
 @Composable
-@Preview
-fun App() {
+fun App(startupEffects: @Composable () -> Unit = {}) {
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
             .components {
@@ -45,8 +44,15 @@ fun App() {
             modules(modules)
         }
     ) {
+        startupEffects()
         LmuTheme {
             MainShell()
         }
     }
+}
+
+@Preview
+@Composable
+fun AppPreview() {
+    App()
 }

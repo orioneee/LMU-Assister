@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">LMU Assister</string>
+    <string name="schedule_notification_channel_id">schedule_notifications</string>
+    <string name="schedule_notification_channel_name">Schedule notifications</string>
 </resources>

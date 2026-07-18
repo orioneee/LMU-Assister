@@ -5,12 +5,18 @@ import com.orioooneee.lmuasister.data.model.SchedulePeriod
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import io.ktor.http.encodeURLQueryComponent
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNamingStrategy
 
@@ -124,6 +130,50 @@ class BackendApi(
     /** Privacy policy as plain text — rendered in-app (no auth required). */
     suspend fun privacy(): String = getText("/privacy")
 
+    suspend fun registerFcmToken(uuid: String, token: String) {
+        val resp = postResponse("/fcm-token") {
+            contentType(ContentType.Application.Json)
+            setBody(AppJson.encodeToString(FcmTokenBody(uuid = uuid, token = token)))
+        }
+        val text = resp.bodyAsText()
+        if (resp.status.value !in 200..299) {
+            throw Exception("HTTP ${resp.status.value}: ${text.take(200)}")
+        }
+    }
+
+    suspend fun createDevicePushScheduleNotification(
+        deviceId: String,
+        eventName: String,
+        notifInSeconds: Int,
+        notifTime: String,
+    ): ScheduleNotificationResponse =
+        postScheduleNotification(
+            path = "/schedule/notifications/devicepush",
+            body = DevicePushScheduleNotificationBody(
+                deviceId = deviceId,
+                eventName = eventName,
+                notifInSeconds = notifInSeconds,
+                notifTime = notifTime,
+            ),
+        )
+
+    suspend fun createEmailScheduleNotification(
+        token: String,
+        eventName: String,
+        notifInSeconds: Int,
+        notifTime: String,
+    ): ScheduleNotificationResponse =
+        postScheduleNotification(
+            path = "/schedule/notifications/email",
+            body = EmailScheduleNotificationBody(
+                eventName = eventName,
+                notifInSeconds = notifInSeconds,
+                notifTime = notifTime,
+            ),
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+
     /** Public driver directory summary: rating distribution + top safety drivers. */
     suspend fun usersSummary(): UsersSummaryResponse =
         ProfileJson.decodeFromString(getText("/users/summary"))
@@ -236,9 +286,74 @@ class BackendApi(
                 block()
             }
         }
+
+    private suspend fun postResponse(
+        pathAndQuery: String,
+        block: io.ktor.client.request.HttpRequestBuilder.() -> Unit = {},
+    ): HttpResponse =
+        apiBaseUrlProvider.withBaseUrlRetry { baseUrl ->
+            client.post(baseUrl + pathAndQuery.withLeadingSlash()) {
+                block()
+            }
+        }
+
+    private suspend inline fun <reified T> postScheduleNotification(
+        path: String,
+        body: T,
+        noinline block: io.ktor.client.request.HttpRequestBuilder.() -> Unit = {},
+    ): ScheduleNotificationResponse {
+        val resp = postResponse(path) {
+            contentType(ContentType.Application.Json)
+            setBody(AppJson.encodeToString(body))
+            block()
+        }
+        val text = resp.bodyAsText()
+        if (resp.status.value !in 200..299) {
+            val error = runCatching { AppJson.decodeFromString<BackendErrorResponse>(text).error }.getOrNull()
+            val code = error?.takeIf { it.isNotBlank() } ?: "HTTP ${resp.status.value}"
+            throw BackendApiException(resp.status.value, code, text.take(200))
+        }
+        return AppJson.decodeFromString(text)
+    }
 }
 
-@kotlinx.serialization.Serializable
+class BackendApiException(
+    val statusCode: Int,
+    val code: String,
+    detail: String,
+) : Exception(detail.ifBlank { code })
+
+@Serializable
+private data class FcmTokenBody(val uuid: String, val token: String)
+
+@Serializable
+private data class DevicePushScheduleNotificationBody(
+    val deviceId: String,
+    val eventName: String,
+    val notifInSeconds: Int,
+    val notifTime: String,
+)
+
+@Serializable
+private data class EmailScheduleNotificationBody(
+    val eventName: String,
+    val notifInSeconds: Int,
+    val notifTime: String,
+)
+
+@Serializable
+data class ScheduleNotificationResponse(
+    val ok: Boolean,
+    val id: Long,
+    val eventName: String,
+    val notifInSeconds: Int,
+    val notifTime: String,
+    val notifType: String,
+    val deviceId: String? = null,
+    val email: String? = null,
+)
+
+@Serializable
 private data class BackendErrorResponse(val error: String? = null)
 
 private val ScheduleCategory.pathSegment: String
