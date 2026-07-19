@@ -23,6 +23,95 @@ sealed class AnalyticsEvent(
     class ScheduleError(reason: String) :
         AnalyticsEvent("schedule_error", mapOf("reason" to reason))
 
+    data object StartNotificationCtaOpened : AnalyticsEvent("start_notif_cta_opened")
+
+    class StartNotificationSheetShown(canDevicePush: Boolean, canEmail: Boolean) :
+        AnalyticsEvent(
+            "start_notif_sheet_shown",
+            mapOf("can_device_push" to canDevicePush, "can_email" to canEmail),
+        )
+
+    class StartNotificationChannelToggled(channel: String, enabled: Boolean) :
+        AnalyticsEvent("start_notif_ch_toggled", mapOf("channel" to channel, "enabled" to enabled))
+
+    class StartNotificationOffsetSelected(minutes: Int) :
+        AnalyticsEvent("start_notif_offset_selected", mapOf("minutes" to minutes))
+
+    class StartNotificationSubmit(devicePush: Boolean, email: Boolean, minutes: Int) :
+        AnalyticsEvent(
+            "start_notif_submit",
+            mapOf("device_push" to devicePush, "email" to email, "minutes" to minutes),
+        )
+
+    class StartNotificationResult(channel: String, success: Boolean, reason: String? = null) :
+        AnalyticsEvent(
+            "start_notif_result",
+            mapOf("channel" to channel, "success" to success, "reason" to reason),
+        )
+
+    class NotificationPermissionResult(source: String, state: String) :
+        AnalyticsEvent("notif_permission_result", mapOf("source" to source, "state" to state))
+
+    class FcmTokenResult(stage: String, success: Boolean, reason: String? = null) :
+        AnalyticsEvent(
+            "fcm_token_result",
+            mapOf("stage" to stage, "success" to success, "reason" to reason),
+        )
+
+    data object ScheduleUpdatesOpened : AnalyticsEvent("schedule_updates_opened")
+
+    class ScheduleUpdatesLoaded(devicePush: Boolean, email: Boolean) :
+        AnalyticsEvent(
+            "schedule_updates_loaded",
+            mapOf("device_push" to devicePush, "email" to email),
+        )
+
+    class ScheduleUpdatesLoadFailed(reason: String) :
+        AnalyticsEvent("schedule_updates_load_failed", mapOf("reason" to reason))
+
+    class ScheduleUpdatesChannelToggled(channel: String, enabled: Boolean) :
+        AnalyticsEvent("schedule_updates_ch_toggled", mapOf("channel" to channel, "enabled" to enabled))
+
+    class ScheduleUpdatesSubmit(deviceChanged: Boolean, emailChanged: Boolean) :
+        AnalyticsEvent(
+            "schedule_updates_submit",
+            mapOf("device_changed" to deviceChanged, "email_changed" to emailChanged),
+        )
+
+    class ScheduleUpdatesResult(channel: String, subscribed: Boolean, success: Boolean, reason: String? = null) :
+        AnalyticsEvent(
+            "schedule_updates_result",
+            mapOf("channel" to channel, "subscribed" to subscribed, "success" to success, "reason" to reason),
+        )
+
+    class PushNotificationReceived(notificationType: String, hasNotification: Boolean, hasBody: Boolean) :
+        AnalyticsEvent(
+            "push_notification_received",
+            mapOf(
+                "notification_type" to notificationType,
+                "has_notification" to hasNotification,
+                "has_body" to hasBody,
+            ),
+        )
+
+    class PushNotificationDisplayed(notificationType: String, channelId: String) :
+        AnalyticsEvent(
+            "push_notification_displayed",
+            mapOf("notification_type" to notificationType, "channel_id" to channelId),
+        )
+
+    class PushNotificationSkipped(notificationType: String, reason: String) :
+        AnalyticsEvent(
+            "push_notification_skipped",
+            mapOf("notification_type" to notificationType, "reason" to reason),
+        )
+
+    class PushNotificationOpened(notificationType: String, notificationId: Int?) :
+        AnalyticsEvent(
+            "push_notification_opened",
+            mapOf("notification_type" to notificationType, "notification_id" to notificationId),
+        )
+
     /** [source] = home_grid | profile_recent | all_races. */
     class RaceDetailOpened(raceId: String, source: String) :
         AnalyticsEvent("race_detail_opened", mapOf("race_id" to raceId, "source" to source))

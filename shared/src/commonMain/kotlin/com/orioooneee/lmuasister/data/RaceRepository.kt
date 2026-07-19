@@ -45,6 +45,7 @@ import com.orioooneee.lmuasister.data.remote.LeaderboardEntryDto
 import com.orioooneee.lmuasister.data.remote.RaceDto
 import com.orioooneee.lmuasister.data.remote.ScheduleResponse
 import com.orioooneee.lmuasister.data.remote.ScheduleNotificationResponse
+import com.orioooneee.lmuasister.data.remote.ScheduleUpdateSubscription
 import com.orioooneee.lmuasister.data.remote.SessionWeatherDto
 import com.orioooneee.lmuasister.data.remote.SettingsDto
 import com.orioooneee.lmuasister.data.remote.TrackDto
@@ -340,6 +341,34 @@ class RaceRepository(
         val token = tokenHolder.await(NOTIFICATION_TOKEN_WAIT_MS)
             ?: throw BackendApiException(401, "unauthorized", "Session token is not ready.")
         api.createEmailScheduleNotification(token, eventName, notifInSeconds, notifTime)
+    }
+
+    suspend fun scheduleUpdateSubscriptions(target: String?, includeEmail: Boolean): Result<List<ScheduleUpdateSubscription>> =
+        runCatching {
+            val token = if (includeEmail) tokenHolder.token.value?.takeIf { it.isNotBlank() } else null
+            api.scheduleUpdateSubscriptions(target = target, token = token).subscriptions
+        }
+
+    suspend fun subscribeScheduleUpdatesDevicePush(target: String): Result<Unit> =
+        runCatching {
+            check(api.subscribeScheduleUpdatesDevicePush(target).ok)
+        }
+
+    suspend fun unsubscribeScheduleUpdatesDevicePush(target: String): Result<Unit> =
+        runCatching {
+            check(api.unsubscribeScheduleUpdatesDevicePush(target).ok)
+        }
+
+    suspend fun subscribeScheduleUpdatesEmail(): Result<Unit> = runCatching {
+        val token = tokenHolder.await(NOTIFICATION_TOKEN_WAIT_MS)
+            ?: throw BackendApiException(401, "unauthorized", "Session token is not ready.")
+        check(api.subscribeScheduleUpdatesEmail(token).ok)
+    }
+
+    suspend fun unsubscribeScheduleUpdatesEmail(): Result<Unit> = runCatching {
+        val token = tokenHolder.await(NOTIFICATION_TOKEN_WAIT_MS)
+            ?: throw BackendApiException(401, "unauthorized", "Session token is not ready.")
+        check(api.unsubscribeScheduleUpdatesEmail(token).ok)
     }
 
     suspend fun leaderboardMe(leaderboardId: String): LapEntry? {

@@ -174,6 +174,54 @@ class BackendApi(
             header(HttpHeaders.Authorization, "Bearer $token")
         }
 
+    suspend fun scheduleUpdateSubscriptions(target: String?, token: String?): ScheduleUpdateSubscriptionsResponse {
+        val path = buildString {
+            append("/schedule/updated-subscribers")
+            target?.takeIf { it.isNotBlank() }?.let {
+                append("?target=${it.encodeURLQueryComponent()}")
+            }
+        }
+        val resp = getResponse(path) {
+            contentType(ContentType.Application.Json)
+            if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        val text = resp.bodyAsText()
+        if (resp.status.value !in 200..299) {
+            val error = runCatching { AppJson.decodeFromString<BackendErrorResponse>(text).error }.getOrNull()
+            val code = error?.takeIf { it.isNotBlank() } ?: "HTTP ${resp.status.value}"
+            throw BackendApiException(resp.status.value, code, text.take(200))
+        }
+        return AppJson.decodeFromString(text)
+    }
+
+    suspend fun subscribeScheduleUpdatesDevicePush(target: String): ScheduleUpdateSubscribeResponse =
+        postScheduleUpdateSubscription(
+            path = "/schedule/updated-subscribers/subscribe",
+            body = ScheduleUpdateSubscriptionBody(type = SCHEDULE_UPDATE_TYPE_DEVICE_PUSH, target = target),
+        )
+
+    suspend fun subscribeScheduleUpdatesEmail(token: String): ScheduleUpdateSubscribeResponse =
+        postScheduleUpdateSubscription(
+            path = "/schedule/updated-subscribers/subscribe",
+            body = ScheduleUpdateSubscriptionBody(type = SCHEDULE_UPDATE_TYPE_EMAIL),
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+
+    suspend fun unsubscribeScheduleUpdatesDevicePush(target: String): ScheduleUpdateUnsubscribeResponse =
+        postScheduleUpdateUnsubscribe(
+            path = "/schedule/updated-subscribers/unsubscribe",
+            body = ScheduleUpdateSubscriptionBody(type = SCHEDULE_UPDATE_TYPE_DEVICE_PUSH, target = target),
+        )
+
+    suspend fun unsubscribeScheduleUpdatesEmail(token: String): ScheduleUpdateUnsubscribeResponse =
+        postScheduleUpdateUnsubscribe(
+            path = "/schedule/updated-subscribers/unsubscribe",
+            body = ScheduleUpdateSubscriptionBody(type = SCHEDULE_UPDATE_TYPE_EMAIL),
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+
     /** Public driver directory summary: rating distribution + top safety drivers. */
     suspend fun usersSummary(): UsersSummaryResponse =
         ProfileJson.decodeFromString(getText("/users/summary"))
@@ -315,6 +363,44 @@ class BackendApi(
         }
         return AppJson.decodeFromString(text)
     }
+
+    private suspend inline fun <reified T> postScheduleUpdateSubscription(
+        path: String,
+        body: T,
+        noinline block: io.ktor.client.request.HttpRequestBuilder.() -> Unit = {},
+    ): ScheduleUpdateSubscribeResponse {
+        val resp = postResponse(path) {
+            contentType(ContentType.Application.Json)
+            setBody(AppJson.encodeToString(body))
+            block()
+        }
+        val text = resp.bodyAsText()
+        if (resp.status.value !in 200..299) {
+            val error = runCatching { AppJson.decodeFromString<BackendErrorResponse>(text).error }.getOrNull()
+            val code = error?.takeIf { it.isNotBlank() } ?: "HTTP ${resp.status.value}"
+            throw BackendApiException(resp.status.value, code, text.take(200))
+        }
+        return AppJson.decodeFromString(text)
+    }
+
+    private suspend inline fun <reified T> postScheduleUpdateUnsubscribe(
+        path: String,
+        body: T,
+        noinline block: io.ktor.client.request.HttpRequestBuilder.() -> Unit = {},
+    ): ScheduleUpdateUnsubscribeResponse {
+        val resp = postResponse(path) {
+            contentType(ContentType.Application.Json)
+            setBody(AppJson.encodeToString(body))
+            block()
+        }
+        val text = resp.bodyAsText()
+        if (resp.status.value !in 200..299) {
+            val error = runCatching { AppJson.decodeFromString<BackendErrorResponse>(text).error }.getOrNull()
+            val code = error?.takeIf { it.isNotBlank() } ?: "HTTP ${resp.status.value}"
+            throw BackendApiException(resp.status.value, code, text.take(200))
+        }
+        return AppJson.decodeFromString(text)
+    }
 }
 
 class BackendApiException(
@@ -352,6 +438,43 @@ data class ScheduleNotificationResponse(
     val deviceId: String? = null,
     val email: String? = null,
 )
+
+@Serializable
+data class ScheduleUpdateSubscription(
+    val id: Long,
+    val target: String,
+    val type: String,
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+@Serializable
+data class ScheduleUpdateSubscriptionsResponse(
+    val ok: Boolean,
+    val subscriptions: List<ScheduleUpdateSubscription> = emptyList(),
+)
+
+@Serializable
+data class ScheduleUpdateSubscribeResponse(
+    val ok: Boolean,
+    val created: Boolean,
+    val subscription: ScheduleUpdateSubscription? = null,
+)
+
+@Serializable
+data class ScheduleUpdateUnsubscribeResponse(
+    val ok: Boolean,
+    val deleted: Int = 0,
+)
+
+@Serializable
+private data class ScheduleUpdateSubscriptionBody(
+    val type: String,
+    val target: String? = null,
+)
+
+const val SCHEDULE_UPDATE_TYPE_DEVICE_PUSH = "device_push"
+const val SCHEDULE_UPDATE_TYPE_EMAIL = "email"
 
 @Serializable
 private data class BackendErrorResponse(val error: String? = null)

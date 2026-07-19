@@ -6,7 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import com.google.firebase.messaging.FirebaseMessaging
+import com.orioooneee.lmuasister.analytics.AnalyticsEvent
+import com.orioooneee.lmuasister.analytics.Telemetry
 import com.orioooneee.lmuasister.data.RaceRepository
+import com.orioooneee.lmuasister.data.remote.BackendApiException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,9 +56,17 @@ object FcmTokenRegistrar {
         @Suppress("DEPRECATION")
         FirebaseMessaging.getInstance().token
             .addOnSuccessListener { token ->
+                Telemetry.log(AnalyticsEvent.FcmTokenResult(stage = "fetch", success = true))
                 persistAndRegisterIfPossible(appContext, token)
             }
             .addOnFailureListener { error ->
+                Telemetry.log(
+                    AnalyticsEvent.FcmTokenResult(
+                        stage = "fetch",
+                        success = false,
+                        reason = error.fcmTokenAnalyticsReason(),
+                    ),
+                )
                 Log.w(TAG, "Couldn't get FCM token", error)
             }
     }
@@ -74,7 +85,17 @@ object FcmTokenRegistrar {
         val uuid = getOrCreateUuid(context.applicationContext)
         scope.launch {
             activeRepository.registerFcmToken(uuid, token)
+                .onSuccess {
+                    Telemetry.log(AnalyticsEvent.FcmTokenResult(stage = "register", success = true))
+                }
                 .onFailure { error ->
+                    Telemetry.log(
+                        AnalyticsEvent.FcmTokenResult(
+                            stage = "register",
+                            success = false,
+                            reason = error.fcmTokenAnalyticsReason(),
+                        ),
+                    )
                     Log.w(TAG, "Couldn't register FCM token", error)
                 }
         }
@@ -95,4 +116,9 @@ object FcmTokenRegistrar {
         prefs.edit { putString(UUID_KEY, uuid) }
         uuid
     }
+}
+
+private fun Throwable.fcmTokenAnalyticsReason(): String = when (this) {
+    is BackendApiException -> code
+    else -> message?.takeIf { it.isNotBlank() }?.let { "client_error" } ?: "unknown"
 }

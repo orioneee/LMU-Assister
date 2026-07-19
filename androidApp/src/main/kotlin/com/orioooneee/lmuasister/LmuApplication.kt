@@ -17,6 +17,7 @@ import com.google.firebase.appcheck.appCheck
 import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import com.google.firebase.initialize
+import com.orioooneee.lmuasister.analytics.initTelemetry
 import com.orioooneee.lmuasister.security.SecurityGate
 import kotlin.time.Duration.Companion.seconds
 
@@ -27,9 +28,10 @@ class LmuApplication: Application() {
         super.onCreate()
 
         SecurityShutdown.install(this)
-        createScheduleNotificationChannel()
+        createNotificationChannels()
 
         Firebase.initialize(this)
+        initTelemetry(applicationContext)
         Firebase.appCheck.installAppCheckProviderFactory(
             if (BuildConfig.DEBUG) {
                 DebugAppCheckProviderFactory.getInstance()
@@ -92,18 +94,28 @@ class LmuApplication: Application() {
         SecurityShutdown.close(this)
     }
 
-    private fun createScheduleNotificationChannel() {
+    private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
-        val channel = NotificationChannel(
-            getString(R.string.schedule_notification_channel_id),
-            getString(R.string.schedule_notification_channel_name),
-            NotificationManager.IMPORTANCE_HIGH,
-        ).apply {
-            enableVibration(true)
-        }
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(channel)
+        manager.createNotificationChannel(
+            NotificationChannel(
+                getString(R.string.schedule_notification_channel_id),
+                getString(R.string.schedule_notification_channel_name),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                enableVibration(true)
+            },
+        )
+        manager.createNotificationChannel(
+            NotificationChannel(
+                getString(R.string.schedule_updated_channel_id),
+                getString(R.string.schedule_updated_channel_name),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                enableVibration(true)
+            },
+        )
     }
 
     private companion object {

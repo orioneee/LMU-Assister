@@ -80,6 +80,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import com.orioooneee.lmuasister.analytics.AnalyticsEvent
+import com.orioooneee.lmuasister.analytics.Telemetry
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.remote.BackendApiException
 import com.orioooneee.lmuasister.data.model.CarGroup
@@ -281,8 +283,15 @@ fun RaceDetailsScreen(
             if (notificationSlots.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     NotifyMeCta {
+                        Telemetry.log(AnalyticsEvent.StartNotificationCtaOpened)
                         coroutineScope.launch {
-                            devicePushController.requestPermission()
+                            val state = devicePushController.requestPermission()
+                            Telemetry.log(
+                                AnalyticsEvent.NotificationPermissionResult(
+                                    source = "start_reminder",
+                                    state = state.name.lowercase(),
+                                ),
+                            )
                             showNotificationSheet = true
                         }
                     }
@@ -430,6 +439,15 @@ private fun ScheduleNotificationSheet(
         (sendDevicePush || sendEmail) &&
         !submitting
 
+    LaunchedEffect(Unit) {
+        Telemetry.log(
+            AnalyticsEvent.StartNotificationSheetShown(
+                canDevicePush = canUseDevicePush,
+                canEmail = canUseEmail,
+            ),
+        )
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -498,7 +516,10 @@ private fun ScheduleNotificationSheet(
                         NotificationMinuteChip(
                             minutes = preset,
                             selected = minutes == preset,
-                            onClick = { minutesText = preset.toString() },
+                            onClick = {
+                                Telemetry.log(AnalyticsEvent.StartNotificationOffsetSelected(preset))
+                                minutesText = preset.toString()
+                            },
                         )
                     }
                 }
@@ -516,7 +537,10 @@ private fun ScheduleNotificationSheet(
                         devicePushController.unavailableMessage
                             ?: "Enable notification permission in Android settings."
                     },
-                    onDevicePushCheckedChange = { devicePushChecked = it },
+                    onDevicePushCheckedChange = {
+                        Telemetry.log(AnalyticsEvent.StartNotificationChannelToggled("device_push", it))
+                        devicePushChecked = it
+                    },
                     emailChecked = sendEmail,
                     emailEnabled = canUseEmail,
                     emailLoading = emailAuthLoading,
@@ -525,7 +549,10 @@ private fun ScheduleNotificationSheet(
                         NotificationEmailAuthState.Pending -> "Checking sign-in session..."
                         NotificationEmailAuthState.SignedOut -> "Sign in to enable email reminders."
                     },
-                    onEmailCheckedChange = { emailChecked = it },
+                    onEmailCheckedChange = {
+                        Telemetry.log(AnalyticsEvent.StartNotificationChannelToggled("email", it))
+                        emailChecked = it
+                    },
                 )
             }
 
@@ -547,6 +574,13 @@ private fun ScheduleNotificationSheet(
                         val offsetMinutes = minutes ?: return@Button
                         val triggerAt = slot - offsetMinutes.minutes
                         if (notificationTimingError(triggerAt, now) != null) return@Button
+                        Telemetry.log(
+                            AnalyticsEvent.StartNotificationSubmit(
+                                devicePush = sendDevicePush,
+                                email = sendEmail,
+                                minutes = offsetMinutes,
+                            ),
+                        )
                         scope.launch {
                             submitting = true
                             val eventName = race.notificationEventName(offsetMinutes)
@@ -572,6 +606,25 @@ private fun ScheduleNotificationSheet(
                                 Result.success(null)
                             }
                             submitting = false
+
+                            if (sendDevicePush) {
+                                Telemetry.log(
+                                    AnalyticsEvent.StartNotificationResult(
+                                        channel = "device_push",
+                                        success = deviceResult.isSuccess,
+                                        reason = deviceResult.exceptionOrNull().notificationAnalyticsReason(),
+                                    ),
+                                )
+                            }
+                            if (sendEmail) {
+                                Telemetry.log(
+                                    AnalyticsEvent.StartNotificationResult(
+                                        channel = "email",
+                                        success = emailResult.isSuccess,
+                                        reason = emailResult.exceptionOrNull().notificationAnalyticsReason(),
+                                    ),
+                                )
+                            }
 
                             val message = scheduleNotificationResultMessage(
                                 deviceSelected = sendDevicePush,
@@ -913,6 +966,12 @@ private fun scheduleNotificationResultMessage(
     deviceError != null -> "Couldn't schedule device push: ${deviceError.userNotificationMessage()}"
     emailError != null -> "Couldn't schedule email: ${emailError.userNotificationMessage()}"
     else -> "Choose at least one notification method"
+}
+
+private fun Throwable?.notificationAnalyticsReason(): String? = when (val error = this) {
+    is BackendApiException -> error.code
+    null -> null
+    else -> error.message?.takeIf { it.isNotBlank() }?.let { "client_error" } ?: "unknown"
 }
 
 private fun Throwable?.userNotificationMessage(): String = when (val error = this) {

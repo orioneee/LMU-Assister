@@ -42,6 +42,55 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
             fun json(body: String) = respond(body, HttpStatusCode.OK, jsonHeaders)
 
             when {
+                path == "/schedule/updated-subscribers" -> json(
+                    buildString {
+                        append("""{"ok":true,"subscriptions":[""")
+                        params["target"]?.takeIf { it.isNotBlank() }?.let { target ->
+                            append(
+                                """
+                                {
+                                  "id": 1,
+                                  "target": "$target",
+                                  "type": "device_push",
+                                  "created_at": "2026-07-19T10:00:00Z",
+                                  "updated_at": "2026-07-19T10:00:00Z"
+                                }
+                                """.trimIndent(),
+                            )
+                        }
+                        if (authed) {
+                            if (params["target"]?.isNotBlank() == true) append(",")
+                            append(
+                                """
+                                {
+                                  "id": 2,
+                                  "target": "driver@example.com",
+                                  "type": "email",
+                                  "created_at": "2026-07-19T10:00:00Z",
+                                  "updated_at": "2026-07-19T10:00:00Z"
+                                }
+                                """.trimIndent(),
+                            )
+                        }
+                        append("""]}""")
+                    },
+                )
+                path == "/schedule/updated-subscribers/subscribe" -> json(
+                    """
+                    {
+                      "ok": true,
+                      "created": true,
+                      "subscription": {
+                        "id": 1,
+                        "target": "mock-target",
+                        "type": "device_push",
+                        "created_at": "2026-07-19T10:00:00Z",
+                        "updated_at": "2026-07-19T10:00:00Z"
+                      }
+                    }
+                    """.trimIndent(),
+                )
+                path == "/schedule/updated-subscribers/unsubscribe" -> json("""{"ok":true,"deleted":1}""")
                 path.startsWith("/schedule/") && path.endsWith("/topcars") ->
                     json(
                         MockData.topCars(

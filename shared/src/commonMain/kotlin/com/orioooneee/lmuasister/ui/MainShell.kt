@@ -74,6 +74,7 @@ import com.orioooneee.lmuasister.ui.publicusers.PublicUserDetailScreen
 import com.orioooneee.lmuasister.ui.publicusers.PublicUserRacesScreen
 import com.orioooneee.lmuasister.ui.publicusers.PublicUserTrackBreakdownScreen
 import com.orioooneee.lmuasister.ui.publicusers.PublicUsersScreen
+import com.orioooneee.lmuasister.ui.schedule.ScheduleUpdatesScreen
 import com.orioooneee.lmuasister.ui.tracks.PublicTrackDetailScreen
 import com.orioooneee.lmuasister.ui.tracks.TrackDetailScreen
 import com.orioooneee.lmuasister.ui.tracks.TracksScreen
@@ -117,6 +118,9 @@ data class CarDetailRoute(val carId: String)
 data class DetailsRoute(val raceId: String)
 @Serializable
 data class LeaderboardRoute(val leaderboardId: String, val title: String)
+
+@Serializable
+object ScheduleUpdatesRoute
 
 @Serializable
 object AllRacesRoute
@@ -274,6 +278,9 @@ fun MainShell(
                 ScheduleTab(viewModel, insets, onOpenRace = {
                     Telemetry.log(AnalyticsEvent.RaceDetailOpened(it.id, source = "home_grid"))
                     nav.navigate(DetailsRoute(it.id))
+                }, onOpenScheduleUpdates = {
+                    Telemetry.log(AnalyticsEvent.ScheduleUpdatesOpened)
+                    nav.navigate(ScheduleUpdatesRoute)
                 })
             }
             composable<ProfileRoute> {
@@ -518,6 +525,14 @@ fun MainShell(
                     )
                 }
             }
+            composable<ScheduleUpdatesRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) {
+                val profileState by profileViewModel.state.collectAsStateWithLifecycle()
+                ScheduleUpdatesScreen(
+                    insets = insets,
+                    authState = profileState,
+                    onBack = { nav.popBackStack() },
+                )
+            }
             composable<LeaderboardRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
                 val route = entry.toRoute<LeaderboardRoute>()
                 FullLeaderboardScreen(
@@ -534,7 +549,12 @@ fun MainShell(
 }
 
 @Composable
-private fun ScheduleTab(viewModel: ScheduleViewModel, insets: PaddingValues, onOpenRace: (Race) -> Unit) {
+private fun ScheduleTab(
+    viewModel: ScheduleViewModel,
+    insets: PaddingValues,
+    onOpenRace: (Race) -> Unit,
+    onOpenScheduleUpdates: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val cars by viewModel.cars.collectAsStateWithLifecycle()
@@ -567,6 +587,7 @@ private fun ScheduleTab(viewModel: ScheduleViewModel, insets: PaddingValues, onO
                     onSelectWeek = viewModel::selectWeek,
                     onSelectCategory = viewModel::selectCategory,
                     onOpenRace = onOpenRace,
+                    onOpenScheduleUpdates = onOpenScheduleUpdates,
                     onRefresh = viewModel::refresh,
                     cars = cars,
                     showTimerInScheduleCard = data.featureFlags.showTimerInScheduleCard,
@@ -591,6 +612,7 @@ private fun screenNameOf(dest: NavDestination): String = when {
     dest.hasRoute(CarDetailRoute::class) -> "car_detail"
     dest.hasRoute(ProfileRoute::class) -> "profile"
     dest.hasRoute(DetailsRoute::class) -> "race_details"
+    dest.hasRoute(ScheduleUpdatesRoute::class) -> "schedule_updates"
     dest.hasRoute(LeaderboardRoute::class) -> "full_leaderboard"
     dest.hasRoute(AllRacesRoute::class) -> "all_races"
     dest.hasRoute(SuspensionsRoute::class) -> "suspensions"

@@ -17,11 +17,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -95,6 +96,7 @@ fun HomeScreen(
     onSelectWeek: (String) -> Unit,
     onSelectCategory: (ScheduleCategory) -> Unit,
     onOpenRace: (Race) -> Unit,
+    onOpenScheduleUpdates: () -> Unit,
     onRefresh: () -> Unit = {},
     cars: List<CarModel> = emptyList(),
     showTimerInScheduleCard: Boolean = false,
@@ -156,60 +158,130 @@ fun HomeScreen(
                 .background(Carbon),
         ) {
             Spacer(Modifier.height(topInset + 12.dp))
-            // Week pills get their own full-width row — never crowded by the support buttons.
-            if (weeks.size > 1) {
-                WeekPillsRow(weeks, selectedWeek, onSelectWeek)
-                Spacer(Modifier.height(12.dp))
-            }
-            TierTabsRow(ScheduleCategory.entries.toList(), selectedCategory, onSelectCategory)
-            Spacer(Modifier.height(8.dp))
-            SupportRow(openRepo, openJar)
-            Spacer(Modifier.height(8.dp))
-        }
-    }
-}
-
-/** Buy-me-a-coffee (Monobank jar) + GitHub, kept as a compact right-aligned cluster. */
-@Composable
-private fun SupportRow(onOpenRepo: () -> Unit, onOpenJar: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SupportCluster(onOpenRepo, onOpenJar)
-    }
-}
-
-@Composable
-private fun SupportCluster(onOpenRepo: () -> Unit, onOpenJar: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(Amber.copy(alpha = 0.15f))
-                .border(1.dp, Amber.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
-                .clickable(onClick = onOpenJar)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(IconCoffee, contentDescription = null, tint = Amber, modifier = Modifier.size(16.dp))
-            Text(
-                "Buy me a coffee",
-                style = MaterialTheme.typography.labelMedium,
-                color = Amber,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
+            ScheduleHeaderControls(
+                weeks = weeks,
+                selectedWeek = selectedWeek,
+                selectedCategory = selectedCategory,
+                onSelectWeek = onSelectWeek,
+                onSelectCategory = onSelectCategory,
+                onOpenScheduleUpdates = onOpenScheduleUpdates,
+                onOpenRepo = openRepo,
+                onOpenJar = openJar,
             )
+            Spacer(Modifier.height(12.dp))
         }
-        Spacer(Modifier.width(6.dp))
-        Box(
-            Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onOpenRepo),
-            contentAlignment = Alignment.Center,
+    }
+}
+
+@Composable
+private fun ScheduleHeaderControls(
+    weeks: List<WeekTab>,
+    selectedWeek: String,
+    selectedCategory: ScheduleCategory,
+    onSelectWeek: (String) -> Unit,
+    onSelectCategory: (ScheduleCategory) -> Unit,
+    onOpenScheduleUpdates: () -> Unit,
+    onOpenRepo: () -> Unit,
+    onOpenJar: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(IconGithub, contentDescription = "Open GitHub repository", tint = TextMed, modifier = Modifier.size(22.dp))
+            if (weeks.size > 1) {
+                WeekPillsRow(
+                    weeks = weeks,
+                    selectedWeek = selectedWeek,
+                    onSelectWeek = onSelectWeek,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            GithubButton(onOpenRepo)
         }
+        TierTabsRow(
+            tabs = ScheduleCategory.entries.toList(),
+            selectedCategory = selectedCategory,
+            onSelect = onSelectCategory,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ScheduleUpdatesChip(onOpenScheduleUpdates, Modifier.weight(1f))
+            CoffeeChip(onOpenJar)
+        }
+    }
+}
+
+@Composable
+private fun ScheduleUpdatesChip(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Surface1)
+            .border(1.dp, Outline, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(Icons.Filled.Notifications, contentDescription = null, tint = TextMed, modifier = Modifier.size(17.dp))
+        Text(
+            "Schedule updates",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextMed,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun CoffeeChip(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Amber.copy(alpha = 0.14f))
+            .border(1.dp, Amber.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(IconCoffee, contentDescription = null, tint = Amber, modifier = Modifier.size(17.dp))
+        Text(
+            "Buy me a coffee",
+            style = MaterialTheme.typography.labelMedium,
+            color = Amber,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun GithubButton(onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(Surface1)
+            .border(1.dp, Outline, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(IconGithub, contentDescription = "Open GitHub repository", tint = TextMed, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -218,9 +290,10 @@ private fun TierTabsRow(
     tabs: List<ScheduleCategory>,
     selectedCategory: ScheduleCategory,
     onSelect: (ScheduleCategory) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         tabs.forEach { tab ->
@@ -230,9 +303,14 @@ private fun TierTabsRow(
 }
 
 @Composable
-private fun WeekPillsRow(weeks: List<WeekTab>, selectedWeek: String, onSelectWeek: (String) -> Unit) {
+private fun WeekPillsRow(
+    weeks: List<WeekTab>,
+    selectedWeek: String,
+    onSelectWeek: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         weeks.forEach { w -> WeekPill(w.label, w.key == selectedWeek) { onSelectWeek(w.key) } }

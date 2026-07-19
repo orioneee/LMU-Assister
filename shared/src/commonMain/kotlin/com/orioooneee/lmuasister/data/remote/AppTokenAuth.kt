@@ -39,6 +39,8 @@ private fun String.isPublicAuthExcluded(): Boolean {
         path == "/internal" ||
         path.startsWith("/internal/") ||
         path == "/schedule/notifications/devicepush" ||
+        path == "/schedule/updated-subscribers" ||
+        path.startsWith("/schedule/updated-subscribers/") ||
         path == "/auth" ||
         path.startsWith("/auth/")
 }
