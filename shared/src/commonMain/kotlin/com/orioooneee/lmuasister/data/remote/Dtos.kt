@@ -130,6 +130,12 @@ data class SettingsDto(
     val trackLimits: String? = null,
     val tireWarmers: String? = null,
     val limitedTires: String? = null,
+    val privateQualifying: Boolean? = null,
+    val multiFormationLap: Int? = null,
+    val mechanicalFailures: Int? = null,
+    val raceTimeScale: Int? = null,
+    val realRoadScale: Int? = null,
+    val trackLimitsPointsAllowed: Int? = null,
 )
 
 // Explicit @SerialName keys (not the global snake-case strategy) because this is also nested in

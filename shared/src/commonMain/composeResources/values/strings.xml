@@ -128,6 +128,12 @@
     <string name="set_track_limits">Track limits</string>
     <string name="set_tire_warmers">Tire warmers</string>
     <string name="set_limited_tires">Limited tires</string>
+    <string name="set_private_qualifying">Private qualifying</string>
+    <string name="set_multi_formation_lap">Formation lap</string>
+    <string name="set_mechanical_failures">Mechanical failures</string>
+    <string name="set_race_time_scale">Race time scale</string>
+    <string name="set_real_road_scale">Real road scale</string>
+    <string name="set_track_limits_points_allowed">Track limit points</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
 </resources>

@@ -468,6 +468,12 @@ private fun SettingsDto.toModel() = RaceSettings(
     trackLimits = trackLimits,
     tireWarmers = tireWarmers,
     limitedTires = limitedTires,
+    privateQualifying = privateQualifying,
+    multiFormationLap = multiFormationLap,
+    mechanicalFailures = mechanicalFailures,
+    raceTimeScale = raceTimeScale,
+    realRoadScale = realRoadScale,
+    trackLimitsPointsAllowed = trackLimitsPointsAllowed,
 )
 
 private fun TrackDto.toModel(): TrackInfo = TrackInfo(

@@ -248,6 +248,12 @@ internal object MockData {
         safetyRank = spec.difficulty, driverRank = "Open",
         splitSize = 32, qualifyingLength = 15, practiceLength = 20,
         driverSwaps = false, trackLimits = "Strict", tireWarmers = "On", limitedTires = "No",
+        privateQualifying = true,
+        multiFormationLap = 1,
+        mechanicalFailures = 1,
+        raceTimeScale = 1,
+        realRoadScale = 1,
+        trackLimitsPointsAllowed = 4,
     )
 
     private fun sampleWeather(id: String): WeatherDto {

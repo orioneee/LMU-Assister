@@ -126,6 +126,12 @@ data class RaceSettings(
     val trackLimits: String?,
     val tireWarmers: String?,
     val limitedTires: String?,
+    val privateQualifying: Boolean?,
+    val multiFormationLap: Int?,
+    val mechanicalFailures: Int?,
+    val raceTimeScale: Int?,
+    val realRoadScale: Int?,
+    val trackLimitsPointsAllowed: Int?,
 )
 
 /**

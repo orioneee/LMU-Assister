@@ -162,15 +162,22 @@ import lmuassister.shared.generated.resources.set_driver_rank
 import lmuassister.shared.generated.resources.set_driver_swaps
 import lmuassister.shared.generated.resources.set_fuel_usage
 import lmuassister.shared.generated.resources.set_limited_tires
+import lmuassister.shared.generated.resources.set_mechanical_failures
+import lmuassister.shared.generated.resources.set_multi_formation_lap
 import lmuassister.shared.generated.resources.set_practice
+import lmuassister.shared.generated.resources.set_private_qualifying
 import lmuassister.shared.generated.resources.set_qualifying
+import lmuassister.shared.generated.resources.set_race_time_scale
+import lmuassister.shared.generated.resources.set_real_road_scale
 import lmuassister.shared.generated.resources.set_safety_rank
 import lmuassister.shared.generated.resources.set_setup
 import lmuassister.shared.generated.resources.set_split_size
 import lmuassister.shared.generated.resources.set_tire_warmers
 import lmuassister.shared.generated.resources.set_tire_wear
 import lmuassister.shared.generated.resources.set_track_limits
+import lmuassister.shared.generated.resources.set_track_limits_points_allowed
 import lmuassister.shared.generated.resources.full_leaderboard
+import lmuassister.shared.generated.resources.race_label
 import lmuassister.shared.generated.resources.set_start_interval
 import lmuassister.shared.generated.resources.track_city
 import lmuassister.shared.generated.resources.track_name
@@ -331,7 +338,7 @@ fun RaceDetailsScreen(
             }
             race.weather?.let { item { WeatherCard(it) } }
             item {
-                Card(stringResource(Res.string.format)) { DetailRows(settingRows(race.settings)) }
+                Card(stringResource(Res.string.format)) { DetailRows(settingRows(race.raceLength, race.settings)) }
             }
             if (upcoming.isNotEmpty()) {
                 item {
@@ -2415,23 +2422,34 @@ private fun SectorSplit(index: Int, seconds: Double) {
 }
 
 @Composable
-private fun settingRows(s: RaceSettings): List<Pair<String, String>> = listOfNotNull(
-    s.qualifyingLength?.let { stringResource(Res.string.set_qualifying) to "${it}m" },
-    s.practiceLength?.let { stringResource(Res.string.set_practice) to "${it}m" },
-    s.setup?.let { stringResource(Res.string.set_setup) to it },
-    s.assists?.let { stringResource(Res.string.set_assists) to it },
-    s.damage?.let { stringResource(Res.string.set_damage) to it },
-    s.tireWear?.let { stringResource(Res.string.set_tire_wear) to it },
-    s.fuelUsage?.let { stringResource(Res.string.set_fuel_usage) to it },
-    s.safetyRank?.let { stringResource(Res.string.set_safety_rank) to it },
-    s.driverRank?.let { stringResource(Res.string.set_driver_rank) to it },
-    s.splitSize?.let { stringResource(Res.string.set_split_size) to it.toString() },
-    s.startIntervalMin?.let { stringResource(Res.string.set_start_interval) to "every ${it}m" },
-    s.driverSwaps?.let { stringResource(Res.string.set_driver_swaps) to if (it) stringResource(Res.string.yes) else stringResource(Res.string.no) },
-    s.trackLimits?.let { stringResource(Res.string.set_track_limits) to it },
-    s.tireWarmers?.let { stringResource(Res.string.set_tire_warmers) to it },
-    s.limitedTires?.let { stringResource(Res.string.set_limited_tires) to it },
-)
+private fun settingRows(raceLength: Int, s: RaceSettings): List<Pair<String, String>> =
+    listOfNotNull(
+        raceLength.takeIf { it > 0 }?.let { stringResource(Res.string.race_label) to "${it}m" },
+        s.qualifyingLength?.let { stringResource(Res.string.set_qualifying) to "${it}m" },
+        s.practiceLength?.let { stringResource(Res.string.set_practice) to "${it}m" },
+        s.setup?.let { stringResource(Res.string.set_setup) to it },
+        s.assists?.let { stringResource(Res.string.set_assists) to it },
+        s.damage?.let { stringResource(Res.string.set_damage) to it },
+        s.tireWear?.let { stringResource(Res.string.set_tire_wear) to it },
+        s.fuelUsage?.let { stringResource(Res.string.set_fuel_usage) to it },
+        s.safetyRank?.let { stringResource(Res.string.set_safety_rank) to it },
+        s.driverRank?.let { stringResource(Res.string.set_driver_rank) to it },
+        s.splitSize?.let { stringResource(Res.string.set_split_size) to it.toString() },
+        s.startIntervalMin?.let { stringResource(Res.string.set_start_interval) to "every ${it}m" },
+        s.driverSwaps?.let { stringResource(Res.string.set_driver_swaps) to yesNo(it) },
+        s.trackLimits?.let { stringResource(Res.string.set_track_limits) to it },
+        s.trackLimitsPointsAllowed?.let { stringResource(Res.string.set_track_limits_points_allowed) to it.toString() },
+        s.tireWarmers?.let { stringResource(Res.string.set_tire_warmers) to it },
+        s.limitedTires?.let { stringResource(Res.string.set_limited_tires) to it },
+        s.privateQualifying?.let { stringResource(Res.string.set_private_qualifying) to yesNo(it) },
+        s.multiFormationLap?.let { stringResource(Res.string.set_multi_formation_lap) to it.toString() },
+        s.mechanicalFailures?.let { stringResource(Res.string.set_mechanical_failures) to it.toString() },
+        s.raceTimeScale?.let { stringResource(Res.string.set_race_time_scale) to "${it}x" },
+        s.realRoadScale?.let { stringResource(Res.string.set_real_road_scale) to "${it}x" },
+    )
+
+@Composable
+private fun yesNo(value: Boolean): String = stringResource(if (value) Res.string.yes else Res.string.no)
 
 @Composable
 private fun Card(
