@@ -195,18 +195,21 @@ data class WeatherDto(
 
 @Serializable
 data class SessionWeatherDto(
-    val timeOfDay: String? = null,
+    @SerialName("time_of_day") val timeOfDay: String? = null,
     val segments: List<WeatherSegmentDto> = emptyList(),
 )
 
 @Serializable
 data class WeatherSegmentDto(
     val sky: Int = 0,
-    val tempC: Int? = null,
+    @SerialName("sky_label") val skyLabel: String? = null,
+    val kind: String? = null,
+    val icon: String? = null,
+    @SerialName("temp_c") val tempC: Int? = null,
     val humidity: Int? = null,
-    val windKmh: Int? = null,
-    val rainChance: Int? = null,
-    val durationMin: Int? = null,
+    @SerialName("wind_kmh") val windKmh: Int? = null,
+    @SerialName("rain_chance") val rainChance: Int? = null,
+    @SerialName("duration_min") val durationMin: Int? = null,
 )
 
 @Serializable

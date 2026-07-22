@@ -90,6 +90,9 @@ data class CarModel(
 
 data class WeatherSegment(
     val sky: Int,
+    val skyLabel: String?,
+    val kind: String?,
+    val icon: String?,
     val tempC: Int?,
     val humidity: Int?,
     val windKmh: Int?,

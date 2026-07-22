@@ -7,7 +7,7 @@ import coil3.decode.ImageSource
 import coil3.fetch.SourceFetchResult
 import coil3.request.Options
 import coil3.svg.SvgDecoder
-import com.orioooneee.lmuasister.ui.util.inlineSvgCss
+import com.orioooneee.lmuasister.ui.util.patchSvgForCoil
 import okio.Buffer
 
 /**
@@ -26,7 +26,7 @@ class SvgCssInlineDecoder(
 
     override suspend fun decode(): DecodeResult? {
         val original = result.source.source().readUtf8()
-        val fixed = inlineSvgCss(original)
+        val fixed = patchSvgForCoil(original)
         val patched = SourceFetchResult(
             source = ImageSource(Buffer().apply { writeUtf8(fixed) }, options.fileSystem),
             mimeType = "image/svg+xml",

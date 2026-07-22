@@ -77,6 +77,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -94,6 +95,7 @@ import com.orioooneee.lmuasister.data.model.RaceLeaderboards
 import com.orioooneee.lmuasister.data.model.RaceSettings
 import com.orioooneee.lmuasister.data.model.RaceWeather
 import com.orioooneee.lmuasister.data.model.SessionWeather
+import com.orioooneee.lmuasister.data.model.WeatherSegment
 import com.orioooneee.lmuasister.data.model.TrackInfo
 import com.orioooneee.lmuasister.data.model.TopCar
 import com.orioooneee.lmuasister.data.model.TopCarsResult
@@ -131,7 +133,6 @@ import com.orioooneee.lmuasister.ui.util.formatLap
 import com.orioooneee.lmuasister.ui.util.formatSector
 import com.orioooneee.lmuasister.ui.util.rememberNow
 import com.orioooneee.lmuasister.ui.util.skyColor
-import com.orioooneee.lmuasister.ui.util.skyEmoji
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import kotlinx.coroutines.delay
@@ -1419,35 +1420,149 @@ private fun WeatherCard(w: RaceWeather) {
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun WeatherSession(label: String, sw: SessionWeather) {
+    if (sw.segments.isEmpty()) return
     val rainPeak = sw.segments.maxOfOrNull { it.rainChance ?: 0 } ?: 0
-    Column {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.SemiBold)
+    val summary = listOfNotNull(
+        sw.timeOfDay?.let(::weatherTimeLabel),
+        sw.segments.averageOf { it.tempC }?.let { "${it}C" },
+        sw.segments.averageOf { it.humidity }?.let { "Humidity ${it}%" },
+        sw.segments.averageOf { it.windKmh }?.let { "Wind $it km/h" },
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.labelMedium, color = TextMed, fontWeight = FontWeight.SemiBold)
+                if (summary.isNotEmpty()) {
+                    Spacer(Modifier.height(2.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        summary.forEach {
+                            Text(it, style = MaterialTheme.typography.labelSmall, color = TextLow, maxLines = 1)
+                        }
+                    }
+                }
+            }
             if (rainPeak > 0) {
                 Text(stringResource(Res.string.weather_rain, rainPeak), style = MaterialTheme.typography.labelSmall, color = ClassLmp2)
             }
         }
-        Spacer(Modifier.height(6.dp))
-        Row(
-            Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(8.dp)),
+        BoxWithConstraints(
+            Modifier.fillMaxWidth().height(124.dp).clip(RoundedCornerShape(8.dp)),
         ) {
-            sw.segments.forEach { seg ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .weight((seg.durationMin ?: 1).toFloat().coerceAtLeast(1f))
-                        .fillMaxHeight()
-                        .background(skyColor(seg.sky, seg.rainChance ?: 0)),
-                ) {
-                    Text(skyEmoji(seg.sky, seg.rainChance ?: 0), style = MaterialTheme.typography.labelSmall, color = TextHigh)
-                    seg.tempC?.let { Text("${it}C", style = MaterialTheme.typography.labelSmall, color = TextHigh) }
+            val count = sw.segments.size.coerceAtLeast(1)
+            val equalWidth = maxWidth / count
+            val cellWidth = if (equalWidth < WEATHER_SEGMENT_MIN_WIDTH) WEATHER_SEGMENT_MIN_WIDTH else equalWidth
+            Row(
+                Modifier
+                    .width(cellWidth * count.toFloat())
+                    .fillMaxHeight()
+                    .horizontalScroll(rememberScrollState()),
+            ) {
+                sw.segments.forEach { seg ->
+                    WeatherSegmentCell(seg, Modifier.width(cellWidth))
                 }
             }
         }
     }
 }
+
+@Composable
+private fun WeatherSegmentCell(seg: WeatherSegment, modifier: Modifier = Modifier) {
+    val label = weatherSegmentLabel(seg)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier
+            .fillMaxHeight()
+            .background(skyColor(seg.sky, seg.rainChance ?: 0))
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+    ) {
+        if (!seg.icon.isNullOrBlank()) {
+            AsyncImage(
+                model = seg.icon,
+                contentDescription = label,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(30.dp),
+            )
+        } else {
+            Text(weatherFallbackGlyph(seg), style = MaterialTheme.typography.titleMedium, color = TextHigh, maxLines = 1)
+        }
+        seg.tempC?.let {
+            Text(
+                "${it}C",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextHigh,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextHigh,
+            maxLines = 2,
+            textAlign = TextAlign.Center,
+            softWrap = true,
+        )
+        seg.humidity?.let {
+            Text("${it}%", style = MaterialTheme.typography.labelSmall, color = TextMed, maxLines = 1)
+        }
+    }
+}
+
+private fun List<WeatherSegment>.averageOf(selector: (WeatherSegment) -> Int?): Int? {
+    val values = mapNotNull(selector)
+    return values.takeIf { it.isNotEmpty() }?.map { it.toDouble() }?.average()?.roundToInt()
+}
+
+private fun weatherTimeLabel(raw: String): String {
+    val value = raw.trim()
+    val match = Regex("""^(\d{1,2})h(?:(\d{1,2})m?)?$""").matchEntire(value) ?: return value
+    val hour = match.groupValues[1].padStart(2, '0')
+    val minute = match.groupValues.getOrNull(2).orEmpty().ifBlank { "00" }.padStart(2, '0')
+    return "$hour:$minute"
+}
+
+private fun weatherSegmentLabel(seg: WeatherSegment): String {
+    seg.skyLabel?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    val kind = seg.kind?.lowercase().orEmpty()
+    val rain = seg.rainChance ?: 0
+    return when {
+        rain >= 60 -> "Heavy rain"
+        rain >= 35 || kind.contains("rain") -> "Rain"
+        kind.contains("storm") -> "Storm"
+        kind.contains("fog") || kind.contains("mist") -> "Fog"
+        kind.contains("cloud") || seg.sky >= 6 -> "Cloudy"
+        kind.contains("sun") || seg.sky >= 2 -> "Partly cloudy"
+        kind.contains("clear") -> "Clear"
+        else -> "Clear"
+    }
+}
+
+private fun weatherFallbackGlyph(seg: WeatherSegment): String {
+    val label = weatherSegmentLabel(seg).lowercase()
+    val kind = seg.kind?.lowercase().orEmpty()
+    return when {
+        (seg.rainChance ?: 0) >= 35 || "rain" in label || "rain" in kind || "storm" in label || "storm" in kind ->
+            "Rain"
+        "fog" in label || "mist" in label || "fog" in kind || "mist" in kind ->
+            "Fog"
+        "partly" in label || "light cloud" in label || "sun" in kind || seg.sky in 2..5 ->
+            "Sun"
+        "cloud" in label || "cloud" in kind || seg.sky >= 6 ->
+            "Cloud"
+        else ->
+            "Clear"
+    }
+}
+
+private val WEATHER_SEGMENT_MIN_WIDTH = 86.dp
 
 internal fun gapLabel(deltaMs: Long): String =
     "+${deltaMs / 1000}.${(deltaMs % 1000).toString().padStart(3, '0')}"

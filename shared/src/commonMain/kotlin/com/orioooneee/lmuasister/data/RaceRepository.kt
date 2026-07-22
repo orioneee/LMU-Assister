@@ -502,6 +502,9 @@ private fun SessionWeatherDto.toModel() = SessionWeather(
     segments = segments.map {
         WeatherSegment(
             sky = it.sky,
+            skyLabel = it.skyLabel,
+            kind = it.kind,
+            icon = it.icon,
             tempC = it.tempC,
             humidity = it.humidity,
             windKmh = it.windKmh,
