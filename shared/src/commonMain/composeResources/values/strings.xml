@@ -35,6 +35,8 @@
     <string name="susp_empty_active">No active suspensions</string>
     <string name="susp_empty_past">No past suspensions</string>
     <string name="susp_empty_subtitle">Nothing on record.</string>
+    <string name="susp_reported_active_subtitle">RaceOS reports the active restriction but does not provide its details.</string>
+    <string name="susp_reported_past_subtitle">RaceOS reports the count but does not provide the old suspension details.</string>
     <string name="susp_type">Type %1$d</string>
     <string name="susp_reason_redacted">Reason withheld.</string>
     <string name="susp_reason_none">No reason provided.</string>

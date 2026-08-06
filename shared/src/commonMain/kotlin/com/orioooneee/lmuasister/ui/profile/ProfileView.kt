@@ -798,36 +798,41 @@ private fun SuspensionFlags(
     onOpen: ((active: Boolean) -> Unit)?,
     trailing: @Composable () -> Unit = {},
 ) {
-    val all = profile.suspensions
-    val active = all.filter { it.active }
-    val past = all.filter { !it.active }
+    val summary = suspensionSummary(profile)
 
     // One row: suspension status first, then any [trailing] badges (wrap if they don't fit).
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (all.isEmpty()) {
-            // No detailed list (e.g. legacy cache): keep the simple count-based status.
-            if (profile.activeSuspensions > 0) {
+        if (!summary.hasList) {
+            // RaceOS may expose only enforcement counters, without the detailed rows.
+            if (summary.activeCount > 0) {
                 ClickablePill(
-                    stringResource(Res.string.susp_active_count, profile.activeSuspensions),
+                    stringResource(Res.string.susp_active_count, summary.activeCount),
                     onClick = onOpen?.let { open -> { open(true) } },
                 )
-            } else {
+            } else if (summary.pastCount == 0) {
                 ClickablePill(stringResource(Res.string.susp_license_clean), PosGreen, onClick = null)
             }
+            if (summary.pastCount > 0) {
+                ClickablePill(
+                    stringResource(Res.string.susp_past_count, summary.pastCount),
+                    FlagGray,
+                    onClick = onOpen?.let { open -> { open(false) } },
+                )
+            }
         } else {
-            if (active.isNotEmpty()) {
-                val label = if (active.any { it.permanent }) stringResource(Res.string.susp_banned)
-                else stringResource(Res.string.susp_active_count, active.size)
+            if (summary.activeCount > 0) {
+                val label = if (summary.banned) stringResource(Res.string.susp_banned)
+                else stringResource(Res.string.susp_active_count, summary.activeCount)
                 ClickablePill(label, NegRed, onClick = onOpen?.let { open -> { open(true) } })
             } else {
                 ClickablePill(stringResource(Res.string.susp_no_active), PosGreen, onClick = null)
             }
-            if (past.isNotEmpty()) {
+            if (summary.pastCount > 0) {
                 ClickablePill(
-                    stringResource(Res.string.susp_past_count, past.size),
+                    stringResource(Res.string.susp_past_count, summary.pastCount),
                     FlagGray,
                     onClick = onOpen?.let { open -> { open(false) } },
                 )
@@ -835,6 +840,26 @@ private fun SuspensionFlags(
         }
         trailing()
     }
+}
+
+internal data class SuspensionSummary(
+    val hasList: Boolean,
+    val activeCount: Int,
+    val pastCount: Int,
+    val banned: Boolean,
+)
+
+internal fun suspensionSummary(profile: SteamProfile): SuspensionSummary {
+    val rows = profile.suspensions
+    val activeRows = rows.filter { it.active }
+    val activeCount = maxOf(activeRows.size, profile.activeSuspensions)
+    val totalCount = maxOf(rows.size, profile.totalSuspensions, activeCount)
+    return SuspensionSummary(
+        hasList = rows.isNotEmpty(),
+        activeCount = activeCount,
+        pastCount = (totalCount - activeCount).coerceAtLeast(0),
+        banned = activeRows.any { it.permanent },
+    )
 }
 
 @Composable

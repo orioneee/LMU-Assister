@@ -6,5 +6,7 @@
 	<true/>
 	<key>CFBundleDisplayName</key>
 	<string>LMU Assister</string>
+	<key>LMUPushNotificationsEnabled</key>
+	<string>$(PUSH_NOTIFICATIONS_ENABLED)</string>
 </dict>
 </plist>

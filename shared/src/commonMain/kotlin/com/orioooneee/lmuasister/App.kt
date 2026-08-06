@@ -3,6 +3,7 @@ package com.orioooneee.lmuasister
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import coil3.ImageLoader
+import coil3.annotation.ExperimentalCoilApi
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import com.orioooneee.lmuasister.config.BuildConfig
@@ -11,17 +12,19 @@ import com.orioooneee.lmuasister.data.mock.mockModule
 import com.orioooneee.lmuasister.data.steam.steamModule
 import com.orioooneee.lmuasister.di.appModule
 import com.orioooneee.lmuasister.di.platformModules
+import com.orioooneee.lmuasister.network.platformHttpClient
 import com.orioooneee.lmuasister.ui.MainShell
 import com.orioooneee.lmuasister.ui.theme.LmuTheme
 import org.koin.compose.KoinApplication
 import org.koin.dsl.koinConfiguration
 
 @Composable
+@OptIn(ExperimentalCoilApi::class)
 fun App(startupEffects: @Composable () -> Unit = {}) {
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
             .components {
-                add(KtorNetworkFetcherFactory())
+                add(KtorNetworkFetcherFactory(httpClient = platformHttpClient()))
                 add(SvgCssInlineDecoder.Factory())
             }
             .build()

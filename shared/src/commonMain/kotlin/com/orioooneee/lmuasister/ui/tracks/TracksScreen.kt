@@ -144,7 +144,11 @@ private fun TrackCardSkeleton() {
 /** Display title: full_name carries the layout (e.g. "Sebring School Circuit"); the trailing
  *  series tag (" - WEC"/" - ELMS"…) is dropped since dedup keeps one config per layout. */
 internal fun trackTitle(t: TrackFullDto): String =
-    (t.fullName?.takeIf { it.isNotBlank() } ?: t.name ?: t.eventName ?: "-")
+    (t.displayName?.takeIf { it.isNotBlank() }
+        ?: t.fullName?.takeIf { it.isNotBlank() }
+        ?: t.name
+        ?: t.eventName
+        ?: "-")
         .replace(Regex(" - (WEC|ELMS|IMSA|GT)$"), "")
         .trim()
 

@@ -75,6 +75,10 @@ data class TrackInfo(
     val backgroundUrl: String? = null,
     /** ISO-3166 alpha-2 country code (for the flag), when the backend sends it. */
     val countryCode: String? = null,
+    /** Curated client-facing track name; takes precedence over source-provided names. */
+    val displayName: String? = null,
+    /** Original official/source name retained for the secondary detail row. */
+    val officialName: String? = null,
 )
 
 /** One car from the v3 roster (deduped to distinct models for the carousel). */

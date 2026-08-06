@@ -144,6 +144,8 @@ data class SettingsDto(
 @Serializable
 data class TrackDto(
     val name: String = "",
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("official_name") val officialName: String? = null,
     @SerialName("short_name") val shortName: String = "",
     @SerialName("simple_name") val simpleName: String? = null,
     val town: String? = null,

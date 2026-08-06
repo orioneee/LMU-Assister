@@ -154,6 +154,7 @@ import lmuassister.shared.generated.resources.length_km
 import lmuassister.shared.generated.resources.next_start_times
 import lmuassister.shared.generated.resources.no
 import lmuassister.shared.generated.resources.no_lap_times
+import lmuassister.shared.generated.resources.retry
 import lmuassister.shared.generated.resources.session_practice
 import lmuassister.shared.generated.resources.session_qualifying
 import lmuassister.shared.generated.resources.session_race
@@ -192,6 +193,12 @@ import lmuassister.shared.generated.resources.yes
 import lmuassister.shared.generated.resources.your_position
 import lmuassister.shared.generated.resources.your_position_none
 
+private sealed interface AsyncPanelState<out T> {
+    data object Loading : AsyncPanelState<Nothing>
+    data class Ready<T>(val data: T) : AsyncPanelState<T>
+    data class Error(val message: String) : AsyncPanelState<Nothing>
+}
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun RaceDetailsScreen(
@@ -212,25 +219,45 @@ fun RaceDetailsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     var showNotificationSheet by remember { mutableStateOf(false) }
+    var leaderboardsLoadKey by remember(race.id) { mutableStateOf(0) }
+    var hotlapsLoadKey by remember(race.id) { mutableStateOf(0) }
     // Leaderboard (fast) and hot-laps (async build) load in parallel — each resolves
     // its own skeleton independently. Offline-first: paint cached (memory/disk) instantly,
-    // then refresh from the network. null = nothing cached yet → skeleton.
-    val leaderboards by produceState<RaceLeaderboards?>(
-        if (race.leaderboardId != null) repo.peekLeaderboards(race.id) else RaceLeaderboards.EMPTY,
+    // then refresh from the network. A terminal failure gets an explicit retry state.
+    val leaderboardsState by produceState<AsyncPanelState<RaceLeaderboards>>(
+        initialValue = when {
+            race.leaderboardId == null -> AsyncPanelState.Ready(RaceLeaderboards.EMPTY)
+            else -> repo.peekLeaderboards(race.id)?.let { AsyncPanelState.Ready(it) } ?: AsyncPanelState.Loading
+        },
         race.id,
+        leaderboardsLoadKey,
     ) {
         if (race.leaderboardId == null) {
-            value = RaceLeaderboards.EMPTY
+            value = AsyncPanelState.Ready(RaceLeaderboards.EMPTY)
             return@produceState
         }
-        if (value == null) repo.cachedLeaderboards(race.id)?.let { value = it }
-        val fresh = withTimeoutOrNull(LEADERBOARDS_TIMEOUT_MS) { repo.leaderboards(race.id).getOrNull() }
-        if (fresh != null) value = fresh else if (value == null) value = RaceLeaderboards.EMPTY
+        repo.cachedLeaderboards(race.id)?.let { value = AsyncPanelState.Ready(it) }
+        val response = withTimeoutOrNull(LEADERBOARDS_TIMEOUT_MS) { repo.leaderboards(race.id) }
+        when {
+            response != null && response.isSuccess -> value = AsyncPanelState.Ready(response.getOrThrow())
+            value !is AsyncPanelState.Ready<*> -> {
+                value = AsyncPanelState.Error("Could not load fastest laps right now.")
+            }
+        }
     }
-    val hotlaps by produceState<List<Hotlap>?>(repo.peekHotlaps(race.id), race.id) {
-        if (value == null) repo.cachedHotlaps(race.id)?.let { value = it }
-        val fresh = repo.hotlaps(race.id).getOrNull()
-        if (fresh != null) value = fresh else if (value == null) value = emptyList()
+    val hotlapsState by produceState<AsyncPanelState<List<Hotlap>>>(
+        initialValue = repo.peekHotlaps(race.id)?.let { AsyncPanelState.Ready(it) } ?: AsyncPanelState.Loading,
+        race.id,
+        hotlapsLoadKey,
+    ) {
+        repo.cachedHotlaps(race.id)?.let { value = AsyncPanelState.Ready(it) }
+        val response = repo.hotlaps(race.id)
+        when {
+            response.isSuccess -> value = AsyncPanelState.Ready(response.getOrThrow())
+            value !is AsyncPanelState.Ready<*> -> {
+                value = AsyncPanelState.Error("Could not load hot laps right now.")
+            }
+        }
     }
     // Exact livery name → physical car model. The schedule still keeps every allowed
     // livery, but the UI collapses identical models and uses the first livery's artwork.
@@ -316,24 +343,28 @@ fun RaceDetailsScreen(
 
             if (race.leaderboardId != null) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    val lbs = leaderboards
-                    if (lbs == null) LeaderboardSkeletonCard()
-                    else LeaderboardWithTopCars(
-                        lbs = lbs,
-                        raceId = race.id,
-                        raceClasses = race.carClasses,
-                        raceTitle = race.title,
-                        onOpenFull = onOpenLeaderboard,
-                    )
+                    when (val state = leaderboardsState) {
+                        AsyncPanelState.Loading -> LeaderboardSkeletonCard()
+                        is AsyncPanelState.Error -> Card(stringResource(Res.string.fastest_laps)) {
+                            AsyncErrorBody(state.message) { leaderboardsLoadKey += 1 }
+                        }
+                        is AsyncPanelState.Ready -> LeaderboardWithTopCars(
+                            lbs = state.data,
+                            raceId = race.id,
+                            raceClasses = race.carClasses,
+                            raceTitle = race.title,
+                            onOpenFull = onOpenLeaderboard,
+                        )
+                    }
                 }
             }
             race.track?.let {
                 item {
                     TrackCard(
                         it,
-                        hotlaps.orEmpty(),
-                        hotlapsLoading = hotlaps == null,
+                        hotlapsState = hotlapsState,
                         hotlapsSkeletonCount = (race.carClasses.size * 2).coerceAtLeast(2),
+                        onRetryHotlaps = { hotlapsLoadKey += 1 },
                     )
                 }
             }
@@ -910,15 +941,15 @@ private fun NotificationChannelCard(
     }
 }
 
-private val NOTIFICATION_MINUTE_PRESETS = listOf(5, 10, 15, 20, 30, 60)
+private val NOTIFICATION_MINUTE_PRESETS = listOf(1, 5, 10, 15, 20, 30, 60)
 
-private const val MIN_NOTIFICATION_LEAD_MINUTES = 10
+internal const val MIN_NOTIFICATION_LEAD_MINUTES = 1
 
-private fun notificationTimingError(notificationTime: Instant?, now: Instant): String? {
+internal fun notificationTimingError(notificationTime: Instant?, now: Instant): String? {
     if (notificationTime == null) return null
     val minAllowedTime = now + MIN_NOTIFICATION_LEAD_MINUTES.minutes
     return if (notificationTime < minAllowedTime) {
-        "Pick a later start or reduce the reminder offset. Notifications need at least 10 minutes of lead time."
+        "Pick a later start or reduce the reminder offset. Notifications need at least 1 minute of lead time."
     } else {
         null
     }
@@ -1002,7 +1033,8 @@ private fun Throwable?.userNotificationMessage(): String = when (val error = thi
 }
 
 private fun Race.notificationEventName(minutes: Int): String {
-    val trackName = track?.simpleName?.takeIf { it.isNotBlank() }
+    val trackName = track?.displayName?.takeIf { it.isNotBlank() }
+        ?: track?.simpleName?.takeIf { it.isNotBlank() }
         ?: track?.name?.takeIf { it.isNotBlank() }
         ?: circuit
     return "$trackName - $title Starts in $minutes minutes"
@@ -1018,9 +1050,9 @@ private fun Int.twoDigits(): String = toString().padStart(2, '0')
 @Composable
 private fun TrackCard(
     track: TrackInfo,
-    hotlaps: List<Hotlap> = emptyList(),
-    hotlapsLoading: Boolean = false,
+    hotlapsState: AsyncPanelState<List<Hotlap>>,
     hotlapsSkeletonCount: Int = 6,
+    onRetryHotlaps: () -> Unit,
 ) {
     val flag = track.countryCode?.let { flagUrlFromCode(it) } ?: track.country?.let { flagUrl(it) }
     Card {
@@ -1030,8 +1062,11 @@ private fun TrackCard(
                 modifier = Modifier.clip(MaterialTheme.shapes.medium),
                 height = 170.dp, emblemHeight = 30.dp, flagSize = 24.dp,
             )
-            val officialName = track.name.takeIf { it.isNotBlank() }
-            val primaryName = track.simpleName?.takeIf { it.isNotBlank() } ?: officialName
+            val officialName = track.officialName?.takeIf { it.isNotBlank() }
+                ?: track.name.takeIf { it.isNotBlank() }
+            val primaryName = track.displayName?.takeIf { it.isNotBlank() }
+                ?: track.simpleName?.takeIf { it.isNotBlank() }
+                ?: officialName
             DetailRows(
                 listOfNotNull(
                     primaryName?.let { stringResource(Res.string.track_name) to it },
@@ -1042,10 +1077,44 @@ private fun TrackCard(
                     track.numTurns?.let { stringResource(Res.string.track_turns) to it.toString() },
                 ),
             )
-            when {
-                hotlapsLoading -> HotlapsSkeleton(hotlapsSkeletonCount)
-                hotlaps.isNotEmpty() -> HotlapsFlow(hotlaps)
+            when (hotlapsState) {
+                AsyncPanelState.Loading -> HotlapsSkeleton(hotlapsSkeletonCount)
+                is AsyncPanelState.Error -> {
+                    Text(
+                        stringResource(Res.string.hotlaps),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextLow,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    AsyncErrorBody(hotlapsState.message, onRetryHotlaps)
+                }
+                is AsyncPanelState.Ready -> if (hotlapsState.data.isNotEmpty()) {
+                    HotlapsFlow(hotlapsState.data)
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun AsyncErrorBody(message: String, onRetry: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextLow,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onRetry) {
+            Text(
+                stringResource(Res.string.retry),
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+            )
         }
     }
 }

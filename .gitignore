@@ -32,6 +32,7 @@ androidApp/google-services.json
 iosApp/iosApp/GoogleService-Info.plist
 google-services.json
 GoogleService-Info.plist
+iosApp/Configuration/PushNotifications.local.xcconfig
 
 # Android signed-release output (not under build/)
 **/release/

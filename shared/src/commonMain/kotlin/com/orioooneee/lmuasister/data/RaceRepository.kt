@@ -489,6 +489,8 @@ private fun TrackDto.toModel(): TrackInfo = TrackInfo(
     cardUrl = cover,
     backgroundUrl = background,
     countryCode = countryCode,
+    displayName = displayName,
+    officialName = officialName,
 )
 
 private fun WeatherDto.toModel(): RaceWeather? = RaceWeather(

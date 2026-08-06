@@ -46,6 +46,10 @@ import lmuassister.shared.generated.resources.susp_issued
 import lmuassister.shared.generated.resources.susp_permanent_note
 import lmuassister.shared.generated.resources.susp_reason_none
 import lmuassister.shared.generated.resources.susp_reason_redacted
+import lmuassister.shared.generated.resources.susp_active_count
+import lmuassister.shared.generated.resources.susp_past_count
+import lmuassister.shared.generated.resources.susp_reported_active_subtitle
+import lmuassister.shared.generated.resources.susp_reported_past_subtitle
 import lmuassister.shared.generated.resources.susp_status_active
 import lmuassister.shared.generated.resources.susp_status_expired
 import lmuassister.shared.generated.resources.susp_status_permanent
@@ -71,6 +75,9 @@ fun SuspensionsScreen(
     val profile = (state as? SteamLoginUiState.SignedIn)?.backend
         ?.let { it as? BackendState.Ok }?.profile
     val suspensions = profile?.suspensions.orEmpty().filter { it.active == active }
+    val reportedCount = profile?.let(::suspensionSummary)?.let {
+        if (active) it.activeCount else it.pastCount
+    } ?: 0
 
     Column(Modifier.fillMaxSize().background(Carbon)) {
         Row(
@@ -91,7 +98,7 @@ fun SuspensionsScreen(
         }
 
         if (suspensions.isEmpty()) {
-            EmptyState(active)
+            EmptyState(active, reportedCount)
             return@Column
         }
 
@@ -106,17 +113,36 @@ fun SuspensionsScreen(
 }
 
 @Composable
-private fun EmptyState(active: Boolean) {
+private fun EmptyState(active: Boolean, reportedCount: Int) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("OK", style = MaterialTheme.typography.displaySmall, color = PosGreen, fontWeight = FontWeight.Black)
+            if (reportedCount == 0) {
+                Text("OK", style = MaterialTheme.typography.displaySmall, color = PosGreen, fontWeight = FontWeight.Black)
+            }
             Text(
-                stringResource(if (active) Res.string.susp_empty_active else Res.string.susp_empty_past),
+                if (reportedCount > 0) {
+                    stringResource(
+                        if (active) Res.string.susp_active_count else Res.string.susp_past_count,
+                        reportedCount,
+                    )
+                } else {
+                    stringResource(if (active) Res.string.susp_empty_active else Res.string.susp_empty_past)
+                },
                 style = MaterialTheme.typography.titleMedium,
                 color = TextHigh,
                 fontWeight = FontWeight.Bold,
             )
-            Text(stringResource(Res.string.susp_empty_subtitle), style = MaterialTheme.typography.bodySmall, color = TextMed)
+            Text(
+                stringResource(
+                    when {
+                        reportedCount == 0 -> Res.string.susp_empty_subtitle
+                        active -> Res.string.susp_reported_active_subtitle
+                        else -> Res.string.susp_reported_past_subtitle
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMed,
+            )
         }
     }
 }

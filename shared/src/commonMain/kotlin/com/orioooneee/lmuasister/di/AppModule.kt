@@ -11,13 +11,13 @@ import com.orioooneee.lmuasister.analytics.installPerformanceMonitoring
 import com.orioooneee.lmuasister.featureflags.FeatureFlagsRepository
 import com.orioooneee.lmuasister.featureflags.platformFeatureFlagRemoteSource
 import com.orioooneee.lmuasister.data.remote.ApiBaseUrlProvider
+import com.orioooneee.lmuasister.network.platformHttpClient
 import com.orioooneee.lmuasister.security.SecurityGate
 import com.orioooneee.lmuasister.security.securityGatePlugin
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
 import com.orioooneee.lmuasister.ui.profile.SteamAuthRunner
 import com.orioooneee.lmuasister.ui.profile.SteamLoginViewModel
 import com.orioooneee.lmuasister.ui.publicusers.PublicUsersViewModel
-import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.request.header
@@ -57,7 +57,7 @@ val appModule = module {
         val apiBaseUrlProvider = get<ApiBaseUrlProvider>()
         // No real backend configured (or backend.mock=true) → serve bundled mock data.
         if (BuildConfig.USE_MOCK) mockHttpClient()
-        else HttpClient {
+        else platformHttpClient {
             install(securityGatePlugin())
             install(appTokenAuthPlugin(tokenHolder, apiBaseUrlProvider))
             installPerformanceMonitoring()

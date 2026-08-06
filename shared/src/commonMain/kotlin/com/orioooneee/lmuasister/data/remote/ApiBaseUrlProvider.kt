@@ -2,7 +2,7 @@ package com.orioooneee.lmuasister.data.remote
 
 import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.cache.LocalCache
-import io.ktor.client.HttpClient
+import com.orioooneee.lmuasister.network.platformHttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -26,7 +26,7 @@ class ApiBaseUrlProvider(
     private val cacheKey = "bootstrap.api_base_url"
     private val mutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val bootstrapClient = HttpClient {
+    private val bootstrapClient = platformHttpClient {
         install(HttpTimeout) {
             requestTimeoutMillis = 5_000
             connectTimeoutMillis = 5_000

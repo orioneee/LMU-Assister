@@ -38,6 +38,7 @@ data class SteamProfile(
     @SerialName("total_suspensions") val totalSuspensions: Int = 0,
     // Full ban/warning history (newest first); each carries its reason + window + active flag.
     val suspensions: List<SuspensionDto> = emptyList(),
+    @SerialName("suspensions_detail_available") val suspensionsDetailAvailable: Boolean = false,
     @SerialName("current_game_version") val currentGameVersion: GameVersionDto? = null,
     @SerialName("recent_races") val recentRaces: List<RecentRaceDto> = emptyList(),
     // Career stats (profile_get_stats) — totals + per-class/manufacturer breakdown.
@@ -256,6 +257,9 @@ data class RecentRaceDto(
     @SerialName("finish_status") val finishStatus: String? = null,
     @SerialName("sr_change") val srChange: Double? = null,
     @SerialName("dr_change") val drChange: Double? = null,
+    @SerialName("safety_rank_adjustment") val safetyRankAdjustment: Int? = null,
+    @SerialName("driver_rank_adjustment") val driverRankAdjustment: Int? = null,
+    @SerialName("joker_used") val jokerUsed: Boolean? = null,
     val sessions: RaceSessionsDto? = null,
     @SerialName("car_id") val carId: String? = null,
     @SerialName("car_image_url") val carImageUrl: String? = null,
@@ -317,6 +321,9 @@ data class RaceDetailDto(
     @SerialName("finish_status") val finishStatus: String? = null,
     @SerialName("sr_change") val srChange: Double? = null,
     @SerialName("dr_change") val drChange: Double? = null,
+    @SerialName("safety_rank_adjustment") val safetyRankAdjustment: Int? = null,
+    @SerialName("driver_rank_adjustment") val driverRankAdjustment: Int? = null,
+    @SerialName("joker_used") val jokerUsed: Boolean? = null,
     // Why SR/DR moved this race — one entry per component (clean racing, contact, off-track…).
     @SerialName("sr_reasons") val srReasons: List<ReasonDto> = emptyList(),
     @SerialName("dr_reasons") val drReasons: List<ReasonDto> = emptyList(),
@@ -379,6 +386,9 @@ data class TeamMemberDto(
     @SerialName("car_class") val carClass: String? = null,
     @SerialName("sr_change") val srChange: Double? = null,
     @SerialName("dr_change") val drChange: Double? = null,
+    @SerialName("safety_rank_adjustment") val safetyRankAdjustment: Int? = null,
+    @SerialName("driver_rank_adjustment") val driverRankAdjustment: Int? = null,
+    @SerialName("joker_used") val jokerUsed: Boolean? = null,
     @SerialName("sr_reasons") val srReasons: List<ReasonDto> = emptyList(),
     @SerialName("dr_reasons") val drReasons: List<ReasonDto> = emptyList(),
     @SerialName("driver_rating") val driverRating: RatingDto? = null,
@@ -418,6 +428,9 @@ data class ClassificationRowDto(
     @SerialName("interval_laps") val intervalLaps: Int = 0,
     @SerialName("sr_change") val srChange: Double? = null,
     @SerialName("dr_change") val drChange: Double? = null,
+    @SerialName("safety_rank_adjustment") val safetyRankAdjustment: Int? = null,
+    @SerialName("driver_rank_adjustment") val driverRankAdjustment: Int? = null,
+    @SerialName("joker_used") val jokerUsed: Boolean? = null,
     // This driver's per-lap progress (carries class_position per lap, unlike the top-level copy).
     @SerialName("lap_progress") val lapProgress: List<LapDto> = emptyList(),
     // Per-driver absolute ratings (driver_rating / safety_rating), same shape as the profile owner's.

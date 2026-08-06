@@ -49,6 +49,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -92,6 +94,7 @@ import com.orioooneee.lmuasister.ui.theme.TextLow
 import com.orioooneee.lmuasister.ui.theme.TextMed
 import com.orioooneee.lmuasister.ui.util.formatIsoDateTime
 import com.orioooneee.lmuasister.ui.util.formatLap
+import kotlin.math.abs
 import kotlin.math.roundToLong
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -427,7 +430,9 @@ private fun TrackCard(t: TrackDto) {
             modifier = Modifier.clip(RoundedCornerShape(12.dp)),
             height = 170.dp, emblemHeight = 28.dp, flagSize = 24.dp,
         )
-        val name = t.simpleName?.takeIf { it.isNotBlank() } ?: t.name.takeIf { it.isNotBlank() }
+        val name = t.displayName?.takeIf { it.isNotBlank() }
+            ?: t.simpleName?.takeIf { it.isNotBlank() }
+            ?: t.name.takeIf { it.isNotBlank() }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             name?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold) }
             FlowRow(
@@ -578,8 +583,8 @@ private fun SummaryCard(d: RaceDetailDto) {
             start?.takeIf { it > 0 }?.let { Stat("Start", "P$it") }
             finish?.takeIf { it > 0 }?.let { Stat("Finish", "P$it" + (finishSize?.let { s -> " / $s" } ?: "")) }
             gainLost(start, finish)?.let { (txt, color) -> StatColored("+/-", txt, color) }
-            DeltaStat("DR", d.drChange)
-            DeltaStat("SR", d.srChange)
+            RatingChangeStat("DR", d.drChange, d.driverRankAdjustment)
+            RatingChangeStat("SR", d.srChange, d.safetyRankAdjustment)
         }
         // Average pace over valid laps (skips the warm-up laps and pit laps), with the gap to
         // the best lap. The number of warm-up laps to drop is adjustable (default 1).
@@ -893,21 +898,30 @@ private fun RatingBreakdownSheet(d: RaceDetailDto, onDismiss: () -> Unit) {
                 color = TextHigh,
                 fontWeight = FontWeight.Bold,
             )
-            BreakdownSection("SR", d.srChange, d.srReasons)
-            BreakdownSection("DR", d.drChange, d.drReasons)
+            BreakdownSection("SR", d.srChange, d.safetyRankAdjustment, d.srReasons)
+            BreakdownSection("DR", d.drChange, d.driverRankAdjustment, d.drReasons)
         }
     }
 }
 
 @Composable
-private fun BreakdownSection(label: String, total: Double?, reasons: List<ReasonDto>) {
-    if (reasons.isEmpty() && total == null) return
+private fun BreakdownSection(
+    label: String,
+    total: Double?,
+    rankAdjustment: Int?,
+    reasons: List<ReasonDto>,
+) {
+    if (reasons.isEmpty() && total == null && rankAdjustment.isNullOrZero()) return
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(label, style = MaterialTheme.typography.titleSmall, color = TextHigh, fontWeight = FontWeight.Bold)
-            total?.let {
-                val color = if (it > 0) PosGreen else if (it < 0) NegRed else TextMed
-                Text(signedOneDecimal(it), style = MaterialTheme.typography.titleSmall, color = color, fontWeight = FontWeight.Bold)
+            if (total != null) {
+                val color = if (total > 0) PosGreen else if (total < 0) NegRed else TextMed
+                Text(signedOneDecimal(total), style = MaterialTheme.typography.titleSmall, color = color, fontWeight = FontWeight.Bold)
+            } else {
+                rankAdjustment?.takeIf { it != 0 }?.let {
+                    RankAdjustmentIndicator(it, compact = false)
+                }
             }
         }
         if (reasons.isEmpty()) {
@@ -1089,13 +1103,20 @@ private fun StatColored(label: String, value: String, color: Color) {
 }
 
 @Composable
-private fun DeltaStat(label: String, delta: Double?) {
-    if (delta == null) return
-    val color = if (delta > 0) PosGreen else if (delta < 0) NegRed else TextMed
-    val prefix = if (delta > 0) "+ " else if (delta < 0) "- " else ""
-    val abs = if (delta < 0) -delta else delta
-    val r = (abs * 10).toLong()
-    StatColored(label, "$prefix${r / 10}.${r % 10}", color)
+private fun RatingChangeStat(label: String, delta: Double?, rankAdjustment: Int?) {
+    if (delta != null) {
+        val color = if (delta > 0) PosGreen else if (delta < 0) NegRed else TextMed
+        val prefix = if (delta > 0) "+ " else if (delta < 0) "- " else ""
+        val magnitude = abs(delta)
+        val rounded = (magnitude * 10).toLong()
+        StatColored(label, "$prefix${rounded / 10}.${rounded % 10}", color)
+        return
+    }
+    val adjustment = rankAdjustment?.takeIf { it != 0 } ?: return
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = TextLow)
+        RankAdjustmentIndicator(adjustment, compact = false)
+    }
 }
 
 
@@ -1263,6 +1284,7 @@ private fun ClassificationSummaryLine(
             style = MaterialTheme.typography.labelMedium,
             color = posColor,
             fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
             maxLines = 1,
             modifier = Modifier.width(18.dp),
         )
@@ -1293,17 +1315,25 @@ private fun ClassificationSummaryLine(
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
             ) {
                 r.carClass?.takeIf { it.isNotBlank() }?.let { ClassMiniBadge(it) }
                 // Position within the driver's own class (the leading number is the overall position).
                 r.classPosition?.takeIf { it > 0 }?.let { ClassPosBadge(it, r.carClass) }
                 if (teamMemberCount != null) {
                     TeamToggle(teamMemberCount, teamExpanded)
-                    if (showRatingDeltas) RatingDeltaColumn(r.teamDrChange, r.teamSrChange)
+                    if (showRatingDeltas) RatingDeltaRow(r.teamDrChange, r.teamSrChange)
                 } else {
                     r.driverRating?.let { RatingMiniBadge("DR", it) }
                     r.safetyRating?.let { RatingMiniBadge("SR", it) }
-                    if (showRatingDeltas) RatingDeltaColumn(r.drChange, r.srChange)
+                    if (showRatingDeltas) {
+                        RatingDeltaRow(
+                            r.drChange,
+                            r.srChange,
+                            r.driverRankAdjustment,
+                            r.safetyRankAdjustment,
+                        )
+                    }
                 }
             }
             // Best-lap sector splits, when the backend provides them.
@@ -1456,10 +1486,18 @@ private fun TeamMemberLine(
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
             ) {
                 member.driverRating?.let { RatingMiniBadge("DR", it) }
                 member.safetyRating?.let { RatingMiniBadge("SR", it) }
-                if (showRatingDeltas) RatingDeltaColumn(member.drChange, member.srChange)
+                if (showRatingDeltas) {
+                    RatingDeltaRow(
+                        member.drChange,
+                        member.srChange,
+                        member.driverRankAdjustment,
+                        member.safetyRankAdjustment,
+                    )
+                }
             }
         }
     }
@@ -1526,42 +1564,83 @@ private fun RatingMiniBadge(label: String, rating: RatingDto) {
 }
 
 @Composable
-private fun RatingDeltaColumn(drChange: Double?, srChange: Double?) {
-    if (drChange == null && srChange == null) return
-    Column(
-        horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(0.dp),
+private fun RatingDeltaRow(
+    drChange: Double?,
+    srChange: Double?,
+    driverRankAdjustment: Int? = null,
+    safetyRankAdjustment: Int? = null,
+) {
+    if (
+        drChange == null && srChange == null &&
+        driverRankAdjustment.isNullOrZero() && safetyRankAdjustment.isNullOrZero()
+    ) return
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        RatingDeltaLine("DR:", drChange)
-        RatingDeltaLine("SR:", srChange)
+        RatingDeltaLine("DR:", drChange, driverRankAdjustment)
+        RatingDeltaLine("SR:", srChange, safetyRankAdjustment)
     }
 }
 
 @Composable
-private fun RatingDeltaLine(label: String, delta: Double?) {
-    if (delta == null) return
-    val color = when {
-        delta > 0 -> PosGreen
-        delta < 0 -> NegRed
-        else -> TextMed
-    }
-    val value = when {
-        delta > 0 -> "+ ${formatRatingDelta(delta)}"
-        delta < 0 -> "- ${formatRatingDelta(delta)}"
-        else -> formatRatingDelta(delta)
-    }
+private fun RatingDeltaLine(label: String, delta: Double?, rankAdjustment: Int?) {
+    if (delta == null && rankAdjustment.isNullOrZero()) return
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         val style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, lineHeight = 9.sp)
         Text(label, style = style, color = TextLow, maxLines = 1)
-        Text(
-            value,
-            style = style,
-            color = color,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-        )
+        if (delta != null) {
+            val color = when {
+                delta > 0 -> PosGreen
+                delta < 0 -> NegRed
+                else -> TextMed
+            }
+            val value = when {
+                delta > 0 -> "+ ${formatRatingDelta(delta)}"
+                delta < 0 -> "- ${formatRatingDelta(delta)}"
+                else -> formatRatingDelta(delta)
+            }
+            Text(
+                value,
+                style = style,
+                color = color,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+        } else {
+            RankAdjustmentIndicator(rankAdjustment!!, compact = true)
+        }
     }
 }
+
+@Composable
+private fun RankAdjustmentIndicator(adjustment: Int, compact: Boolean) {
+    if (adjustment == 0) return
+    val count = abs(adjustment).coerceIn(1, 4)
+    val color = if (adjustment > 0) PosGreen else NegRed
+    val direction = if (adjustment > 0) "up" else "down"
+    Column(
+        modifier = Modifier
+            .width(if (compact) 24.dp else 34.dp)
+            .then(if (adjustment < 0) Modifier.rotate(180f) else Modifier)
+            .semantics { contentDescription = "$count rank ${if (count == 1) "step" else "steps"} $direction" },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(if (compact) (-5).dp else (-7).dp),
+    ) {
+        repeat(count) {
+            Text(
+                "⌃",
+                color = color,
+                fontSize = if (compact) 10.sp else 17.sp,
+                lineHeight = if (compact) 10.sp else 17.sp,
+                fontWeight = FontWeight.Normal,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+private fun Int?.isNullOrZero(): Boolean = this == null || this == 0
 
 private fun formatRatingDelta(delta: Double): String {
     val abs = if (delta < 0) -delta else delta

@@ -13,6 +13,7 @@
 		845638E42FE734FF00AAD32F /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 845638E32FE734FF00AAD32F /* FirebaseCrashlytics */; };
 		845638E62FE734FF00AAD32F /* FirebasePerformance in Frameworks */ = {isa = PBXBuildFile; productRef = 845638E52FE734FF00AAD32F /* FirebasePerformance */; };
 		845638EA2FE734FF00AAD32F /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 845638E92FE734FF00AAD32F /* FirebaseRemoteConfig */; };
+		A81C3DE82FEA100100AAD32F /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = A81C3DE72FEA100100AAD32F /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +57,7 @@
 				845638EA2FE734FF00AAD32F /* FirebaseRemoteConfig in Frameworks */,
 				845638E22FE734FF00AAD32F /* FirebaseCore in Frameworks */,
 				845638E02FE734FF00AAD32F /* FirebaseAnalyticsCore in Frameworks */,
+				A81C3DE82FEA100100AAD32F /* FirebaseMessaging in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -106,6 +108,7 @@
 				845638E32FE734FF00AAD32F /* FirebaseCrashlytics */,
 				845638E52FE734FF00AAD32F /* FirebasePerformance */,
 				845638E92FE734FF00AAD32F /* FirebaseRemoteConfig */,
+				A81C3DE72FEA100100AAD32F /* FirebaseMessaging */,
 			);
 			productName = iosApp;
 			productReference = F06762B58571586B3CABB3EB /* Lmu assister.app */;
@@ -194,13 +197,14 @@
 		78033EAA0B840DA215111583 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = development;
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
-				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				DEVELOPMENT_TEAM = J4S9DXC7AF;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
@@ -209,11 +213,15 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				OTHER_LDFLAGS = "$(inherited) -ObjC";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.orioooneee.lmuasister;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -347,13 +355,14 @@
 		BCA13A94AC3E9860D369D630 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = production;
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
-				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				DEVELOPMENT_TEAM = J4S9DXC7AF;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
@@ -362,11 +371,15 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				OTHER_LDFLAGS = "$(inherited) -ObjC";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.orioooneee.lmuasister;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -438,6 +451,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 845638DC2FE734FF00AAD32F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseRemoteConfig;
+		};
+		A81C3DE72FEA100100AAD32F /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 845638DC2FE734FF00AAD32F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

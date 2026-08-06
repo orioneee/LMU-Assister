@@ -51,7 +51,9 @@ import lmuassister.shared.generated.resources.Res
 import lmuassister.shared.generated.resources.next_up
 import org.jetbrains.compose.resources.stringResource
 
-private fun Race.trackLabel(): String = track?.shortName?.takeIf { it.isNotBlank() } ?: circuit
+private fun Race.trackLabel(): String = track?.displayName?.takeIf { it.isNotBlank() }
+    ?: track?.shortName?.takeIf { it.isNotBlank() }
+    ?: circuit
 private fun Race.durationLabel(): String = if (raceLength > 0) "${raceLength}m" else ""
 private fun Race.scheduleCoverUrl(useTrackBackgroundCover: Boolean): String? =
     if (useTrackBackgroundCover) track?.backgroundUrl?.takeIf { it.isNotBlank() } ?: imageUrl else imageUrl

@@ -20,6 +20,8 @@ data class TrackFullDto(
     val code: String? = null,        // raw cmpName
     val base: String? = null,        // slug
     val name: String? = null,
+    val displayName: String? = null,
+    val officialName: String? = null,
     val eventName: String? = null,
     val grandPrix: String? = null,
     val fullName: String? = null,

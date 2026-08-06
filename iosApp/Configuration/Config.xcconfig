@@ -1,5 +1,13 @@
 TEAM_ID=
 
+// Personal Teams cannot sign the APNs entitlement. Keep push disabled by
+// default and opt in from the ignored PushNotifications.local.xcconfig when
+// building with a paid Apple Developer Program team.
+PUSH_NOTIFICATIONS_ENABLED=NO
+PUSH_NOTIFICATIONS_ENTITLEMENTS=
+#include? "PushNotifications.local.xcconfig"
+CODE_SIGN_ENTITLEMENTS=$(PUSH_NOTIFICATIONS_ENTITLEMENTS)
+
 PRODUCT_NAME=Lmu assister
 PRODUCT_BUNDLE_IDENTIFIER=com.orioooneee.lmuasister.Lmuassister$(TEAM_ID)
 

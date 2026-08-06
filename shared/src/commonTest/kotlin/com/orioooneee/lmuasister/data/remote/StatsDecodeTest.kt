@@ -39,4 +39,61 @@ class StatsDecodeTest {
         assertEquals(84, total?.dnfs)
         assertEquals(3, total?.fastestLaps)       // camelCase
     }
+
+    @Test
+    fun decodesRaceOsRankAdjustmentsAcrossRaceDetailRows() {
+        val json = """
+            {
+              "title": "Test race",
+              "driver_rank_adjustment": 2,
+              "safety_rank_adjustment": -1,
+              "joker_used": true,
+              "sessions": {
+                "race": {
+                  "classification": [
+                    {
+                      "driver_rank_adjustment": 3,
+                      "safety_rank_adjustment": -2,
+                      "joker_used": false,
+                      "team_members": [
+                        {
+                          "driver_rank_adjustment": 1,
+                          "safety_rank_adjustment": -4,
+                          "joker_used": true
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val detail = ProfileJson.decodeFromString<RaceDetailDto>(json)
+        val row = detail.sessions.getValue("race")!!.classification.single()
+        val member = row.teamMembers.single()
+        assertEquals(2, detail.driverRankAdjustment)
+        assertEquals(-1, detail.safetyRankAdjustment)
+        assertEquals(true, detail.jokerUsed)
+        assertEquals(3, row.driverRankAdjustment)
+        assertEquals(-2, row.safetyRankAdjustment)
+        assertEquals(false, row.jokerUsed)
+        assertEquals(1, member.driverRankAdjustment)
+        assertEquals(-4, member.safetyRankAdjustment)
+        assertEquals(true, member.jokerUsed)
+    }
+
+    @Test
+    fun decodesSuspensionDetailAvailabilityAndTrackDisplayName() {
+        val profile = ProfileJson.decodeFromString<SteamProfile>(
+            """{"uid":"abc","suspensions_detail_available":false}""",
+        )
+        val track = ProfileJson.decodeFromString<TrackDto>(
+            """{"name":"Official","display_name":"Daytona","official_name":"Daytona International Speedway"}""",
+        )
+
+        assertEquals(false, profile.suspensionsDetailAvailable)
+        assertEquals("Daytona", track.displayName)
+        assertEquals("Daytona International Speedway", track.officialName)
+    }
 }

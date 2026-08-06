@@ -1,0 +1,4 @@
+// Copy this file to PushNotifications.local.xcconfig when the selected team
+// belongs to the paid Apple Developer Program and the App ID has APNs enabled.
+PUSH_NOTIFICATIONS_ENABLED=YES
+PUSH_NOTIFICATIONS_ENTITLEMENTS=iosApp/iosApp.entitlements
