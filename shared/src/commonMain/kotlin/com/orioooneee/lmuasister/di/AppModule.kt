@@ -12,6 +12,8 @@ import com.orioooneee.lmuasister.featureflags.FeatureFlagsRepository
 import com.orioooneee.lmuasister.featureflags.platformFeatureFlagRemoteSource
 import com.orioooneee.lmuasister.data.remote.ApiBaseUrlProvider
 import com.orioooneee.lmuasister.network.platformHttpClient
+import com.orioooneee.lmuasister.remoteconfig.DemoCredentialsRepository
+import com.orioooneee.lmuasister.remoteconfig.platformDemoCredentialsRemoteSource
 import com.orioooneee.lmuasister.security.SecurityGate
 import com.orioooneee.lmuasister.security.securityGatePlugin
 import com.orioooneee.lmuasister.ui.ScheduleViewModel
@@ -74,6 +76,8 @@ val appModule = module {
     single { RaceRepository(get(), get()) }
     single { platformFeatureFlagRemoteSource() }
     single { FeatureFlagsRepository(get()) }
+    single { platformDemoCredentialsRemoteSource() }
+    single { DemoCredentialsRepository(get()) }
     single { SteamAuthRunner(get()) }
     viewModelOf(::ScheduleViewModel)
     viewModelOf(::PublicUsersViewModel)

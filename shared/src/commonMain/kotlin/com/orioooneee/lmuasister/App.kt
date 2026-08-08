@@ -7,6 +7,7 @@ import coil3.annotation.ExperimentalCoilApi
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import com.orioooneee.lmuasister.config.BuildConfig
+import com.orioooneee.lmuasister.data.image.createImageDiskCache
 import com.orioooneee.lmuasister.data.image.SvgCssInlineDecoder
 import com.orioooneee.lmuasister.data.mock.mockModule
 import com.orioooneee.lmuasister.data.steam.steamModule
@@ -23,6 +24,9 @@ import org.koin.dsl.koinConfiguration
 fun App(startupEffects: @Composable () -> Unit = {}) {
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
+            // Coil's multiplatform default cache lives in the system temporary directory.
+            // Use the app's persistent cache directory so track artwork survives restarts.
+            .diskCache { createImageDiskCache(context) }
             .components {
                 add(KtorNetworkFetcherFactory(httpClient = platformHttpClient()))
                 add(SvgCssInlineDecoder.Factory())

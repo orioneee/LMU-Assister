@@ -49,8 +49,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -83,6 +81,7 @@ import com.orioooneee.lmuasister.ui.components.classColorFor
 import com.orioooneee.lmuasister.ui.components.classDisplayLabel
 import com.orioooneee.lmuasister.ui.components.onBadgeText
 import com.orioooneee.lmuasister.ui.components.RankLight
+import com.orioooneee.lmuasister.ui.components.RankAdjustmentIcon
 import com.orioooneee.lmuasister.ui.details.CircleButton
 import com.orioooneee.lmuasister.ui.theme.Amber
 import com.orioooneee.lmuasister.ui.theme.Carbon
@@ -426,7 +425,7 @@ private fun TrackCard(t: TrackDto) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         TrackPreview(
-            backgroundUrl = bg, mapUrl = map, logoUrl = logo, flagUrl = flag,
+            backgroundUrl = bg, backgroundFallbackUrl = t.cover, mapUrl = map, logoUrl = logo, flagUrl = flag,
             modifier = Modifier.clip(RoundedCornerShape(12.dp)),
             height = 170.dp, emblemHeight = 28.dp, flagSize = 24.dp,
         )
@@ -920,7 +919,7 @@ private fun BreakdownSection(
                 Text(signedOneDecimal(total), style = MaterialTheme.typography.titleSmall, color = color, fontWeight = FontWeight.Bold)
             } else {
                 rankAdjustment?.takeIf { it != 0 }?.let {
-                    RankAdjustmentIndicator(it, compact = false)
+                    RankAdjustmentIcon(it, compact = false)
                 }
             }
         }
@@ -1115,7 +1114,7 @@ private fun RatingChangeStat(label: String, delta: Double?, rankAdjustment: Int?
     val adjustment = rankAdjustment?.takeIf { it != 0 } ?: return
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = TextLow)
-        RankAdjustmentIndicator(adjustment, compact = false)
+        RankAdjustmentIcon(adjustment, compact = false)
     }
 }
 
@@ -1608,34 +1607,7 @@ private fun RatingDeltaLine(label: String, delta: Double?, rankAdjustment: Int?)
                 maxLines = 1,
             )
         } else {
-            RankAdjustmentIndicator(rankAdjustment!!, compact = true)
-        }
-    }
-}
-
-@Composable
-private fun RankAdjustmentIndicator(adjustment: Int, compact: Boolean) {
-    if (adjustment == 0) return
-    val count = abs(adjustment).coerceIn(1, 4)
-    val color = if (adjustment > 0) PosGreen else NegRed
-    val direction = if (adjustment > 0) "up" else "down"
-    Column(
-        modifier = Modifier
-            .width(if (compact) 24.dp else 34.dp)
-            .then(if (adjustment < 0) Modifier.rotate(180f) else Modifier)
-            .semantics { contentDescription = "$count rank ${if (count == 1) "step" else "steps"} $direction" },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(if (compact) (-5).dp else (-7).dp),
-    ) {
-        repeat(count) {
-            Text(
-                "⌃",
-                color = color,
-                fontSize = if (compact) 10.sp else 17.sp,
-                lineHeight = if (compact) 10.sp else 17.sp,
-                fontWeight = FontWeight.Normal,
-                maxLines = 1,
-            )
+            RankAdjustmentIcon(rankAdjustment!!, compact = true)
         }
     }
 }

@@ -12,8 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
+import com.orioooneee.lmuasister.ui.components.CoverImage
 import com.orioooneee.lmuasister.ui.theme.Surface2
 
 /**
@@ -26,6 +26,7 @@ import com.orioooneee.lmuasister.ui.theme.Surface2
 @Composable
 internal fun TrackPreview(
     backgroundUrl: String?,
+    backgroundFallbackUrl: String? = null,
     mapUrl: String?,
     logoUrl: String?,
     flagUrl: String?,
@@ -35,8 +36,14 @@ internal fun TrackPreview(
     flagSize: Dp = 22.dp,
 ) {
     Box(modifier.fillMaxWidth().height(height).background(Surface2)) {
-        backgroundUrl?.let {
-            AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        if (!backgroundUrl.isNullOrBlank() || !backgroundFallbackUrl.isNullOrBlank()) {
+            CoverImage(
+                url = backgroundUrl,
+                fallbackUrl = backgroundFallbackUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
         }
         mapUrl?.let { TrackSvgImage(it, Modifier.fillMaxSize().padding(10.dp)) }

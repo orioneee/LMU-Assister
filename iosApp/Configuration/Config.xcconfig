@@ -4,7 +4,7 @@ TEAM_ID=
 // default and opt in from the ignored PushNotifications.local.xcconfig when
 // building with a paid Apple Developer Program team.
 PUSH_NOTIFICATIONS_ENABLED=NO
-PUSH_NOTIFICATIONS_ENTITLEMENTS=
+PUSH_NOTIFICATIONS_ENTITLEMENTS=iosApp/AppCheck.entitlements
 #include? "PushNotifications.local.xcconfig"
 CODE_SIGN_ENTITLEMENTS=$(PUSH_NOTIFICATIONS_ENTITLEMENTS)
 

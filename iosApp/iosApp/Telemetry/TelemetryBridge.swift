@@ -20,6 +20,27 @@ enum TelemetryBridge {
 enum FeatureFlagsBridge {
     static func install() {
         RemoteFeatureFlags.shared.remoteSource = FirebaseFeatureFlagRemoteSource()
+        RemoteDemoCredentials.shared.remoteSource = FirebaseDemoCredentialsRemoteSource()
+    }
+}
+
+private final class FirebaseDemoCredentialsRemoteSource: DemoCredentialsRemoteSource {
+    private let remoteConfig = RemoteConfig.remoteConfig()
+
+    init() {
+        let settings = RemoteConfigSettings()
+        settings.minimumFetchInterval = 0
+        remoteConfig.configSettings = settings
+    }
+
+    func fetch(keys: [DemoCredentialKey], onComplete_ onComplete: @escaping ([String: String]) -> Void) {
+        remoteConfig.setDefaults(Dictionary(uniqueKeysWithValues: keys.map { ($0.remoteName, "" as NSString) }))
+        remoteConfig.fetchAndActivate { [remoteConfig] _, _ in
+            let values = Dictionary(uniqueKeysWithValues: keys.map { key in
+                (key.remoteName, remoteConfig.configValue(forKey: key.remoteName).stringValue)
+            })
+            onComplete(values)
+        }
     }
 }
 

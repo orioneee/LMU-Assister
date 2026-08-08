@@ -25,6 +25,7 @@ private const val APPROVAL_WAIT_SECONDS = 120
 private const val QR_WAIT_SECONDS = 120
 private const val LOGIN_WAIT_MS = 45_000L
 private const val RESTORE_WAIT_MS = 10_000L
+private const val REAUTH_WAIT_MS = 30_000L
 private const val APPROVAL_WAIT_MS = APPROVAL_WAIT_SECONDS * 1_000L
 private const val QR_STATUS_WAIT_MS = 15_000L
 private const val PROMPT_STATE_WAIT_MS = 2_000L
@@ -248,11 +249,29 @@ internal class KSteamSignIn(
 
     override suspend fun reauth(): String? =
         mutex.withLock {
-            val steam = startedClient()
-            runCatching { exchangeTicket(steam) }
-                .onFailure { SteamLog.e("ksteam: reauth failed", it) }
-                .getOrNull()
-                ?.token
+            val mark = TimeSource.Monotonic.markNow()
+            try {
+                withTimeout(REAUTH_WAIT_MS) {
+                    val steam = startedClient()
+                    if (!restoreSteamSessionForReauth(steam)) return@withTimeout null
+                    exchangeTicket(steam).token
+                }.also {
+                    SteamLog.d("ksteam: silent reauth completed in ${mark.elapsedNow().inWholeMilliseconds}ms")
+                }
+            } catch (e: TimeoutCancellationException) {
+                SteamLog.e(
+                    "ksteam: silent reauth timed out after ${mark.elapsedNow().inWholeMilliseconds}ms",
+                    e,
+                )
+                // A slow network/Steam connection is not proof that the refresh session is
+                // invalid. Keep it so a later foreground refresh can retry instead of logging out.
+                throw SteamRestoreTimedOut()
+            } catch (t: Throwable) {
+                SteamLog.e("ksteam: silent reauth failed", t)
+                // Do not collapse transport/backend errors to null: null exclusively means
+                // there is no saved Steam session and a full credential login is required.
+                throw t
+            }
         }
 
     override suspend fun achievements(appId: Int): SteamAchievements =
@@ -414,6 +433,34 @@ internal class KSteamSignIn(
         withTimeout(RESTORE_WAIT_MS) {
             awaitSignedInWithLogs(steam)
         }
+    }
+
+    /** Returns false only when there is genuinely no refresh session to restore. */
+    private suspend fun restoreSteamSessionForReauth(steam: SteamClient): Boolean {
+        if (steam.account.clientAuthState.value is AuthorizationState.Success) return true
+
+        val saved = sessionStore.load()
+        val savedIsUsable = saved != null && saved.steamId != 0L && saved.refreshToken.isNotBlank()
+        val hasKsteamSavedData = steam.account.hasSavedDataForAtLeastOneAccount()
+        if (!savedIsUsable && !hasKsteamSavedData) {
+            SteamLog.d("ksteam: silent reauth unavailable; no saved refresh session")
+            return false
+        }
+
+        SteamLog.d(
+            "ksteam: restoring Steam session for silent reauth " +
+                "appStore=$savedIsUsable ksteamStore=$hasKsteamSavedData",
+        )
+        val restoreStarted = if (savedIsUsable) tryRestoreStoredSession(steam, saved) else false
+        if (!restoreStarted && !hasKsteamSavedData &&
+            steam.account.clientAuthState.value !is AuthorizationState.Success
+        ) {
+            // tryRestoreStoredSession already logged the concrete failure. Preserve the stored
+            // token and surface a retryable error rather than falsely reporting "signed out".
+            throw SteamRestoreTimedOut()
+        }
+        awaitSignedInWithLogs(steam)
+        return true
     }
 
     private suspend fun currentSteamId(steam: SteamClient): Long {

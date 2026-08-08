@@ -161,7 +161,7 @@ secrets live in `local.properties` (git-ignored, never committed).
 Toggles:
 
 - `backend.mock=true` → force the built-in Ktor `MockEngine` for UI/dev work.
-- `demo.username` / `demo.password` → optional app-review/demo login credentials for `/auth/demo`; leave unset for normal Steam auth.
+- App-review/demo login credentials are read from Firebase Remote Config (`DEMO_LOGIN` / `DEMO_PASS`).
 - `companion.url` → optional web minter URL; defaults to `http://127.0.0.1:8787`.
 - `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`, `measurementId` → optional Firebase Web Analytics config.
 

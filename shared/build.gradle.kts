@@ -118,6 +118,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutinesTest)
         }
         jvmMain {
             dependsOn(nativeSteamMain)
@@ -165,11 +166,6 @@ val generateBuildConfig by tasks.registering {
             ?: fallback
         // Mock data is opt-in for local UI/dev work.
         val useMock = props.getProperty("backend.mock")?.trim()?.toBooleanStrictOrNull() ?: false
-        // App-store-review demo login — set in local.properties (demo.username /
-        // demo.password) to match the backend's DEMO_USERNAME/DEMO_PASSWORD. No defaults:
-        // when unset the creds are empty and the demo path simply never triggers.
-        val demoUser = props.getProperty("demo.username")?.trim().orEmpty()
-        val demoPass = props.getProperty("demo.password")?.trim().orEmpty()
         val companionUrl = props.getProperty("companion.url")?.trim()?.trimEnd('/')
             ?: "http://127.0.0.1:8787"
         val firebaseApiKey = (props.getProperty("firebase.apiKey") ?: props.getProperty("apiKey")).orEmpty().trim()
@@ -199,8 +195,6 @@ val generateBuildConfig by tasks.registering {
             |    const val APP_SITE: String = "${appSite.trimEnd('/')}"
             |    const val USE_MOCK: Boolean = $useMock
             |    const val STEAM_LOGS: Boolean = $steamLogs
-            |    const val DEMO_USERNAME: String = "$demoUser"
-            |    const val DEMO_PASSWORD: String = "$demoPass"
             |    const val COMPANION_URL: String = "$companionUrl"
             |    const val FIREBASE_WEB_ANALYTICS_ENABLED: Boolean = $firebaseWebAnalyticsEnabled
             |    const val FIREBASE_WEB_API_KEY: String = "$firebaseApiKey"
@@ -250,40 +244,6 @@ val generateJvmBuildConfig by tasks.registering {
 
 kotlin.sourceSets.named("jvmMain") {
     kotlin.srcDir(generateJvmBuildConfig)
-}
-
-val generateIosBuildConfig by tasks.registering {
-    val outDir = layout.buildDirectory.dir("generated/ios-buildconfig/kotlin")
-    val lp = localPropsFile.asFile
-
-    inputs.file(localPropsFile).optional(true)
-    outputs.dir(outDir)
-
-    doLast {
-        val props = Properties()
-        if (lp.exists()) lp.inputStream().use { props.load(it) }
-
-        val debugAppCheck = props.getProperty("debug.app.check")
-            ?.trim()
-
-        val pkgDir = outDir.get().asFile.resolve("com/orioooneee/lmuasister/config")
-        pkgDir.mkdirs()
-
-        pkgDir.resolve("IosBuildConfig.kt").writeText(
-            """
-            |package com.orioooneee.lmuasister.config
-            |
-            |internal object IosBuildConfig {
-            |    const val DEBUG_APP_CHECK: String = "$debugAppCheck"
-            |}
-            |
-            """.trimMargin(),
-        )
-    }
-}
-
-kotlin.sourceSets.named("iosMain") {
-    kotlin.srcDir(generateIosBuildConfig)
 }
 
 // Make the generated file part of commonMain (visible to every target) and ensure

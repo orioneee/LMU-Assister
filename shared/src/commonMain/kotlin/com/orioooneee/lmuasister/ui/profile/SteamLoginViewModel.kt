@@ -6,7 +6,6 @@ import com.orioooneee.lmuasister.analytics.AnalyticsEvent
 import com.orioooneee.lmuasister.analytics.Telemetry
 import com.orioooneee.lmuasister.analytics.TelemetryError
 import com.orioooneee.lmuasister.analytics.UserProperties
-import com.orioooneee.lmuasister.config.BuildConfig
 import com.orioooneee.lmuasister.data.cache.LocalCache
 import com.orioooneee.lmuasister.data.remote.AppJson
 import com.orioooneee.lmuasister.data.remote.AppTokenHolder
@@ -28,10 +27,14 @@ import com.orioooneee.lmuasister.data.steam.SteamGuardKind
 import com.orioooneee.lmuasister.data.steam.SteamLog
 import com.orioooneee.lmuasister.data.steam.SteamRestoreTimedOut
 import com.orioooneee.lmuasister.data.steam.SteamSignIn
+import com.orioooneee.lmuasister.remoteconfig.DemoCredentials
+import com.orioooneee.lmuasister.remoteconfig.DemoCredentialsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlin.time.Clock
 
@@ -108,11 +111,6 @@ private const val PROFILE_CACHE_KEY = "steam_profile_v4"
 private const val ACHIEVEMENTS_CACHE_KEY = "steam_achievements_v3"
 private const val ACHIEVEMENTS_PROFILE_REFRESH_COOLDOWN_MS = 60_000L
 
-// App-store-review login: the reviewer types these into the normal form; we route them to
-// /auth/demo (a service-account session) instead of a real Steam sign-in. Configured via
-// local.properties (demo.username / demo.password); defaults match the backend's.
-private val DEMO_USERNAME = BuildConfig.DEMO_USERNAME
-private val DEMO_PASSWORD = BuildConfig.DEMO_PASSWORD
 // Marks the active session as a demo one so we silently re-mint it on restart / 401.
 private const val DEMO_FLAG_KEY = "auth_demo_session"
 
@@ -131,6 +129,7 @@ class SteamLoginViewModel(
     private val backend: SteamBackendApi,
     private val tokenHolder: AppTokenHolder,
     private val achievementsClient: SteamAchievementsClient,
+    private val demoCredentialsRepository: DemoCredentialsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<SteamLoginUiState>(SteamLoginUiState.Restoring)
@@ -170,6 +169,7 @@ class SteamLoginViewModel(
     private var pendingGuardPassword: String? = null
     private var pendingGuardKind: SteamGuardKind? = null
     private var lastSubmittedGuardCode = false
+    private val reauthMutex = Mutex()
 
     init {
         val cached = loadCachedProfile()
@@ -178,6 +178,8 @@ class SteamLoginViewModel(
             _state.value = SteamLoginUiState.SignedIn(BackendState.Ok(cached, fromCache = true))
         }
         observeAuthRunner()
+        // Warm the native Firebase Remote Config cache before the user reaches the login form.
+        viewModelScope.launch { demoCredentialsRepository.get() }
         viewModelScope.launch {
             if (authRunner.state.value !is SteamAuthRunnerState.Idle) {
                 SteamLog.d("vm: auth runner already active, skipping restore")
@@ -187,7 +189,11 @@ class SteamLoginViewModel(
             try {
                 if (LocalCache.read(DEMO_FLAG_KEY) == "1") {
                     SteamLog.d("vm: restoring demo session...")
-                    val r = runCatching { backend.authDemo(DEMO_USERNAME, DEMO_PASSWORD) }.getOrNull()
+                    val credentials = demoCredentialsRepository.get()
+                    val demoRestore = credentials?.let {
+                        runCatching { backend.authDemo(it.login, it.password) }
+                    }
+                    val r = demoRestore?.getOrNull()
                     if (r != null) {
                         appToken = r.token
                         Telemetry.log(AnalyticsEvent.LoginSuccess(restored = true))
@@ -199,8 +205,17 @@ class SteamLoginViewModel(
                         loadProfile()
                         return@launch
                     }
-                    SteamLog.d("vm: demo restore failed, falling back")
-                    runCatching { LocalCache.write(DEMO_FLAG_KEY, "") }
+                    val demoError = demoRestore?.exceptionOrNull()
+                    val credentialsRejected =
+                        demoError is BackendAuthFailed || demoError is BackendReauthRequired
+                    if (!credentialsRejected) {
+                        demoError?.let { SteamLog.e("vm: demo restore temporarily unavailable", it) }
+                        SteamLog.d("vm: keeping demo session marker for a later silent retry")
+                        if (cached == null) showLoginAfterPreflight()
+                        return@launch
+                    }
+                    SteamLog.d("vm: demo credentials rejected, falling back to Steam restore")
+                    runCatching { LocalCache.remove(DEMO_FLAG_KEY) }
                 }
                 SteamLog.d("vm: trying silent session restore...")
                 val restored = runCatching { signIn.restore() }
@@ -219,7 +234,16 @@ class SteamLoginViewModel(
                     val restoreError = restored.exceptionOrNull()
                     if (restoreError is SteamRestoreTimedOut) {
                         SteamLog.d("vm: saved session restore timed out")
-                        forceLoginAfterMissingSession(clearSteamSession = false)
+                        Telemetry.recordError(
+                            restoreError,
+                            "stage" to "session_restore",
+                            "had_cache" to (cached != null),
+                        )
+                        if (cached == null) {
+                            showLoginAfterPreflight()
+                        } else {
+                            SteamLog.d("vm: keeping cached profile; refresh will retry silent reauth")
+                        }
                     } else {
                         restoreError?.let { SteamLog.e("vm: silent session restore failed", it) }
                         SteamLog.d("vm: no saved session")
@@ -283,17 +307,21 @@ class SteamLoginViewModel(
             _state.value = SteamLoginUiState.Error("Enter your login and password.")
             return
         }
-        if (authUsername == DEMO_USERNAME && authPassword == DEMO_PASSWORD) {
-            loginDemo()
-            return
-        }
-        SteamLog.d("vm: login submitted has2fa=${code.isNotBlank()}")
         _state.value = SteamLoginUiState.Loading
         Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = code.isNotBlank()))
-        pendingGuardUsername = authUsername
-        pendingGuardPassword = authPassword
-        lastSubmittedGuardCode = code.isNotBlank()
-        authRunner.startSignIn(authUsername, authPassword, code)
+        viewModelScope.launch {
+            val demoCredentials = demoCredentialsRepository.get()
+            if (_state.value !is SteamLoginUiState.Loading) return@launch
+            if (demoCredentials?.matches(authUsername, authPassword) == true) {
+                loginDemo(demoCredentials)
+            } else {
+                SteamLog.d("vm: login submitted has2fa=${code.isNotBlank()}")
+                pendingGuardUsername = authUsername
+                pendingGuardPassword = authPassword
+                lastSubmittedGuardCode = code.isNotBlank()
+                authRunner.startSignIn(authUsername, authPassword, code)
+            }
+        }
     }
 
     fun submitGuardCode(guardCode: String) {
@@ -536,26 +564,22 @@ class SteamLoginViewModel(
     }
 
     /** App-store-review path: no Steam, just exchange the demo creds for a service-account token. */
-    private fun loginDemo() {
-        _state.value = SteamLoginUiState.Loading
-        Telemetry.log(AnalyticsEvent.LoginSubmitted(has2fa = false))
-        viewModelScope.launch {
-            runCatching { backend.authDemo(DEMO_USERNAME, DEMO_PASSWORD) }
-                .onSuccess { r ->
-                    appToken = r.token
-                    runCatching { LocalCache.write(DEMO_FLAG_KEY, "1") }
-                    Telemetry.log(AnalyticsEvent.LoginSuccess(restored = false))
-                    Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
-                    _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
-                    loadProfile()
-                }
-                .onFailure { e ->
-                    SteamLog.e("vm: demo login failed", e)
-                    Telemetry.log(AnalyticsEvent.LoginFailed(loginFailReason(e.message ?: "")))
-                    Telemetry.recordError(e, "stage" to "login_demo")
-                    _state.value = SteamLoginUiState.Error(e.message ?: "Login failed")
-                }
-        }
+    private suspend fun loginDemo(credentials: DemoCredentials) {
+        runCatching { backend.authDemo(credentials.login, credentials.password) }
+            .onSuccess { r ->
+                appToken = r.token
+                runCatching { LocalCache.write(DEMO_FLAG_KEY, "1") }
+                Telemetry.log(AnalyticsEvent.LoginSuccess(restored = false))
+                Telemetry.userProperty(UserProperties.IS_LOGGED_IN, "true")
+                _state.value = SteamLoginUiState.SignedIn(BackendState.Loading)
+                loadProfile()
+            }
+            .onFailure { e ->
+                SteamLog.e("vm: demo login failed", e)
+                Telemetry.log(AnalyticsEvent.LoginFailed(loginFailReason(e.message ?: "")))
+                Telemetry.recordError(e, "stage" to "login_demo")
+                _state.value = SteamLoginUiState.Error(e.message ?: "Login failed")
+            }
     }
 
     private fun loginFailReason(raw: String): String {
@@ -594,7 +618,9 @@ class SteamLoginViewModel(
     }
 
     private fun canStartProfileUpdate(): Boolean =
-        appToken != null && !_refreshing.value && !_updatingProfile.value
+        (appToken != null || _state.value is SteamLoginUiState.SignedIn) &&
+            !_refreshing.value &&
+            !_updatingProfile.value
 
     private suspend fun updateProfileFromBackend() {
         runCatching { fetchProfileWithReauth() }
@@ -854,36 +880,64 @@ class SteamLoginViewModel(
 
     private suspend fun <T> withReauth(block: suspend (token: String) -> T): T {
         // Auth may still be restoring at launch (Render cold start). Wait for the token
-        // instead of failing instantly with "not signed in" — callers paint a loader
-        // meanwhile. Only give up if it genuinely never arrives.
-        val token = appToken ?: (if (restoreFinished) null else tokenHolder.await(AUTH_WAIT_MS))
-            ?: throw IllegalStateException("Session expired. Sign in again.")
+        // instead of failing instantly with "not signed in". If restore timed out while a
+        // cached profile was visible, a pull-to-refresh gets one more silent restore attempt.
+        val restoredToken = appToken ?: (if (restoreFinished) null else tokenHolder.await(AUTH_WAIT_MS))
+        val token = restoredToken ?: silentReauth(rejectedToken = null)
+            ?: requireFullLogin("Session expired. Sign in again.")
         return try {
             block(token)
         } catch (e: BackendReauthRequired) {
             Telemetry.log(AnalyticsEvent.ProfileReauthTriggered)
             val fresh = try {
-                reauthToken()
+                silentReauth(rejectedToken = token)
             } catch (reauthError: SteamAuthEnvironmentUnavailable) {
                 SteamLog.e("vm: reauth environment unavailable, forcing full login", reauthError)
-                forceLoginAfterMissingSession(clearSteamSession = true)
-                throw ReauthLoginRequired(reauthError.message ?: "Session expired. Sign in again.")
+                requireFullLogin(reauthError.message ?: "Session expired. Sign in again.")
+            } catch (reauthError: BackendAuthFailed) {
+                SteamLog.e("vm: Steam ticket was rejected during reauth", reauthError)
+                requireFullLogin(reauthError.message ?: "Session expired. Sign in again.")
+            } catch (reauthError: BackendReauthRequired) {
+                SteamLog.e("vm: auth endpoint rejected the refreshed session", reauthError)
+                requireFullLogin("Session expired. Sign in again.")
             }
             if (fresh == null) {
                 SteamLog.d("vm: reauth returned no token, forcing full login")
-                forceLoginAfterMissingSession(clearSteamSession = true)
-                throw ReauthLoginRequired("Session expired. Sign in again.")
+                requireFullLogin("Session expired. Sign in again.")
             }
-            appToken = fresh
-            block(fresh)
+            try {
+                block(fresh)
+            } catch (_: BackendReauthRequired) {
+                SteamLog.d("vm: fresh app token was rejected, forcing full login")
+                requireFullLogin("Session expired. Sign in again.")
+            }
         }
+    }
+
+    /**
+     * Coalesces simultaneous 401s into one Steam refresh. A caller that queued behind another
+     * request reuses the token already minted by that request instead of opening a second
+     * kSteam restore/ticket flow.
+     */
+    private suspend fun silentReauth(rejectedToken: String?): String? = reauthMutex.withLock {
+        appToken?.takeIf { it != rejectedToken }?.let { return@withLock it }
+        reauthToken()?.also { appToken = it }
+    }
+
+    private suspend fun requireFullLogin(message: String): Nothing {
+        forceLoginAfterMissingSession(clearSteamSession = true)
+        throw ReauthLoginRequired(message)
     }
 
     /** Silent reauth → fresh app token: re-mint the demo session, else a real Steam reauth. */
     private suspend fun reauthToken(): String? =
-        if (LocalCache.read(DEMO_FLAG_KEY) == "1")
-            runCatching { backend.authDemo(DEMO_USERNAME, DEMO_PASSWORD).token }.getOrNull()
-        else signIn.reauth()
+        if (LocalCache.read(DEMO_FLAG_KEY) == "1") {
+            demoCredentialsRepository.get()?.let { credentials ->
+                backend.authDemo(credentials.login, credentials.password).token
+            }
+        } else {
+            signIn.reauth()
+        }
 
     private fun applyProfileTelemetry(p: SteamProfile) {
         Telemetry.setUserId(p.uid.takeIf { it.isNotBlank() })

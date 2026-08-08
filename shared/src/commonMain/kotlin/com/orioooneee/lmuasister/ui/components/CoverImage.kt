@@ -12,8 +12,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -34,16 +38,27 @@ fun CoverImage(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
     contentScale: ContentScale = ContentScale.Crop,
+    fallbackUrl: String? = null,
 ) {
-    if (url.isNullOrBlank()) {
+    val primary = url?.takeIf { it.isNotBlank() }
+    val fallback = fallbackUrl?.takeIf { it.isNotBlank() && it != primary }
+    var activeUrl by remember(primary, fallback) { mutableStateOf(primary ?: fallback) }
+
+    if (activeUrl == null) {
         Box(modifier.then(Modifier.fillMaxSize()).background(Surface2), contentAlignment = Alignment.Center) {
             Icon(IconFlag, contentDescription = null, tint = TextLow.copy(alpha = 0.35f), modifier = Modifier.size(40.dp))
         }
         return
     }
 
-    val painter = rememberAsyncImagePainter(model = url, contentScale = contentScale)
+    val painter = rememberAsyncImagePainter(model = activeUrl, contentScale = contentScale)
     val state by painter.state.collectAsState()
+
+    LaunchedEffect(state, activeUrl, fallback) {
+        if (state is AsyncImagePainter.State.Error && activeUrl == primary && fallback != null) {
+            activeUrl = fallback
+        }
+    }
 
     Box(
         modifier.then(Modifier.fillMaxSize()).background(Surface2),

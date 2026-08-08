@@ -1058,7 +1058,8 @@ private fun TrackCard(
     Card {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             TrackPreview(
-                backgroundUrl = track.backgroundUrl, mapUrl = track.mapUrl, logoUrl = track.logoUrl, flagUrl = flag,
+                backgroundUrl = track.backgroundUrl, backgroundFallbackUrl = track.cardUrl,
+                mapUrl = track.mapUrl, logoUrl = track.logoUrl, flagUrl = flag,
                 modifier = Modifier.clip(MaterialTheme.shapes.medium),
                 height = 170.dp, emblemHeight = 30.dp, flagSize = 24.dp,
             )

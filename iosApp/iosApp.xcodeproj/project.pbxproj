@@ -13,6 +13,7 @@
 		845638E42FE734FF00AAD32F /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 845638E32FE734FF00AAD32F /* FirebaseCrashlytics */; };
 		845638E62FE734FF00AAD32F /* FirebasePerformance in Frameworks */ = {isa = PBXBuildFile; productRef = 845638E52FE734FF00AAD32F /* FirebasePerformance */; };
 		845638EA2FE734FF00AAD32F /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 845638E92FE734FF00AAD32F /* FirebaseRemoteConfig */; };
+		A81C3DEA2FEA100100AAD32F /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = A81C3DE92FEA100100AAD32F /* FirebaseAppCheck */; };
 		A81C3DE82FEA100100AAD32F /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = A81C3DE72FEA100100AAD32F /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
@@ -52,6 +53,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				845638DE2FE734FF00AAD32F /* FirebaseAnalytics in Frameworks */,
+				A81C3DEA2FEA100100AAD32F /* FirebaseAppCheck in Frameworks */,
 				845638E42FE734FF00AAD32F /* FirebaseCrashlytics in Frameworks */,
 				845638E62FE734FF00AAD32F /* FirebasePerformance in Frameworks */,
 				845638EA2FE734FF00AAD32F /* FirebaseRemoteConfig in Frameworks */,
@@ -104,6 +106,7 @@
 			packageProductDependencies = (
 				845638DD2FE734FF00AAD32F /* FirebaseAnalytics */,
 				845638DF2FE734FF00AAD32F /* FirebaseAnalyticsCore */,
+				A81C3DE92FEA100100AAD32F /* FirebaseAppCheck */,
 				845638E12FE734FF00AAD32F /* FirebaseCore */,
 				845638E32FE734FF00AAD32F /* FirebaseCrashlytics */,
 				845638E52FE734FF00AAD32F /* FirebasePerformance */,
@@ -451,6 +454,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 845638DC2FE734FF00AAD32F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseRemoteConfig;
+		};
+		A81C3DE92FEA100100AAD32F /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 845638DC2FE734FF00AAD32F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
 		};
 		A81C3DE72FEA100100AAD32F /* FirebaseMessaging */ = {
 			isa = XCSwiftPackageProductDependency;

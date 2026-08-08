@@ -92,6 +92,7 @@ private fun TrackGridCard(t: TrackFullDto, onClick: () -> Unit) {
     val logo = trackAsset(t, "logo.svg")
     val map = trackAsset(t, "map.svg")
     val bg = trackAsset(t, "background.webp")
+    val cover = trackAsset(t, "card.webp")
     val flag = trackFlagUrl(t.countryCode)
     Column(
         modifier = Modifier
@@ -101,7 +102,14 @@ private fun TrackGridCard(t: TrackFullDto, onClick: () -> Unit) {
             .border(1.dp, Outline, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
     ) {
-        TrackPreview(backgroundUrl = bg, mapUrl = map, logoUrl = logo, flagUrl = flag, height = 104.dp)
+        TrackPreview(
+            backgroundUrl = bg,
+            backgroundFallbackUrl = cover,
+            mapUrl = map,
+            logoUrl = logo,
+            flagUrl = flag,
+            height = 104.dp,
+        )
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 trackTitle(t),

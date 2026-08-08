@@ -440,13 +440,14 @@ private fun TrackCard(t: TrackFullDto, modifier: Modifier = Modifier) {
     val logo = trackAsset(t, "logo.svg")
     val map = trackAsset(t, "map.svg")
     val bg = trackAsset(t, "background.webp")
+    val cover = trackAsset(t, "card.webp")
     val flag = trackFlagUrl(t.countryCode)
     Column(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Surface1).border(1.dp, Outline, RoundedCornerShape(14.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         TrackPreview(
-            backgroundUrl = bg, mapUrl = map, logoUrl = logo, flagUrl = flag,
+            backgroundUrl = bg, backgroundFallbackUrl = cover, mapUrl = map, logoUrl = logo, flagUrl = flag,
             modifier = Modifier.clip(RoundedCornerShape(12.dp)),
             height = 180.dp, emblemHeight = 30.dp, flagSize = 26.dp,
         )

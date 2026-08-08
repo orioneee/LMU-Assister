@@ -67,7 +67,8 @@ fun ScheduleScreen(
 ) {
     var category by remember { mutableStateOf(RaceType.DAILY) }
     val now = rememberNow()
-    val useTrackBackgroundCover = weeks.size > 1 && selectedWeek != weeks.first().key
+    val isCurrentWeek = weeks.isEmpty() || selectedWeek == weeks.first().key
+    val useTrackBackgroundCover = !isCurrentWeek
 
     val races = when (category) {
         RaceType.DAILY -> schedule.daily
@@ -124,6 +125,7 @@ fun ScheduleScreen(
                     cols,
                     onOpenRace,
                     showTimer = showTimerInScheduleCard,
+                    showTimes = isCurrentWeek,
                     useTrackBackgroundCover = useTrackBackgroundCover,
                 )
             }

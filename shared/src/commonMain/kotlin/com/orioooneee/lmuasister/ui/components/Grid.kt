@@ -30,6 +30,7 @@ fun EqualHeightRaceRow(
     spacing: Dp = 12.dp,
     showCountdown: Boolean = true,
     showTimer: Boolean = true,
+    showTimes: Boolean = true,
     useTrackBackgroundCover: Boolean = false,
     contentPadding: Dp = 32.dp, // LazyColumn horizontal padding (16dp each side)
 ) {
@@ -46,6 +47,7 @@ fun EqualHeightRaceRow(
                 Modifier.weight(1f).fillMaxHeight(),
                 showCountdown = showCountdown,
                 showTimer = showTimer,
+                showTimes = showTimes,
                 timeColumns = timeColumns,
                 useTrackBackgroundCover = useTrackBackgroundCover,
             ) { onOpenRace(race) }

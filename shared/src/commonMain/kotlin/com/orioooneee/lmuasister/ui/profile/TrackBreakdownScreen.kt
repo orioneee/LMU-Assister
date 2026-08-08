@@ -155,7 +155,7 @@ private fun TrackBreakdownCard(t: TrackBreakdownDto, onOpenTrack: (String) -> Un
             .clickable(enabled = trackId != null) { trackId?.let(onOpenTrack) },
     ) {
         TrackPreview(
-            backgroundUrl = t.background, mapUrl = t.scheme, logoUrl = t.logo,
+            backgroundUrl = t.background, backgroundFallbackUrl = t.cover, mapUrl = t.scheme, logoUrl = t.logo,
             flagUrl = trackFlagUrl(t.countryCode),
             height = 96.dp, emblemHeight = 24.dp,
         )

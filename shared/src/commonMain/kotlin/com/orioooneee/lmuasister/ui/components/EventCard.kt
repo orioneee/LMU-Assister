@@ -57,6 +57,8 @@ private fun Race.trackLabel(): String = track?.displayName?.takeIf { it.isNotBla
 private fun Race.durationLabel(): String = if (raceLength > 0) "${raceLength}m" else ""
 private fun Race.scheduleCoverUrl(useTrackBackgroundCover: Boolean): String? =
     if (useTrackBackgroundCover) track?.backgroundUrl?.takeIf { it.isNotBlank() } ?: imageUrl else imageUrl
+private fun Race.scheduleCoverFallbackUrl(useTrackBackgroundCover: Boolean): String? =
+    imageUrl?.takeIf { useTrackBackgroundCover && it.isNotBlank() }
 
 private val CARD_TEXT_SHADOW = Shadow(color = Color.Black.copy(alpha = 0.7f), offset = Offset(0f, 2f), blurRadius = 6f)
 
@@ -73,6 +75,7 @@ fun RaceCard(
     modifier: Modifier = Modifier,
     showCountdown: Boolean = true,
     showTimer: Boolean = true,
+    showTimes: Boolean = true,
     timeColumns: Int = 3,
     useTrackBackgroundCover: Boolean = false,
     onClick: () -> Unit = {},
@@ -89,7 +92,12 @@ fun RaceCard(
             .clickable(onClick = onClick),
     ) {
         Box(Modifier.fillMaxWidth().height(175.dp).background(Surface2)) {
-            CoverImage(coverUrl, Modifier.fillMaxSize(), race.title)
+            CoverImage(
+                url = coverUrl,
+                modifier = Modifier.fillMaxSize(),
+                contentDescription = race.title,
+                fallbackUrl = race.scheduleCoverFallbackUrl(useTrackBackgroundCover),
+            )
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.horizontalGradient(
@@ -141,7 +149,7 @@ fun RaceCard(
                 }
             }
         }
-        if (race.times.isNotEmpty()) {
+        if (showTimes && race.times.isNotEmpty()) {
             Column(Modifier.padding(12.dp)) {
                 TimesGrid(
                     race.times,
@@ -255,6 +263,7 @@ fun HeroRaceTimesCard(
     heroHeight: Dp,
     showCountdown: Boolean = true,
     showTimer: Boolean = true,
+    showTimes: Boolean = true,
     useTrackBackgroundCover: Boolean = false,
     onClick: () -> Unit = {},
 ) {
@@ -274,7 +283,7 @@ fun HeroRaceTimesCard(
             useTrackBackgroundCover = useTrackBackgroundCover,
             modifier = Modifier.fillMaxWidth().height(heroHeight),
         )
-        if (race.times.isNotEmpty()) {
+        if (showTimes && race.times.isNotEmpty()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
                 // No countdown here — the hero above already shows it.
                 TimesGrid(
@@ -302,6 +311,7 @@ private fun HeroContent(
             url = race.scheduleCoverUrl(useTrackBackgroundCover),
             contentDescription = race.title,
             modifier = Modifier.fillMaxSize().background(Surface2),
+            fallbackUrl = race.scheduleCoverFallbackUrl(useTrackBackgroundCover),
         )
         Box(
             Modifier.fillMaxSize().background(

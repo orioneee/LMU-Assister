@@ -3,8 +3,8 @@ package com.orioooneee.lmuasister.ui
 /**
  * Best-effort circuit-emblem lookup by track name.
  *
- * The schedule's track logos resolve fine (the client derives `…/logo.svg` from the
- * minimap path), but the profile's race cards come back with `track_logo = null`
+ * The schedule's track logos resolve fine (the client uses the backend-provided logo URL),
+ * but the profile's race cards come back with `track_logo = null`
  * (the backend only emits a logo when its asset manifest lists one). So we cache the
  * working schedule logos keyed by a normalised track name and let the profile fall
  * back to them. Missing entries simply mean no emblem — never an error.

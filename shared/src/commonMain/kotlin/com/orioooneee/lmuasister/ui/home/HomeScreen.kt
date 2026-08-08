@@ -380,6 +380,7 @@ private fun TabContent(
                         heroHeight = heroHeight,
                         showCountdown = isCurrentWeek,
                         showTimer = showTimerInScheduleCard,
+                        showTimes = isCurrentWeek,
                         useTrackBackgroundCover = useTrackBackgroundCover,
                     ) {
                         onOpenRace(race)
@@ -400,6 +401,7 @@ private fun TabContent(
                             onOpenRace,
                             showCountdown = isCurrentWeek,
                             showTimer = showTimerInScheduleCard,
+                            showTimes = isCurrentWeek,
                             useTrackBackgroundCover = useTrackBackgroundCover,
                         )
                     }
