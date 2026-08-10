@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import com.orioooneee.lmuasister.data.RaceRepository
 import com.orioooneee.lmuasister.data.model.LapEntry
 import com.orioooneee.lmuasister.ui.components.LeaderboardRowSkeleton
@@ -114,20 +115,27 @@ fun FullLeaderboardScreen(leaderboardId: String, title: String, insets: PaddingV
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp + insets.calculateBottomPadding()),
         ) {
-            items(entries.itemCount) { index ->
+            items(
+                count = entries.itemCount,
+                key = entries.itemKey { it.rank },
+            ) { index ->
                 entries[index]?.let { e -> LeaderboardRow(e, best, alt = index % 2 == 1, liveryToModel = liveryToModel) }
             }
 
             when (val append = entries.loadState.append) {
-                is LoadState.Loading -> items(2) { LeaderboardRowSkeleton(skeletonBrush) }
-                is LoadState.Error -> item { FooterRetry { entries.retry() } }
+                is LoadState.Loading -> items(2, key = { "append-loading:$it" }) { LeaderboardRowSkeleton(skeletonBrush) }
+                is LoadState.Error -> item(key = "append-error") { FooterRetry { entries.retry() } }
                 is LoadState.NotLoading ->
-                    if (append.endOfPaginationReached && entries.itemCount > 0) item { FooterEnd() }
+                    if (append.endOfPaginationReached && entries.itemCount > 0) item(key = "pagination-end") { FooterEnd() }
             }
 
             when (val refresh = entries.loadState.refresh) {
-                is LoadState.Loading -> if (entries.itemCount == 0) items(12) { LeaderboardRowSkeleton(skeletonBrush) }
-                is LoadState.Error -> if (entries.itemCount == 0) item { FooterRetry { entries.retry() } }
+                is LoadState.Loading -> if (entries.itemCount == 0) {
+                    items(12, key = { "refresh-loading:$it" }) { LeaderboardRowSkeleton(skeletonBrush) }
+                }
+                is LoadState.Error -> if (entries.itemCount == 0) {
+                    item(key = "refresh-error") { FooterRetry { entries.retry() } }
+                }
                 else -> {}
             }
         }

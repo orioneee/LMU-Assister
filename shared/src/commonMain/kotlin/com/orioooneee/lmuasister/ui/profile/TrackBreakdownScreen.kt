@@ -110,7 +110,9 @@ fun TrackBreakdownView(
         }
 
         when {
-            tracks == null -> TrackGrid(insets) { items(6) { TrackBreakdownSkeleton() } }
+            tracks == null -> TrackGrid(insets) {
+                items(6, key = { "track-breakdown-loading:$it" }) { TrackBreakdownSkeleton() }
+            }
             tracks.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("No track distance yet.", style = MaterialTheme.typography.bodyMedium, color = TextLow)
             }

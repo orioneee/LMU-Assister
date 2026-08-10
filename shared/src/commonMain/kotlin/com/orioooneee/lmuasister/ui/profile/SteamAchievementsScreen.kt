@@ -89,7 +89,10 @@ fun SteamAchievementsScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            item(
+                key = "achievements-top-bar",
+                span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+            ) {
                 AchievementsTopBar(
                     loading = state.loading && state.data == null,
                     refreshing = isRefreshing,
@@ -99,23 +102,29 @@ fun SteamAchievementsScreen(
             }
 
             state.data?.let { data ->
-                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                item(
+                    key = "achievements-hero",
+                    span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+                ) {
                     AchievementsHero(data, fromCache = state.fromCache, error = state.error)
                 }
                 items(
                     items = data.achievements,
-                    key = { "${it.name}_${it.unlockTime}" },
+                    key = { "achievement:${it.name}" },
                 ) { achievement ->
                     AchievementCard(achievement)
                 }
             }
 
             if (state.loading && state.data == null) {
-                items(8) {
+                items(8, key = { "achievement-loading:$it" }) {
                     AchievementSkeletonCard()
                 }
             } else if (state.data == null && state.error != null) {
-                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                item(
+                    key = "achievements-error",
+                    span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+                ) {
                     EmptyState(
                         title = "Couldn't load achievements",
                         subtitle = state.error,

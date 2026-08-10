@@ -284,7 +284,7 @@ fun ScheduleUpdatesScreen(
                 bottom = bottomInset + if (desktopLayout) 32.dp else 24.dp,
             ),
         ) {
-            item {
+            item(key = "schedule-updates-content") {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                     Column(
                         modifier = Modifier.widthIn(max = contentMaxWidth).fillMaxWidth(),

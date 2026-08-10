@@ -292,17 +292,19 @@ private fun DetailContent(
         contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomInset),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        d.trackInfo?.let { item { TrackCard(it) } }
-        item { SummaryCard(d) }
+        d.trackInfo?.let { item(key = "race-track") { TrackCard(it) } }
+        item(key = "race-summary") { SummaryCard(d) }
         if (d.availableCars.isNotEmpty()) {
-            item { AvailableCarsSection(d.availableCars) }
+            item(key = "race-available-cars") { AvailableCarsSection(d.availableCars) }
         }
         if (tabs.size > 1) {
-            item { SplitTabs(tabs, selected, mySplit) { selected = it } }
+            item(key = "race-split-tabs") { SplitTabs(tabs, selected, mySplit) { selected = it } }
         }
         when {
-            selectedSessions == null -> item { SplitSessionsSkeleton(shimmerBrush()) }
-            selectedSessions.isFailure -> item {
+            selectedSessions == null -> item(key = "split-loading:${selected ?: "mine"}") {
+                SplitSessionsSkeleton(shimmerBrush())
+            }
+            selectedSessions.isFailure -> item(key = "split-error:${selected ?: "mine"}") {
                 SplitError {
                     loaded.remove(selected)
                     reloadNonce++
@@ -313,7 +315,7 @@ private fun DetailContent(
                 for (key in listOf("practice", "qualifying", "race")) {
                     val session = sessions[key] ?: continue
                     if (session.classification.isEmpty() && session.teamClassification.isEmpty()) continue
-                    item(key = "$selected-$key") {
+                    item(key = "split:$selected:$key") {
                         SessionCard(
                             label = sessionLabel(key),
                             sessionKey = key,

@@ -85,7 +85,7 @@ fun ToolsScreen(onOpenUrl: (String) -> Unit) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
+        item(key = "tools-header") {
             Column {
                 Text(
                     "Tools",
@@ -102,7 +102,7 @@ fun ToolsScreen(onOpenUrl: (String) -> Unit) {
                 Spacer(Modifier.height(8.dp))
             }
         }
-        items(tools.size) { i ->
+        items(count = tools.size, key = { tools[it].url }) { i ->
             ToolRow(tools[i]) { onOpenUrl(tools[i].url) }
         }
     }

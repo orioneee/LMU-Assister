@@ -278,7 +278,7 @@ fun RaceDetailsScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item(key = "race-hero:${race.id}", span = { GridItemSpan(maxLineSpan) }) {
                 Box(Modifier.fillMaxWidth().height(220.dp).clip(MaterialTheme.shapes.large)) {
                     CoverImage(
                         url = race.imageUrl,
@@ -303,7 +303,7 @@ fun RaceDetailsScreen(
                 }
             }
 
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item(key = "race-meta:${race.id}", span = { GridItemSpan(maxLineSpan) }) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -316,7 +316,7 @@ fun RaceDetailsScreen(
             }
 
             if (notificationSlots.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item(key = "race-notify:${race.id}", span = { GridItemSpan(maxLineSpan) }) {
                     NotifyMeCta {
                         Telemetry.log(AnalyticsEvent.StartNotificationCtaOpened)
                         coroutineScope.launch {
@@ -334,15 +334,17 @@ fun RaceDetailsScreen(
             }
 
             if (race.availableCars.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item(key = "race-available-cars:${race.id}", span = { GridItemSpan(maxLineSpan) }) {
                     AvailableCarsSection(race.availableCars, liveryToModel)
                 }
             } else if (race.carsByClass.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) { CarsTicker(race.carsByClass) }
+                item(key = "race-cars-ticker:${race.id}", span = { GridItemSpan(maxLineSpan) }) {
+                    CarsTicker(race.carsByClass)
+                }
             }
 
             if (race.leaderboardId != null) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item(key = "race-leaderboard:${race.leaderboardId}", span = { GridItemSpan(maxLineSpan) }) {
                     when (val state = leaderboardsState) {
                         AsyncPanelState.Loading -> LeaderboardSkeletonCard()
                         is AsyncPanelState.Error -> Card(stringResource(Res.string.fastest_laps)) {
@@ -359,7 +361,7 @@ fun RaceDetailsScreen(
                 }
             }
             race.track?.let {
-                item {
+                item(key = "race-track:${race.id}") {
                     TrackCard(
                         it,
                         hotlapsState = hotlapsState,
@@ -368,12 +370,12 @@ fun RaceDetailsScreen(
                     )
                 }
             }
-            race.weather?.let { item { WeatherCard(it) } }
-            item {
+            race.weather?.let { item(key = "race-weather:${race.id}") { WeatherCard(it) } }
+            item(key = "race-format:${race.id}") {
                 Card(stringResource(Res.string.format)) { DetailRows(settingRows(race.raceLength, race.settings)) }
             }
             if (upcoming.isNotEmpty()) {
-                item {
+                item(key = "race-next-times:${race.id}") {
                     Card(stringResource(Res.string.next_start_times)) {
                         TimesGrid(race.times)
                     }

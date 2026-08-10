@@ -482,21 +482,21 @@ private fun SearchSheet(
                             )
                         }
                         if (state.loadingMore) {
-                            item {
+                            item(key = "search-loading-more") {
                                 Box(Modifier.fillMaxWidth().height(54.dp), contentAlignment = Alignment.Center) {
                                     CircularProgressIndicator(color = Amber, modifier = Modifier.size(24.dp))
                                 }
                             }
                         }
                         if (state.loading && !state.loadingMore) {
-                            item {
+                            item(key = "search-loading") {
                                 Box(Modifier.fillMaxWidth().height(54.dp), contentAlignment = Alignment.Center) {
                                     CircularProgressIndicator(color = Amber, modifier = Modifier.size(24.dp))
                                 }
                             }
                         }
                         if (state.error != null) {
-                            item {
+                            item(key = "search-error") {
                                 Box(Modifier.fillMaxWidth().height(54.dp), contentAlignment = Alignment.Center) {
                                     Text(
                                         state.error,

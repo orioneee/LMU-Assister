@@ -91,7 +91,7 @@ fun ScheduleScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
+        item(key = "schedule-controls") {
             Column {
                 Text("Race Control", style = MaterialTheme.typography.headlineMedium, color = TextHigh, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(2.dp))
@@ -118,8 +118,11 @@ fun ScheduleScreen(
         }
 
         groups.forEach { (tier, list) ->
-            item { TierHeader(tier, list.size) }
-            items(list.chunked(cols)) { row ->
+            item(key = "tier:$tier") { TierHeader(tier, list.size) }
+            items(
+                items = list.chunked(cols),
+                key = { row -> "tier:$tier:${row.joinToString(",") { it.id }}" },
+            ) { row ->
                 EqualHeightRaceRow(
                     row,
                     cols,
@@ -132,7 +135,7 @@ fun ScheduleScreen(
         }
 
         if (races.isEmpty()) {
-            item {
+            item(key = "schedule-empty") {
                 Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
                     Text("No ${category.label.lowercase()} events.", color = TextLow, style = MaterialTheme.typography.bodyMedium)
                 }

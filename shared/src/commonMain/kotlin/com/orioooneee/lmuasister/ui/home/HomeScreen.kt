@@ -368,13 +368,15 @@ private fun TabContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         when {
-            errorMessage != null -> item { ScheduleError(Modifier.fillParentMaxSize(), errorMessage, onRefresh) }
+            errorMessage != null -> item(key = "schedule-error") {
+                ScheduleError(Modifier.fillParentMaxSize(), errorMessage, onRefresh)
+            }
 
-            all.isEmpty() -> item { NoRaces(Modifier.fillParentMaxSize(), onRefresh) }
+            all.isEmpty() -> item(key = "schedule-empty") { NoRaces(Modifier.fillParentMaxSize(), onRefresh) }
 
             all.size == 1 -> {
                 val race = all.first()
-                item {
+                item(key = "schedule-hero:${race.id}") {
                     HeroRaceTimesCard(
                         race,
                         heroHeight = heroHeight,
@@ -393,8 +395,14 @@ private fun TabContent(
                     val sorted = sec.races.sortedWith(
                         compareBy({ srRank(it.settings.safetyRank) }, { nextKey(it) }),
                     )
-                    sec.label?.let { lbl -> item { SectionHeader(lbl) } }
-                    items(sorted.chunked(cols)) { row ->
+                    val sectionKey = sec.races.first().type.name
+                    sec.label?.let { lbl ->
+                        item(key = "section-header:$sectionKey") { SectionHeader(lbl) }
+                    }
+                    items(
+                        items = sorted.chunked(cols),
+                        key = { row -> "section:$sectionKey:${row.joinToString(",") { it.id }}" },
+                    ) { row ->
                         EqualHeightRaceRow(
                             row,
                             cols,

@@ -105,7 +105,7 @@ fun CarsScreen(
             ) {
                 val list = cars
                 if (list == null) {
-                    items(3) {
+                    items(3, key = { "car-loading:$it" }) {
                         CardSkeletonRow(columns)
                     }
                 } else {
@@ -115,7 +115,7 @@ fun CarsScreen(
                         }
                         items(
                             items = group.chunked(columns),
-                            key = { row -> row.joinToString("|") { it.displayId() } },
+                            key = { row -> "cars:$category:${row.joinToString("|") { it.displayId() }}" },
                         ) { rowCars ->
                             CarGridRow(rowCars, columns, onOpenCar)
                         }
@@ -389,34 +389,34 @@ private fun CarDetailContent(car: CarDetailedDto, bottomInset: androidx.compose.
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (car.heroUrl() != null || car.description.isNotBlank()) {
-                item { CarHeroCard(car) }
+                item(key = "car-hero") { CarHeroCard(car) }
             } else {
-                item { CarSummaryCard(car) }
+                item(key = "car-summary") { CarSummaryCard(car) }
             }
 
             val gallery = car.galleryUrls()
             if (gallery.isNotEmpty()) {
-                item { SectionTitle("Gallery") }
-                item { GalleryStrip(gallery, car.name) }
+                item(key = "gallery-title") { SectionTitle("Gallery") }
+                item(key = "gallery-strip") { GalleryStrip(gallery, car.name) }
             }
 
             val specItems = headlineSpecs(car)
             if (specItems.isNotEmpty()) {
-                item { SectionTitle("Specs") }
-                item { SpecsCard(specItems) }
+                item(key = "specs-title") { SectionTitle("Specs") }
+                item(key = "specs-card") { SpecsCard(specItems) }
             }
 
             val tech = extraTechSpecs(car, specItems)
             if (tech.isNotEmpty()) {
-                item { SectionTitle("Tech specs") }
-                item { SpecsCard(tech) }
+                item(key = "tech-specs-title") { SectionTitle("Tech specs") }
+                item(key = "tech-specs-card") { SpecsCard(tech) }
             }
 
             if (car.liveries.isNotEmpty()) {
-                item { SectionTitle("Liveries") }
+                item(key = "liveries-title") { SectionTitle("Liveries") }
                 items(
                     items = car.liveries.chunked(liveryColumns),
-                    key = { row -> row.joinToString("|") { it.id.ifBlank { it.name } } },
+                    key = { row -> "liveries:${row.joinToString("|") { it.id.ifBlank { it.name } }}" },
                 ) { row ->
                     LiveryGridRow(row, liveryColumns)
                 }
@@ -498,7 +498,7 @@ private fun CarSummaryCard(car: CarDetailedDto) {
 @Composable
 private fun GalleryStrip(urls: List<String>, contentDescription: String) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(urls) { url ->
+        items(urls, key = { it }) { url ->
             AsyncImage(
                 model = url,
                 contentDescription = contentDescription,

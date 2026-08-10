@@ -107,7 +107,12 @@ fun SuspensionsScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + insets.calculateBottomPadding()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(suspensions) { SuspensionCard(it) }
+            items(
+                items = suspensions,
+                key = {
+                    "suspension:${it.from}:${it.to}:${it.type}:${it.permanent}"
+                },
+            ) { SuspensionCard(it) }
         }
     }
 }

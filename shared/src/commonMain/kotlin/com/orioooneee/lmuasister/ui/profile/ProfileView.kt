@@ -936,6 +936,15 @@ private fun ProgressBar(fraction: Float, color: Color) {
     }
 }
 
+internal fun RecentRaceDto.historyListKey(): String =
+    "race:" + listOfNotNull(
+        eventId,
+        seriesId,
+        date,
+        title,
+        (split ?: splitNo)?.toString(),
+    ).joinToString("|")
+
 @Composable
 internal fun RaceHistoryRow(race: RecentRaceDto) {
     // Non-finish (DNF/DQ/DNS): the race result itself is meaningless, so hide the

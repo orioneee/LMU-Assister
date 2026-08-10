@@ -78,7 +78,7 @@ fun TracksScreen(insets: PaddingValues, onOpenTrack: (String) -> Unit) {
             ) {
                 val list = tracks
                 if (list == null) {
-                    items(8) { TrackCardSkeleton() }
+                    items(8, key = { "track-loading:$it" }) { TrackCardSkeleton() }
                 } else {
                     items(list, key = { it.id }) { t -> TrackGridCard(t) { onOpenTrack(t.id) } }
                 }

@@ -79,7 +79,7 @@ fun AllRacesScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + insets.calculateBottomPadding()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(state.races) { race ->
+            items(state.races, key = { it.historyListKey() }) { race ->
                 Box(
                     Modifier.clip(RoundedCornerShape(12.dp))
                         .clickable(enabled = race.eventId != null) {
@@ -90,9 +90,9 @@ fun AllRacesScreen(
                 }
             }
             when {
-                state.races.isEmpty() && state.loading -> items(7) { RaceRowSkeleton(brush) }
-                state.loading -> item { RaceRowSkeleton(brush) }
-                state.error != null -> item {
+                state.races.isEmpty() && state.loading -> items(7, key = { "initial-loading:$it" }) { RaceRowSkeleton(brush) }
+                state.loading -> item(key = "append-loading") { RaceRowSkeleton(brush) }
+                state.error != null -> item(key = "load-error") {
                     Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
                         Text(
                             state.error!!,
@@ -104,7 +104,7 @@ fun AllRacesScreen(
                         )
                     }
                 }
-                state.races.isEmpty() -> item {
+                state.races.isEmpty() -> item(key = "empty") {
                     Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
                         Text("No races yet", style = MaterialTheme.typography.bodyMedium, color = TextMed)
                     }
