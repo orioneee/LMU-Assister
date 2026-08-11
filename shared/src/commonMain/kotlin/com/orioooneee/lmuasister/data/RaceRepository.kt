@@ -121,7 +121,7 @@ class RaceRepository(
     private val tokenHolder: AppTokenHolder,
 ) {
 
-    private val scheduleMem = mutableMapOf<ScheduleKey, ScheduleResponse>()
+    private val scheduleMem = mutableMapOf<ScheduleKey, CachedScheduleSlice>()
 
     fun cachedSchedule(period: SchedulePeriod, category: ScheduleCategory): ScheduleSlice? {
         val key = ScheduleKey(period, category)
@@ -132,34 +132,49 @@ class RaceRepository(
         period: SchedulePeriod,
         category: ScheduleCategory,
         refresh: Boolean = false,
-    ): Result<ScheduleSlice> = runCatching {
+    ): Result<ScheduleSlice> {
         val key = ScheduleKey(period, category)
-        if (refresh) {
-            network(key, refresh = true).toSlice()
-        } else {
-            cachedSlice(key) ?: network(key, refresh = false).toSlice()
+        if (!refresh) {
+            cachedSlice(key)?.let { return Result.success(it) }
         }
+
+        return runCatching { network(key, refresh = refresh).toSlice() }
+            .recoverCatching { error ->
+                if (refresh) throw error
+                currentRotationFallbackSlice(key) ?: throw error
+            }
     }
 
-    private fun cached(key: ScheduleKey): ScheduleResponse? =
-        scheduleMem[key] ?: disk(key)?.also { scheduleMem[key] = it }
+    private fun cachedEntry(key: ScheduleKey): CachedScheduleSlice? =
+        scheduleMem[key] ?: diskEntry(key)?.also { scheduleMem[key] = it }
 
     private fun cachedSlice(key: ScheduleKey): ScheduleSlice? =
-        cached(key)?.let { resp ->
-            runCatching { resp.toSlice() }
-                .onFailure { scheduleMem.remove(key) }
-                .getOrNull()
-        }
+        cachedEntry(key)
+            ?.takeIf { isScheduleCacheFresh(it.ts, Clock.System.now()) }
+            ?.let { cached ->
+                runCatching { cached.data.toSlice() }
+                    .onFailure { scheduleMem.remove(key) }
+                    .getOrNull()
+            }
 
-    private fun disk(key: ScheduleKey): ScheduleResponse? = runCatching {
-        LocalCache.read(key.cacheKey)?.let { AppJson.decodeFromString<CachedScheduleSlice>(it).data }
+    private fun currentRotationFallbackSlice(key: ScheduleKey): ScheduleSlice? =
+        cachedEntry(key)
+            ?.takeIf { isScheduleCacheFromCurrentRotation(it.ts, Clock.System.now()) }
+            ?.let { cached ->
+                runCatching { cached.data.toSlice() }
+                    .onFailure { scheduleMem.remove(key) }
+                    .getOrNull()
+            }
+
+    private fun diskEntry(key: ScheduleKey): CachedScheduleSlice? = runCatching {
+        LocalCache.read(key.cacheKey)?.let { AppJson.decodeFromString<CachedScheduleSlice>(it) }
     }.getOrNull()
 
     private suspend fun network(key: ScheduleKey, refresh: Boolean): ScheduleResponse =
         api.schedule(key.period, key.category, refresh = refresh).also { resp ->
-            scheduleMem[key] = resp
+            val wrapped = CachedScheduleSlice(Clock.System.now().toEpochMilliseconds(), resp)
+            scheduleMem[key] = wrapped
             runCatching {
-                val wrapped = CachedScheduleSlice(Clock.System.now().toEpochMilliseconds(), resp)
                 LocalCache.write(key.cacheKey, AppJson.encodeToString(wrapped))
             }
         }

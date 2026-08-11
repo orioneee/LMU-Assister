@@ -205,6 +205,7 @@ fun RaceDetailsScreen(
     race: Race,
     insets: PaddingValues,
     authState: SteamLoginUiState,
+    isNextWeek: Boolean = false,
     onBack: () -> Unit,
     onOpenLeaderboard: (leaderboardId: String, title: String) -> Unit = { _, _ -> },
 ) {
@@ -315,7 +316,7 @@ fun RaceDetailsScreen(
                 }
             }
 
-            if (notificationSlots.isNotEmpty()) {
+            if (!isNextWeek && notificationSlots.isNotEmpty()) {
                 item(key = "race-notify:${race.id}", span = { GridItemSpan(maxLineSpan) }) {
                     NotifyMeCta {
                         Telemetry.log(AnalyticsEvent.StartNotificationCtaOpened)
@@ -374,7 +375,7 @@ fun RaceDetailsScreen(
             item(key = "race-format:${race.id}") {
                 Card(stringResource(Res.string.format)) { DetailRows(settingRows(race.raceLength, race.settings)) }
             }
-            if (upcoming.isNotEmpty()) {
+            if (!isNextWeek && upcoming.isNotEmpty()) {
                 item(key = "race-next-times:${race.id}") {
                     Card(stringResource(Res.string.next_start_times)) {
                         TimesGrid(race.times)
@@ -390,7 +391,7 @@ fun RaceDetailsScreen(
                 .padding(bottom = 12.dp + insets.calculateBottomPadding()),
         )
 
-        if (showNotificationSheet) {
+        if (!isNextWeek && showNotificationSheet) {
             ScheduleNotificationSheet(
                 race = race,
                 slots = notificationSlots,

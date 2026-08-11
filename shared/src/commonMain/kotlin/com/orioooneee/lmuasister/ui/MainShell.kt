@@ -115,7 +115,7 @@ data class TrackDetailRoute(val trackId: String)
 data class CarDetailRoute(val carId: String)
 
 @Serializable
-data class DetailsRoute(val raceId: String)
+data class DetailsRoute(val raceId: String, val isNextWeek: Boolean = false)
 @Serializable
 data class LeaderboardRoute(val leaderboardId: String, val title: String)
 
@@ -275,9 +275,9 @@ fun MainShell(
                     popExitTransition = { ExitTransition.None },
                 ) {
             composable<HomeRoute> {
-                ScheduleTab(viewModel, insets, onOpenRace = {
-                    Telemetry.log(AnalyticsEvent.RaceDetailOpened(it.id, source = "home_grid"))
-                    nav.navigate(DetailsRoute(it.id))
+                ScheduleTab(viewModel, insets, onOpenRace = { race, isNextWeek ->
+                    Telemetry.log(AnalyticsEvent.RaceDetailOpened(race.id, source = "home_grid"))
+                    nav.navigate(DetailsRoute(race.id, isNextWeek))
                 }, onOpenScheduleUpdates = {
                     Telemetry.log(AnalyticsEvent.ScheduleUpdatesOpened)
                     nav.navigate(ScheduleUpdatesRoute)
@@ -508,15 +508,16 @@ fun MainShell(
                 )
             }
             composable<DetailsRoute>(enterTransition = enterForward, exitTransition = exitForward, popEnterTransition = popEnter, popExitTransition = popExit) { entry ->
-                val id = entry.toRoute<DetailsRoute>().raceId
+                val route = entry.toRoute<DetailsRoute>()
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 val profileState by profileViewModel.state.collectAsStateWithLifecycle()
-                val race = (state as? ScheduleUiState.Success)?.data?.schedule?.races?.firstOrNull { it.id == id }
+                val race = (state as? ScheduleUiState.Success)?.data?.schedule?.races?.firstOrNull { it.id == route.raceId }
                 if (race != null) {
                     RaceDetailsScreen(
                         race,
                         insets = insets,
                         authState = profileState,
+                        isNextWeek = route.isNextWeek,
                         onBack = { nav.popBackStack() },
                         onOpenLeaderboard = { lbId, title ->
                             Telemetry.log(AnalyticsEvent.LeaderboardOpened(lbId))
@@ -552,7 +553,7 @@ fun MainShell(
 private fun ScheduleTab(
     viewModel: ScheduleViewModel,
     insets: PaddingValues,
-    onOpenRace: (Race) -> Unit,
+    onOpenRace: (Race, isNextWeek: Boolean) -> Unit,
     onOpenScheduleUpdates: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -586,7 +587,7 @@ private fun ScheduleTab(
                     insets = insets,
                     onSelectWeek = viewModel::selectWeek,
                     onSelectCategory = viewModel::selectCategory,
-                    onOpenRace = onOpenRace,
+                    onOpenRace = { race -> onOpenRace(race, data.isNextWeek) },
                     onOpenScheduleUpdates = onOpenScheduleUpdates,
                     onRefresh = viewModel::refresh,
                     cars = cars,

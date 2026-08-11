@@ -32,6 +32,9 @@ data class ScheduleData(
     val featureFlags: FeatureFlags,
 )
 
+internal val ScheduleData.isNextWeek: Boolean
+    get() = selected == NEXT_WEEK
+
 sealed interface ScheduleUiState {
     data object Loading : ScheduleUiState
     data class Success(val data: ScheduleData) : ScheduleUiState
