@@ -30,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -95,6 +96,7 @@ import com.orioooneee.lmuasister.ui.util.formatIsoDateTime
 import com.orioooneee.lmuasister.ui.util.formatLap
 import kotlin.math.abs
 import kotlin.math.roundToLong
+import kotlinx.datetime.TimeZone
 import org.koin.compose.viewmodel.koinViewModel
 
 private val PosGreen = Color(0xFF53D769)
@@ -149,6 +151,13 @@ fun RaceProfileDetailScreen(
                         bottomInset = insets.calculateBottomPadding(),
                         cachedSplitSessions = { splitNo -> viewModel.cachedSplit(eventId, splitNo)?.sessions },
                         loadSplitSessions = { splitNo -> viewModel.raceSplit(eventId, splitNo, it.seriesId).sessions },
+                        loadRaceCard = {
+                            viewModel.raceShareCard(
+                                eventId = eventId,
+                                split = it.split ?: split,
+                                timezone = TimeZone.currentSystemDefault().id,
+                            )
+                        },
                     )
                 },
                 onFailure = {
@@ -208,6 +217,14 @@ fun PublicRaceProfileDetailScreen(
                         bottomInset = insets.calculateBottomPadding(),
                         cachedSplitSessions = { splitNo -> viewModel.cachedRaceDetail(uid, eventId, splitNo)?.sessions },
                         loadSplitSessions = { splitNo -> viewModel.raceDetail(uid, eventId, splitNo).sessions },
+                        loadRaceCard = {
+                            viewModel.raceShareCard(
+                                uid = uid,
+                                eventId = eventId,
+                                split = it.split ?: split,
+                                timezone = TimeZone.currentSystemDefault().id,
+                            )
+                        },
                     )
                 },
                 onFailure = {
@@ -257,6 +274,7 @@ private fun DetailContent(
     bottomInset: Dp,
     cachedSplitSessions: (Int) -> Map<String, RaceSessionDetailDto?>? = { null },
     loadSplitSessions: suspend (Int) -> Map<String, RaceSessionDetailDto?>,
+    loadRaceCard: (suspend () -> ByteArray)? = null,
 ) {
     val mySplit = d.split
     val tabs = d.splitsAvailable.takeIf { it.isNotEmpty() }
@@ -286,47 +304,59 @@ private fun DetailContent(
         null, mySplit -> Result.success(d.sessions)
         else -> loaded[selected]
     }
+    val raceCardSnackbar = remember { SnackbarHostState() }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomInset),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        d.trackInfo?.let { item(key = "race-track") { TrackCard(it) } }
-        item(key = "race-summary") { SummaryCard(d) }
-        if (d.availableCars.isNotEmpty()) {
-            item(key = "race-available-cars") { AvailableCarsSection(d.availableCars) }
-        }
-        if (tabs.size > 1) {
-            item(key = "race-split-tabs") { SplitTabs(tabs, selected, mySplit) { selected = it } }
-        }
-        when {
-            selectedSessions == null -> item(key = "split-loading:${selected ?: "mine"}") {
-                SplitSessionsSkeleton(shimmerBrush())
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomInset),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (loadRaceCard != null) {
+                item(key = "race-card-actions") { RaceCardActionsRow(d, loadRaceCard, raceCardSnackbar) }
             }
-            selectedSessions.isFailure -> item(key = "split-error:${selected ?: "mine"}") {
-                SplitError {
-                    loaded.remove(selected)
-                    reloadNonce++
+            d.trackInfo?.let { item(key = "race-track") { TrackCard(it) } }
+            item(key = "race-summary") { SummaryCard(d) }
+            if (d.availableCars.isNotEmpty()) {
+                item(key = "race-available-cars") { AvailableCarsSection(d.availableCars) }
+            }
+            if (tabs.size > 1) {
+                item(key = "race-split-tabs") { SplitTabs(tabs, selected, mySplit) { selected = it } }
+            }
+            when {
+                selectedSessions == null -> item(key = "split-loading:${selected ?: "mine"}") {
+                    SplitSessionsSkeleton(shimmerBrush())
                 }
-            }
-            else -> {
-                val sessions = selectedSessions.getOrThrow()
-                for (key in listOf("practice", "qualifying", "race")) {
-                    val session = sessions[key] ?: continue
-                    if (session.classification.isEmpty() && session.teamClassification.isEmpty()) continue
-                    item(key = "split:$selected:$key") {
-                        SessionCard(
-                            label = sessionLabel(key),
-                            sessionKey = key,
-                            session = session,
-                            showRatingDeltas = key == "race",
-                            showSectors = d.features?.sectors != false,
-                        )
+                selectedSessions.isFailure -> item(key = "split-error:${selected ?: "mine"}") {
+                    SplitError {
+                        loaded.remove(selected)
+                        reloadNonce++
+                    }
+                }
+                else -> {
+                    val sessions = selectedSessions.getOrThrow()
+                    for (key in listOf("practice", "qualifying", "race")) {
+                        val session = sessions[key] ?: continue
+                        if (session.classification.isEmpty() && session.teamClassification.isEmpty()) continue
+                        item(key = "split:$selected:$key") {
+                            SessionCard(
+                                label = sessionLabel(key),
+                                sessionKey = key,
+                                session = session,
+                                showRatingDeltas = key == "race",
+                                showSectors = d.features?.sectors != false,
+                            )
+                        }
                     }
                 }
             }
         }
+        RaceCardSnackbarHost(
+            hostState = raceCardSnackbar,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 16.dp, vertical = 12.dp + bottomInset),
+        )
     }
 }
 
@@ -627,6 +657,7 @@ private fun SummaryCard(d: RaceDetailDto) {
             }
             if (showPaceInfo) PaceInfoDialog { showPaceInfo = false }
         }
+        SessionStrategiesSection(d)
         if (hasQualifyingLaps || hasRaceLaps || hasBreakdown) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 // All per-lap times + extra stats for each session when the backend provides them.

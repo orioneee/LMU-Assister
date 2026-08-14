@@ -290,6 +290,13 @@ class PublicUsersViewModel(
         api.publicUserRaceDetail(uid, eventId, split)
             .also { runCatching { LocalCache.write(raceDetailKey(uid, eventId, split), ProfileJson.encodeToString(it)) } }
 
+    suspend fun raceShareCard(
+        uid: String,
+        eventId: String,
+        split: Int?,
+        timezone: String?,
+    ): ByteArray = api.publicUserRaceShareCard(uid, eventId, split, timezone)
+
     fun cachedRaceDetail(uid: String, eventId: String, split: Int?): RaceDetailDto? =
         LocalCache.read(raceDetailKey(uid, eventId, split))?.takeIf { it.isNotBlank() }
             ?.let { runCatching { ProfileJson.decodeFromString<RaceDetailDto>(it) }.getOrNull() }

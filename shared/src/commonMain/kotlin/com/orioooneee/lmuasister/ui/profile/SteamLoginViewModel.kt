@@ -851,6 +851,9 @@ class SteamLoginViewModel(
         withReauth { backend.raceDetail(it, eventId, split, page) }
             .also { runCatching { LocalCache.write(raceDetailKey(eventId), AppJson.encodeToString(it)) } }
 
+    suspend fun raceShareCard(eventId: String, split: Int?, timezone: String?): ByteArray =
+        withReauth { backend.raceShareCard(it, eventId, split, timezone) }
+
     fun cachedRaceDetail(eventId: String): RaceDetailDto? =
         LocalCache.read(raceDetailKey(eventId))?.takeIf { it.isNotBlank() }
             ?.let { runCatching { AppJson.decodeFromString<RaceDetailDto>(it) }.getOrNull() }

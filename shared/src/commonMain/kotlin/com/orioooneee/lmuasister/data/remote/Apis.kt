@@ -276,6 +276,37 @@ class BackendApi(
         return ProfileJson.decodeFromString(text)
     }
 
+    /** Ensures a public local or RaceCenter driver's card exists in R2, then downloads its PNG. */
+    suspend fun publicUserRaceShareCard(
+        uid: String,
+        eventId: String,
+        split: Int? = null,
+        timezone: String? = null,
+    ): ByteArray {
+        val query = buildList {
+            split?.let { add("split=$it") }
+            timezone?.takeIf { it.isNotBlank() }?.let {
+                add("tz=${it.encodeURLQueryComponent()}")
+            }
+        }.joinToString("&")
+        val path = buildString {
+            append("/users/${uid.encodeURLPathPart()}")
+            if (uid.startsWith("racecenter:")) append("/external")
+            append("/race/${eventId.encodeURLPathPart()}/share-card")
+            if (query.isNotEmpty()) append("?$query")
+        }
+        val response = getResponse(path)
+        if (response.status.value !in 200..299) {
+            throw response.toRaceShareCardException()
+        }
+        val card = runCatching {
+            ProfileJson.decodeFromString<RaceShareCardDto>(response.bodyAsText())
+        }.getOrElse {
+            throw Exception("share_card_invalid_response")
+        }
+        return client.downloadRaceShareCard(card.url)
+    }
+
     /** Public saved track history for a user. Same payload shape as /profile/track/<track_id>. */
     suspend fun publicUserTrack(uid: String, trackId: String, patch: String? = null): TrackDetailResponse {
         val qs = patch?.takeIf { it.isNotBlank() }?.let { "?patch=${it.encodeURLQueryComponent()}" }.orEmpty()
@@ -493,6 +524,9 @@ private fun String.publicRaceErrorCode(): String? =
         "external_user_unsupported",
         "local_user_unsupported",
         "nakama_unavailable",
+        "share_card_unavailable",
+        "share_card_storage_unavailable",
+        "share_card_storage_error",
     ).firstOrNull { contains(it) }
 
 private fun String.withLeadingSlash(): String =

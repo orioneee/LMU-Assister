@@ -10,6 +10,7 @@ import com.orioooneee.lmuasister.data.remote.ClassLeaderboardDto
 import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
 import com.orioooneee.lmuasister.data.remote.FavoriteCarClassInfoDto
 import com.orioooneee.lmuasister.data.remote.FavoriteCarDto
+import com.orioooneee.lmuasister.data.remote.FuelStrategyDto
 import com.orioooneee.lmuasister.data.remote.GameVersionDto
 import com.orioooneee.lmuasister.data.remote.HotlapDto
 import com.orioooneee.lmuasister.data.remote.HotlapsResponse
@@ -26,6 +27,7 @@ import com.orioooneee.lmuasister.data.remote.RacesPageDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SessionSummaryDto
+import com.orioooneee.lmuasister.data.remote.SessionStrategyDto
 import com.orioooneee.lmuasister.data.remote.SessionWeatherDto
 import com.orioooneee.lmuasister.data.remote.SettingsDto
 import com.orioooneee.lmuasister.data.remote.ProfileStatsDto
@@ -52,6 +54,9 @@ import com.orioooneee.lmuasister.data.remote.TopCarsCacheDto
 import com.orioooneee.lmuasister.data.remote.TopCarsResponse
 import com.orioooneee.lmuasister.data.remote.TopCarsScopeDto
 import com.orioooneee.lmuasister.data.remote.TracksResponse
+import com.orioooneee.lmuasister.data.remote.TyreCompoundDto
+import com.orioooneee.lmuasister.data.remote.TyreStintDto
+import com.orioooneee.lmuasister.data.remote.TyreStrategyDto
 import com.orioooneee.lmuasister.data.remote.UsersDistributionDto
 import com.orioooneee.lmuasister.data.remote.UsersSearchResponse
 import com.orioooneee.lmuasister.data.remote.UsersSummaryResponse
@@ -882,6 +887,75 @@ internal object MockData {
         val t = tracks.firstOrNull { it.simple == card.track } ?: tracks[1]
         fun summary(pos: Int, grid: Int, lapMs: Long) =
             SessionSummaryDto(position = pos, classPosition = pos, gridPosition = grid, bestLapMs = lapMs)
+        val qualifyingStrategy = SessionStrategyDto(
+            lapCount = 5,
+            tyres = TyreStrategyDto(
+                lapCount = 5,
+                stintCount = 1,
+                stints = listOf(
+                    TyreStintDto(
+                        number = 1,
+                        startLap = 1,
+                        endLap = 5,
+                        lapCount = 5,
+                        label = "SOFT",
+                        frontCompound = "soft",
+                        rearCompound = "soft",
+                        frontColor = "#F2F4F8",
+                        rearColor = "#F2F4F8",
+                    ),
+                ),
+                compounds = listOf(TyreCompoundDto("soft", "SOFT", "S", "#F2F4F8")),
+            ),
+            fuel = FuelStrategyDto(
+                usedPct = 18.4,
+                remainingPct = 77.2,
+                averagePerLapPct = 3.68,
+                lapCount = 5,
+            ),
+        )
+        val raceStrategy = SessionStrategyDto(
+            lapCount = 12,
+            tyres = TyreStrategyDto(
+                lapCount = 12,
+                stintCount = 2,
+                stints = listOf(
+                    TyreStintDto(
+                        number = 1,
+                        startLap = 1,
+                        endLap = 6,
+                        lapCount = 6,
+                        pitAfter = true,
+                        label = "MEDIUM",
+                        frontCompound = "medium",
+                        rearCompound = "medium",
+                        frontColor = "#F2C94C",
+                        rearColor = "#F2C94C",
+                    ),
+                    TyreStintDto(
+                        number = 2,
+                        startLap = 7,
+                        endLap = 12,
+                        lapCount = 6,
+                        label = "HARD",
+                        frontCompound = "hard",
+                        rearCompound = "hard",
+                        frontColor = "#E33B32",
+                        rearColor = "#E33B32",
+                    ),
+                ),
+                compounds = listOf(
+                    TyreCompoundDto("medium", "MEDIUM", "M", "#F2C94C"),
+                    TyreCompoundDto("hard", "HARD", "H", "#E33B32"),
+                ),
+            ),
+            fuel = FuelStrategyDto(
+                usedPct = 83.6,
+                remainingPct = 16.4,
+                averagePerLapPct = 6.97,
+                lapCount = 12,
+            ),
+        )
         val detail = RaceDetailDto(
             date = card.date,
             title = card.title,
@@ -933,10 +1007,12 @@ internal object MockData {
                 "qualifying" to RaceSessionDetailDto(
                     me = summary(card.gridPosition ?: 12, card.gridPosition ?: 12, (card.bestLapMs ?: 0)),
                     classification = classification(eventId, "q", card),
+                    strategy = qualifyingStrategy,
                 ),
                 "race" to RaceSessionDetailDto(
                     me = summary(card.position, card.gridPosition ?: 12, (card.bestLapMs ?: 0) + 1_900),
                     classification = classification(eventId, "r", card),
+                    strategy = raceStrategy,
                 ),
             ),
         )

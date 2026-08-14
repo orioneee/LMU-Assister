@@ -238,6 +238,26 @@ class SteamBackendApi(
         return ProfileJson.decodeFromString(getAuthed(path, token))
     }
 
+    /** Ensures the signed-in driver's race card exists in R2, then downloads its PNG. */
+    suspend fun raceShareCard(
+        token: String,
+        eventId: String,
+        split: Int?,
+        timezone: String?,
+    ): ByteArray {
+        val qs = buildList {
+            split?.let { add("split=$it") }
+            timezone?.takeIf { it.isNotBlank() }?.let {
+                add("tz=${it.encodeURLQueryComponent()}")
+            }
+        }.joinToString("&")
+        val path = "/profile/race/${eventId.encodeURLPathPart()}/share-card" +
+            if (qs.isEmpty()) "" else "?$qs"
+        val response = getAuthedResponse(path, token, preserveBackendError = true)
+        val card = ProfileJson.decodeFromString<RaceShareCardDto>(response.bodyAsText())
+        return client.downloadRaceShareCard(card.url)
+    }
+
     /** One foreign split's classification (lazy, per-tab). `seriesId` lets the backend skip a history re-read. */
     suspend fun raceSplit(token: String, eventId: String, splitNo: Int, seriesId: String?): SplitDetailDto {
         val qs = seriesId?.takeIf { it.isNotBlank() }?.let { "?series_id=${it.encodeURLQueryComponent()}" } ?: ""
@@ -348,14 +368,26 @@ class SteamBackendApi(
      */
 
     private suspend fun getAuthed(pathAndQuery: String, token: String): String {
+        return getAuthedResponse(pathAndQuery, token).bodyAsText()
+    }
+
+    private suspend fun getAuthedResponse(
+        pathAndQuery: String,
+        token: String,
+        preserveBackendError: Boolean = false,
+    ): HttpResponse {
         val path = pathAndQuery.withLeadingSlash()
         val resp = apiBaseUrlProvider.withBaseUrlRetry { baseUrl ->
             client.get(baseUrl + path) { header(HttpHeaders.Authorization, "Bearer $token") }
         }
         SteamLog.d("backend: GET $path -> ${resp.status.value}")
         return when (resp.status.value) {
-            in 200..299 -> resp.bodyAsText()
-            else -> throw resp.toError()
+            in 200..299 -> resp
+            else -> if (preserveBackendError) {
+                throw resp.toRaceShareCardException()
+            } else {
+                throw resp.toError()
+            }
         }
     }
 

@@ -68,6 +68,7 @@ kotlin {
             dependencies {
                 implementation(libs.compose.uiToolingPreview)
                 implementation(libs.androidx.activity.compose)
+                implementation(libs.androidx.core.ktx)
                 implementation(libs.firebase.appcheck.playintegrity)
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.bouncycastle.prov)

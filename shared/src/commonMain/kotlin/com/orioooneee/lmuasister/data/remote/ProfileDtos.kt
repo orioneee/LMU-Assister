@@ -200,6 +200,21 @@ data class LapDto(
     @SerialName("lap_time_ms") val lapTimeMs: Long? = null,
     @SerialName("sectors_ms") val sectorsMs: List<Long?> = emptyList(),
     val pit: Boolean = false,    // in/out lap around a pit stop — excluded from average pace
+    @SerialName("front_compound") val frontCompound: String? = null,
+    @SerialName("rear_compound") val rearCompound: String? = null,
+    @SerialName("front_compound_key") val frontCompoundKey: String? = null,
+    @SerialName("rear_compound_key") val rearCompoundKey: String? = null,
+    @SerialName("fuel_remaining") val fuelRemaining: Double? = null,
+    @SerialName("fuel_remaining_pct") val fuelRemainingPct: Double? = null,
+    @SerialName("tyre_wear_remaining") val tyreWearRemaining: TyreWearRemainingDto? = null,
+)
+
+@Serializable
+data class TyreWearRemainingDto(
+    @SerialName("front_left") val frontLeft: Double? = null,
+    @SerialName("front_right") val frontRight: Double? = null,
+    @SerialName("rear_left") val rearLeft: Double? = null,
+    @SerialName("rear_right") val rearRight: Double? = null,
 )
 
 /** Per-session line (practice / qualifying / race) for a recent race. */
@@ -294,6 +309,7 @@ data class RaceDetailDto(
     @SerialName("car_name") val carName: String? = null,
     @SerialName("car_class") val carClass: String? = null,
     @SerialName("car_image_url") val carImageUrl: String? = null,
+    @SerialName("car_hero_image_url") val carHeroImageUrl: String? = null,
     val manufacturer: String? = null,
     val engine: String? = null,
     @SerialName("manufacturer_logo_url") val manufacturerLogoUrl: String? = null,
@@ -330,6 +346,12 @@ data class RaceDetailDto(
     // The player's per-lap times (for the average-pace / delta-to-best stat).
     @SerialName("lap_progress") val lapProgress: List<LapDto> = emptyList(),
     @SerialName("hero_image") val heroImage: String? = null,
+    @SerialName("race_started_at") val raceStartedAt: String? = null,
+    @SerialName("race_ends_at") val raceEndsAt: String? = null,
+    @SerialName("driver_name") val driverName: String? = null,
+    @SerialName("profile_badge_url") val profileBadgeUrl: String? = null,
+    @SerialName("driver_rating") val driverRating: RatingDto? = null,
+    @SerialName("safety_rating") val safetyRating: RatingDto? = null,
     // Highlight categories this race earned (keys from RACE_CATEGORIES: wins / poles / grand_slam…),
     // shown as colored chips. Ordered by the backend.
     val categories: List<String> = emptyList(),
@@ -353,7 +375,21 @@ data class RaceDetailFeaturesDto(
     @SerialName("team_breakdown") val teamBreakdown: Boolean = false,
     @SerialName("lap_progress") val lapProgress: Boolean = true,
     val sectors: Boolean = true,
+    @SerialName("session_strategy") val sessionStrategy: Boolean = false,
+    @SerialName("physical_fuel") val physicalFuel: Boolean = false,
+    @SerialName("tyre_compounds") val tyreCompounds: Boolean = false,
     @SerialName("nakama_detail") val nakamaDetail: Boolean = true,
+    @SerialName("raceos_detail") val raceOsDetail: Boolean = false,
+)
+
+/** Response from a /share-card endpoint; the PNG itself is stored in public R2. */
+@Serializable
+data class RaceShareCardDto(
+    val url: String,
+    val key: String? = null,
+    @SerialName("content_hash") val contentHash: String? = null,
+    @SerialName("render_version") val renderVersion: Int? = null,
+    val cached: Boolean = false,
 )
 
 /** GET /api/v3/profile/race/<eventId>/split/<n> — one foreign split's tables (no `me` row). */
@@ -372,6 +408,58 @@ data class RaceSessionDetailDto(
     val me: SessionSummaryDto? = null,
     val classification: List<ClassificationRowDto> = emptyList(),
     @SerialName("team_classification") val teamClassification: List<ClassificationRowDto> = emptyList(),
+    val strategy: SessionStrategyDto? = null,
+)
+
+@Serializable
+data class SessionStrategyDto(
+    @SerialName("lap_count") val lapCount: Int = 0,
+    val tyres: TyreStrategyDto? = null,
+    val fuel: FuelStrategyDto? = null,
+)
+
+@Serializable
+data class TyreStrategyDto(
+    @SerialName("lap_count") val lapCount: Int = 0,
+    @SerialName("stint_count") val stintCount: Int = 0,
+    val stints: List<TyreStintDto> = emptyList(),
+    val compounds: List<TyreCompoundDto> = emptyList(),
+)
+
+@Serializable
+data class TyreStintDto(
+    val number: Int = 0,
+    @SerialName("start_lap") val startLap: Int? = null,
+    @SerialName("end_lap") val endLap: Int? = null,
+    @SerialName("lap_count") val lapCount: Int = 0,
+    @SerialName("pit_after") val pitAfter: Boolean = false,
+    val label: String = "",
+    @SerialName("front_compound") val frontCompound: String = "unknown",
+    @SerialName("rear_compound") val rearCompound: String = "unknown",
+    @SerialName("front_color") val frontColor: String = "#6F7785",
+    @SerialName("rear_color") val rearColor: String = "#6F7785",
+)
+
+@Serializable
+data class TyreCompoundDto(
+    val key: String = "unknown",
+    val label: String = "UNKNOWN",
+    @SerialName("short_label") val shortLabel: String = "?",
+    val color: String = "#6F7785",
+)
+
+@Serializable
+data class FuelStrategyDto(
+    val source: String? = null,
+    val label: String = "FUEL",
+    val unit: String = "percent",
+    @SerialName("accent_color") val accentColor: String = "#F1667E",
+    val estimated: Boolean = false,
+    @SerialName("used_pct") val usedPct: Double? = null,
+    @SerialName("remaining_pct") val remainingPct: Double? = null,
+    @SerialName("average_per_lap_pct") val averagePerLapPct: Double? = null,
+    @SerialName("lap_count") val lapCount: Int = 0,
+    @SerialName("refuel_count") val refuelCount: Int = 0,
 )
 
 @Serializable
@@ -404,6 +492,8 @@ data class ClassificationRowDto(
     val name: String? = null,
     @SerialName("driver_name") val driverName: String? = null,
     val nationality: String? = null,
+    val badge: String? = null,
+    @SerialName("badge_url") val badgeUrl: String? = null,
     @SerialName("is_me") val isMe: Boolean = false,
     val car: String? = null,
     @SerialName("car_image_url") val carImageUrl: String? = null,

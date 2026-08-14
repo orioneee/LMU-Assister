@@ -96,4 +96,107 @@ class StatsDecodeTest {
         assertEquals("Daytona", track.displayName)
         assertEquals("Daytona International Speedway", track.officialName)
     }
+
+    @Test
+    fun decodesFrontendReadyTyreAndFuelStrategy() {
+        val detail = ProfileJson.decodeFromString<RaceDetailDto>(
+            """
+            {
+              "title": "Strategy test",
+              "features": {
+                "session_strategy": true,
+                "physical_fuel": true,
+                "tyre_compounds": true
+              },
+              "sessions": {
+                "race": {
+                  "strategy": {
+                    "lap_count": 3,
+                    "tyres": {
+                      "lap_count": 3,
+                      "stint_count": 2,
+                      "stints": [
+                        {
+                          "number": 1,
+                          "start_lap": 1,
+                          "end_lap": 2,
+                          "lap_count": 2,
+                          "pit_after": true,
+                          "label": "MEDIUM",
+                          "front_compound": "medium",
+                          "rear_compound": "medium",
+                          "front_color": "#F2C94C",
+                          "rear_color": "#F2C94C"
+                        },
+                        {
+                          "number": 2,
+                          "start_lap": 3,
+                          "end_lap": 3,
+                          "lap_count": 1,
+                          "pit_after": false,
+                          "label": "HARD",
+                          "front_compound": "hard",
+                          "rear_compound": "hard",
+                          "front_color": "#E33B32",
+                          "rear_color": "#E33B32"
+                        }
+                      ],
+                      "compounds": [
+                        {"key":"medium","label":"MEDIUM","short_label":"M","color":"#F2C94C"}
+                      ]
+                    },
+                    "fuel": {
+                      "source": "physical_fuel",
+                      "label": "FUEL",
+                      "unit": "percent",
+                      "accent_color": "#F1667E",
+                      "estimated": true,
+                      "used_pct": 30.0,
+                      "remaining_pct": 70.0,
+                      "average_per_lap_pct": 10.0,
+                      "lap_count": 3,
+                      "refuel_count": 0
+                    }
+                  },
+                  "classification": [{
+                    "is_me": true,
+                    "badge": "sr-clean",
+                    "badge_url": "https://example.com/sr-clean.svg",
+                    "lap_progress": [{
+                      "lap": 1,
+                      "front_compound": "Medium",
+                      "rear_compound": "Medium",
+                      "front_compound_key": "medium",
+                      "rear_compound_key": "medium",
+                      "fuel_remaining": 0.9,
+                      "fuel_remaining_pct": 90.0,
+                      "tyre_wear_remaining": {
+                        "front_left": 0.98,
+                        "front_right": 0.97,
+                        "rear_left": 0.96,
+                        "rear_right": 0.95
+                      }
+                    }]
+                  }]
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val race = detail.sessions.getValue("race")!!
+        val strategy = race.strategy!!
+        val firstStint = strategy.tyres!!.stints.first()
+        val lap = race.classification.single().lapProgress.single()
+        assertEquals(true, detail.features?.sessionStrategy)
+        assertEquals(2, strategy.tyres.stintCount)
+        assertEquals("MEDIUM", firstStint.label)
+        assertEquals(true, firstStint.pitAfter)
+        assertEquals(30.0, strategy.fuel?.usedPct)
+        assertEquals("#F1667E", strategy.fuel?.accentColor)
+        assertEquals("medium", lap.frontCompoundKey)
+        assertEquals(90.0, lap.fuelRemainingPct)
+        assertEquals(0.95, lap.tyreWearRemaining?.rearRight)
+        assertEquals("sr-clean", race.classification.single().badge)
+    }
 }

@@ -10,6 +10,7 @@ import io.ktor.client.engine.mock.respondOk
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlin.io.encoding.Base64
 import kotlinx.coroutines.delay
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -24,6 +25,10 @@ import org.koin.dsl.module
  */
 
 private val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
+private val pngHeaders = headersOf(HttpHeaders.ContentType, "image/png")
+private val mockRaceCardPng = Base64.Default.decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+R4XcWQAAAABJRU5ErkJggg==",
+)
 
 /** Drop-in for the real network client — every request is served from [MockData]. */
 fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
@@ -155,6 +160,11 @@ fun mockHttpClient(): HttpClient = HttpClient(MockEngine) {
                     json(MockData.categoryRacesPage(path.removePrefix("/profile/races/"), params["page"]?.toIntOrNull() ?: 1))
                 path.startsWith("/profile/track/") ->
                     json(MockData.trackDetail(path.removePrefix("/profile/track/"), params["patch"]))
+                path.endsWith("/share-card") -> json(
+                    """{"url":"https://mock.local/assets/race-card.png","key":"cards/mock.png","content_hash":"mock","render_version":1,"cached":true}""",
+                )
+                path == "/assets/race-card.png" ->
+                    respond(mockRaceCardPng, HttpStatusCode.OK, pngHeaders)
                 path.startsWith("/profile/race/") ->
                     json(MockData.profileRaceDetail(path.removePrefix("/profile/race/")))
 
