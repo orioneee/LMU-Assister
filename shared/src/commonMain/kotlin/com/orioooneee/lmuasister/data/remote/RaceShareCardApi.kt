@@ -23,8 +23,8 @@ internal suspend fun HttpResponse.toRaceShareCardException(): BackendApiExceptio
 }
 
 internal suspend fun HttpClient.downloadRaceShareCard(url: String): ByteArray {
-    require(url.startsWith("https://") || url.startsWith("http://")) {
-        "share_card_invalid_url"
+    if (!url.startsWith("https://") && !url.startsWith("http://")) {
+        error("share_card_invalid_url")
     }
     val response = get(url)
     if (response.status.value !in 200..299) {
@@ -36,6 +36,6 @@ internal suspend fun HttpClient.downloadRaceShareCard(url: String): ByteArray {
         )
     }
     return response.bodyAsBytes().also {
-        require(it.isNotEmpty()) { "share_card_empty" }
+        if (it.isEmpty()) error("share_card_empty")
     }
 }

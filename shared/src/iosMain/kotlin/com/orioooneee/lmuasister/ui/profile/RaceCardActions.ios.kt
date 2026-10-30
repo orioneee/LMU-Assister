@@ -20,16 +20,16 @@ import platform.UIKit.popoverPresentationController
 actual fun rememberRaceCardActionsController(): RaceCardActionsController =
     remember { IosRaceCardActionsController() }
 
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 private class IosRaceCardActionsController : RaceCardActionsController {
     override val canShare: Boolean = true
     override val canCopy: Boolean = true
 
     override suspend fun sharePng(bytes: ByteArray, fileName: String): RaceCardActionResult =
         runCatching {
-            val image = bytes.toImage() ?: error("The race card image couldn't be decoded")
+            val image = bytes.toImage() ?: error("share_card_invalid_png")
             val presenter = IosRootViewController.current?.topPresenter()
-                ?: error("The share sheet isn't available")
+                ?: error("share_sheet_unavailable")
             val controller = UIActivityViewController(
                 activityItems = listOf(image),
                 applicationActivities = null,
@@ -38,16 +38,16 @@ private class IosRaceCardActionsController : RaceCardActionsController {
             presenter.presentViewController(controller, animated = true, completion = null)
             RaceCardActionResult(true, "Race card ready to share")
         }.getOrElse {
-            RaceCardActionResult(false, it.message ?: "Couldn't share the race card", cause = it)
+            RaceCardActionResult(false, "Couldn't share the race card", cause = it)
         }
 
     override suspend fun copyPng(bytes: ByteArray, fileName: String): RaceCardActionResult =
         runCatching {
-            val image = bytes.toImage() ?: error("The race card image couldn't be decoded")
+            val image = bytes.toImage() ?: error("share_card_invalid_png")
             UIPasteboard.generalPasteboard.image = image
             RaceCardActionResult(true, "Race card copied")
         }.getOrElse {
-            RaceCardActionResult(false, it.message ?: "Couldn't copy the race card", cause = it)
+            RaceCardActionResult(false, "Couldn't copy the race card", cause = it)
         }
 }
 

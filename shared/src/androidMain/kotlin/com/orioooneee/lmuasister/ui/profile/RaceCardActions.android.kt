@@ -37,25 +37,23 @@ private class AndroidRaceCardActionsController(
             context.startActivity(chooser)
             RaceCardActionResult(true, "Race card ready to share")
         }.getOrElse {
-            RaceCardActionResult(false, it.message ?: "Couldn't share the race card", cause = it)
+            RaceCardActionResult(false, "Couldn't share the race card", cause = it)
         }
 
     override suspend fun copyPng(bytes: ByteArray, fileName: String): RaceCardActionResult =
         runCatching {
             val uri = writeCard(bytes, fileName)
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(
-                ClipData.newUri(context.contentResolver, "LMU race card", uri),
-            )
+            clipboard.setPrimaryClip(ClipData.newUri(context.contentResolver, "Race card", uri))
             RaceCardActionResult(true, "Race card copied")
         }.getOrElse {
-            RaceCardActionResult(false, it.message ?: "Couldn't copy the race card", cause = it)
+            RaceCardActionResult(false, "Couldn't copy the race card", cause = it)
         }
 
     private fun writeCard(bytes: ByteArray, fileName: String): android.net.Uri {
-        require(bytes.isNotEmpty()) { "The race card is empty" }
+        if (bytes.isEmpty()) error("share_card_empty")
         val directory = File(context.cacheDir, "shared-race-cards").apply { mkdirs() }
-        val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        val safeName = fileName.replace(Regex("[^a-zA-Z0-9._-]"), "-")
         val file = File(directory, safeName).apply { writeBytes(bytes) }
         return FileProvider.getUriForFile(
             context,

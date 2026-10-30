@@ -10,6 +10,7 @@ import com.orioooneee.lmuasister.data.remote.ProfileJson
 import com.orioooneee.lmuasister.data.remote.PublicUserDto
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
 import com.orioooneee.lmuasister.data.remote.RacesPageDto
+import com.orioooneee.lmuasister.data.remote.RaceShareCardDto
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
 import com.orioooneee.lmuasister.data.remote.SteamProfile
 import com.orioooneee.lmuasister.data.remote.UsersSummaryResponse
@@ -295,7 +296,10 @@ class PublicUsersViewModel(
         eventId: String,
         split: Int?,
         timezone: String?,
-    ): ByteArray = api.publicUserRaceShareCard(uid, eventId, split, timezone)
+    ): RaceShareCardDto = api.publicUserRaceShareCard(uid, eventId, split, timezone)
+
+    suspend fun downloadRaceShareCardImage(url: String): ByteArray =
+        api.downloadRaceShareCardImage(url)
 
     fun cachedRaceDetail(uid: String, eventId: String, split: Int?): RaceDetailDto? =
         LocalCache.read(raceDetailKey(uid, eventId, split))?.takeIf { it.isNotBlank() }

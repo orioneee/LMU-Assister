@@ -276,13 +276,13 @@ class BackendApi(
         return ProfileJson.decodeFromString(text)
     }
 
-    /** Ensures a public local or RaceCenter driver's card exists in R2, then downloads its PNG. */
+    /** Ensures a public local or RaceCenter driver's card exists and returns its public URL. */
     suspend fun publicUserRaceShareCard(
         uid: String,
         eventId: String,
         split: Int? = null,
         timezone: String? = null,
-    ): ByteArray {
+    ): RaceShareCardDto {
         val query = buildList {
             split?.let { add("split=$it") }
             timezone?.takeIf { it.isNotBlank() }?.let {
@@ -299,13 +299,15 @@ class BackendApi(
         if (response.status.value !in 200..299) {
             throw response.toRaceShareCardException()
         }
-        val card = runCatching {
+        return runCatching {
             ProfileJson.decodeFromString<RaceShareCardDto>(response.bodyAsText())
         }.getOrElse {
             throw Exception("share_card_invalid_response")
         }
-        return client.downloadRaceShareCard(card.url)
     }
+
+    suspend fun downloadRaceShareCardImage(url: String): ByteArray =
+        client.downloadRaceShareCard(url)
 
     /** Public saved track history for a user. Same payload shape as /profile/track/<track_id>. */
     suspend fun publicUserTrack(uid: String, trackId: String, patch: String? = null): TrackDetailResponse {

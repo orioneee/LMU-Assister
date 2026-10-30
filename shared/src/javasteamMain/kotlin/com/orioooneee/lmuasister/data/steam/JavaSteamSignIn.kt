@@ -14,7 +14,7 @@ internal class JavaSteamSignIn(
     private val steam: SteamAuthClient,
     private val backend: SteamBackendApi,
     private val store: SteamSessionStore,
-) : SteamSignIn {
+) : SteamSignIn, SteamAchievementsClient {
 
     override suspend fun signIn(username: String, password: String, guardCode: String?): SignInOutcome {
         SteamLog.d("javasteam: login start (userLen=${username.trim().length})")
@@ -35,6 +35,20 @@ internal class JavaSteamSignIn(
 
     override fun signOut() {
         store.clear()
+    }
+
+    override suspend fun achievements(appId: Int): SteamAchievements {
+        val tokens = store.load()
+            ?: throw IllegalStateException("Steam session expired. Sign in again.")
+        return steam.achievements(
+            steamId = tokens.steamId,
+            accountName = tokens.accountName,
+            refreshToken = tokens.refreshToken,
+            appId = appId,
+        ).getOrElse { error ->
+            SteamLog.e("javasteam: achievements failed", error)
+            throw error
+        }
     }
 
     private suspend fun silentToken(tokens: SteamTokens): String? =

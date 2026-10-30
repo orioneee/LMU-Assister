@@ -1,11 +1,3 @@
 package com.orioooneee.lmuasister.data.steam
 
-import com.orioooneee.lmuasister.data.remote.SteamBackendApi
-import org.koin.dsl.module
-
-actual fun steamModule() = module {
-    single<SteamSessionStore> { steamSessionStore() }
-    single { KSteamSignIn(get<SteamBackendApi>(), get()) }
-    single<SteamSignIn> { get<KSteamSignIn>() }
-    single<SteamAchievementsClient> { get<KSteamSignIn>() }
-}
+actual fun steamModule() = javaSteamModule()

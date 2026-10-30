@@ -46,15 +46,33 @@ internal class KSteamSignIn(
     private var started = false
     private var activeQrFlow: QrFlow? = null
 
+    private fun diagnosticState(): String = client?.let {
+        "auth=${it.account.clientAuthState.value.describe()} cm=${it.connectionStatus.value}"
+    } ?: "client=none"
+
+    private suspend fun <T> loggedLock(operation: String, block: suspend () -> T): T =
+        SteamLog.step("ksteam.$operation", ::diagnosticState) {
+            SteamLog.d("ksteam: $operation waiting for auth mutex locked=${mutex.isLocked}")
+            val mark = TimeSource.Monotonic.markNow()
+            mutex.withLock {
+                SteamLog.d("ksteam: $operation acquired auth mutex waitMs=${mark.elapsedNow().inWholeMilliseconds}")
+                try {
+                    block()
+                } finally {
+                    SteamLog.d("ksteam: $operation releasing auth mutex")
+                }
+            }
+        }
+
     override suspend fun signIn(username: String, password: String, guardCode: String?): SignInOutcome =
-        mutex.withLock {
+        loggedLock("credentials") {
             val steam = startedClient()
             val code = guardCode?.trim().orEmpty()
             activeQrFlow = null
 
             if (code.isNotBlank() && steam.account.clientAuthState.value is AuthorizationState.AwaitingTwoFactor) {
                 SteamLog.d("ksteam: login has typed guard code while auth state=${steam.account.clientAuthState.value.describe()}")
-                return@withLock submitGuardCode(steam, code)
+                return@loggedLock submitGuardCode(steam, code)
             }
 
             if (steam.account.clientAuthState.value is AuthorizationState.AwaitingTwoFactor) {
@@ -64,30 +82,32 @@ internal class KSteamSignIn(
 
             SteamLog.d("ksteam: credential login start userLen=${username.trim().length} state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}")
             val authResult = try {
-                steam.account.signIn(username.trim(), password, rememberSession = true)
+                SteamLog.step("ksteam.credentials_rpc", ::diagnosticState) {
+                    steam.account.signIn(username.trim(), password, rememberSession = true)
+                }.also { SteamLog.d("ksteam: credential RPC result=$it") }
             } catch (e: CancellationException) {
                 SteamLog.e("ksteam: credential login interrupted state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}", e)
                 resetClientAfterCredentialFailure(steam, "interrupted")
-                return@withLock SignInOutcome.Failure("Steam connection was interrupted. Try again.")
+                return@loggedLock SignInOutcome.Failure("Steam connection was interrupted. Try again.")
             }
             when (authResult) {
                 Account.AuthorizationResult.InvalidPassword -> {
                     SteamLog.d("ksteam: credential login rejected: invalid password")
                     resetClientAfterCredentialFailure(steam, "invalid_password")
-                    return@withLock SignInOutcome.Failure("Steam rejected the password.")
+                    return@loggedLock SignInOutcome.Failure("Steam rejected the password.")
                 }
                 Account.AuthorizationResult.RpcError -> {
                     SteamLog.d("ksteam: credential login rejected: rpc error")
                     resetClientAfterCredentialFailure(steam, "rpc_error")
-                    return@withLock SignInOutcome.Failure("Steam auth request failed. Try again.")
+                    return@loggedLock SignInOutcome.Failure("Steam auth request failed. Try again.")
                 }
                 Account.AuthorizationResult.ProceedToTfa -> Unit
             }
 
-            val awaiting = awaitGuardPrompt(steam) ?: return@withLock finishSignedIn(steam)
+            val awaiting = awaitGuardPrompt(steam) ?: return@loggedLock finishSignedIn(steam)
             if (code.isNotBlank()) {
                 SteamLog.d("ksteam: submitting typed guard code after credential login reached 2FA")
-                return@withLock submitGuardCode(steam, code)
+                return@loggedLock submitGuardCode(steam, code)
             }
 
             val hasApproval = awaiting.supportedConfirmationMethods.any { it.isApprovalBased() }
@@ -116,7 +136,7 @@ internal class KSteamSignIn(
         }
 
     override suspend fun startQrSignIn(): SignInOutcome =
-        mutex.withLock {
+        loggedLock("qr_start") {
             val steam = startedClient()
             if (steam.account.clientAuthState.value is AuthorizationState.AwaitingTwoFactor || activeQrFlow != null) {
                 SteamLog.d("ksteam: cancelling stale auth session before QR login")
@@ -124,10 +144,10 @@ internal class KSteamSignIn(
             }
 
             SteamLog.d("ksteam: QR login start state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}")
-            val qr = runCatching { steam.account.getSignInQrCode() }
+            val qr = runCatching { SteamLog.step("ksteam.request_qr", ::diagnosticState) { steam.account.getSignInQrCode() } }
                 .onFailure { SteamLog.e("ksteam: QR login start failed", it) }
                 .getOrNull()
-                ?: return@withLock SignInOutcome.Failure("Steam QR sign-in could not be started. Try again.")
+                ?: return@loggedLock SignInOutcome.Failure("Steam QR sign-in could not be started. Try again.")
 
             val flow = QrFlow(
                 flowId = qr.data,
@@ -136,46 +156,46 @@ internal class KSteamSignIn(
             )
             activeQrFlow = flow
             SteamLog.d(
-                "ksteam: QR login pending flow=${SteamLog.short(flow.flowId)} " +
-                    "code=${flow.displayCode.orEmpty()} version=${qr.version}",
+                "ksteam: QR login pending flowPresent=${flow.flowId.isNotBlank()} " +
+                    "version=${qr.version}",
             )
             flow.toPending()
         }
 
     override suspend fun continueQrSignIn(flowId: String): SignInOutcome =
-        mutex.withLock {
+        loggedLock("qr_poll") {
             val steam = startedClient()
             val flow = activeQrFlow
-                ?: return@withLock if (steam.account.clientAuthState.value is AuthorizationState.Success) {
+                ?: return@loggedLock if (steam.account.clientAuthState.value is AuthorizationState.Success) {
                     finishSignedIn(steam)
                 } else {
                     SignInOutcome.Failure("Steam QR sign-in expired. Start again.")
                 }
             if (flow.flowId != flowId) {
                 SteamLog.d(
-                    "ksteam: QR flow mismatch expected=${SteamLog.short(flow.flowId)} " +
-                        "actual=${SteamLog.short(flowId)}",
+                    "ksteam: QR flow mismatch expectedPresent=${flow.flowId.isNotBlank()} " +
+                        "actualPresent=${flowId.isNotBlank()}",
                 )
-                return@withLock SignInOutcome.Failure("Steam QR sign-in expired. Start again.")
+                return@loggedLock SignInOutcome.Failure("Steam QR sign-in expired. Start again.")
             }
             if (steam.account.clientAuthState.value is AuthorizationState.Success) {
-                return@withLock finishSignedIn(steam)
+                return@loggedLock finishSignedIn(steam)
             }
 
-            SteamLog.d("ksteam: waiting for QR scan flow=${SteamLog.short(flow.flowId)} up to ${QR_STATUS_WAIT_MS / 1000}s")
+            SteamLog.d("ksteam: waiting for QR scan flowPresent=${flow.flowId.isNotBlank()} up to ${QR_STATUS_WAIT_MS / 1000}s")
             val signedIn = withTimeoutOrNull(QR_STATUS_WAIT_MS) {
                 steam.account.clientAuthState.filterIsInstance<AuthorizationState.Success>().first()
             }
             if (signedIn != null) {
                 finishSignedIn(steam)
             } else {
-                SteamLog.d("ksteam: QR still pending flow=${SteamLog.short(flow.flowId)} state=${steam.account.clientAuthState.value.describe()}")
+                SteamLog.d("ksteam: QR still pending flowPresent=${flow.flowId.isNotBlank()} state=${steam.account.clientAuthState.value.describe()}")
                 flow.toPending()
             }
         }
 
     override suspend fun continueDeviceConfirmation(challengeId: String): SignInOutcome =
-        mutex.withLock {
+        loggedLock("guard_approval") {
             val steam = startedClient()
             val state = steam.account.clientAuthState.value
             SteamLog.d("ksteam: continue approval challenge=${SteamLog.short(challengeId)} state=${state.describe()}")
@@ -184,7 +204,7 @@ internal class KSteamSignIn(
                     "ksteam: approval challenge mismatch expected=${SteamLog.short(challengeId)} " +
                         "actual=${SteamLog.short(state.steamId.toString())}",
                 )
-                return@withLock SignInOutcome.Failure("Steam Guard request expired. Sign in again.")
+                return@loggedLock SignInOutcome.Failure("Steam Guard request expired. Sign in again.")
             }
 
             SteamLog.d("ksteam: waiting for Steam Guard approval for up to ${APPROVAL_WAIT_MS / 1000}s")
@@ -198,7 +218,7 @@ internal class KSteamSignIn(
         }
 
     override suspend fun restore(): String? =
-        mutex.withLock {
+        loggedLock("restore") {
             val steam = startedClient()
             val saved = sessionStore.load()
             val secureIds = secureAccountIds(steam)
@@ -228,7 +248,7 @@ internal class KSteamSignIn(
             if (!restoreStarted && !hasKsteamSavedData && steam.account.clientAuthState.value !is AuthorizationState.Success) {
                 SteamLog.d("ksteam: restore unavailable; clearing stored session")
                 clearStoredSession(steam)
-                return@withLock null
+                return@loggedLock null
             }
 
             SteamLog.d("ksteam: restore waiting for signed-in state up to ${RESTORE_WAIT_MS}ms")
@@ -248,7 +268,7 @@ internal class KSteamSignIn(
         }
 
     override suspend fun reauth(): String? =
-        mutex.withLock {
+        loggedLock("reauth") {
             val mark = TimeSource.Monotonic.markNow()
             try {
                 withTimeout(REAUTH_WAIT_MS) {
@@ -275,7 +295,7 @@ internal class KSteamSignIn(
         }
 
     override suspend fun achievements(appId: Int): SteamAchievements =
-        mutex.withLock {
+        loggedLock("achievements") {
             val steam = startedClient()
             ensureSignedInForSteamData(steam)
             val steamId = currentSteamId(steam)
@@ -339,7 +359,7 @@ internal class KSteamSignIn(
         if (!started) {
             SteamLog.d("ksteam: starting client root=persistent-app-store state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}")
             val mark = TimeSource.Monotonic.markNow()
-            steam.start()
+            SteamLog.step("ksteam.start_client", ::diagnosticState) { steam.start() }
             started = true
             SteamLog.d("ksteam: client started in ${mark.elapsedNow().inWholeMilliseconds}ms state=${steam.account.clientAuthState.value.describe()} cm=${steam.connectionStatus.value}")
         }
@@ -365,9 +385,10 @@ internal class KSteamSignIn(
 
     private suspend fun submitGuardCode(steam: SteamClient, code: String): SignInOutcome {
         SteamLog.d("ksteam: submitting typed Steam Guard code")
-        val accepted = runCatching { steam.account.updateCurrentSessionWithCode(code) }
+        val accepted = runCatching { SteamLog.step("ksteam.submit_guard", ::diagnosticState) { steam.account.updateCurrentSessionWithCode(code) } }
             .onFailure { SteamLog.e("ksteam: Steam Guard code submit failed", it) }
             .getOrDefault(false)
+        SteamLog.d("ksteam: guard submission accepted=$accepted ${diagnosticState()}")
         if (!accepted) {
             val kind = (steam.account.clientAuthState.value as? AuthorizationState.AwaitingTwoFactor)
                 ?.supportedConfirmationMethods
@@ -380,7 +401,7 @@ internal class KSteamSignIn(
 
     private suspend fun finishSignedIn(steam: SteamClient): SignInOutcome {
         val mark = TimeSource.Monotonic.markNow()
-        awaitSignedInWithLogs(steam)
+        SteamLog.step("ksteam.wait_signed_in", ::diagnosticState) { awaitSignedInWithLogs(steam) }
         val outcome = exchangeSignedIn(steam)
         SteamLog.d("ksteam: finishSignedIn completed in ${mark.elapsedNow().inWholeMilliseconds}ms")
         return outcome
@@ -390,7 +411,7 @@ internal class KSteamSignIn(
         SteamLog.d("ksteam: Steam sign-in success observed, requesting app ticket")
         val auth = exchangeTicket(steam)
         SteamLog.d("ksteam: backend token received uid=${auth.uid}")
-        saveCurrentSession(steam)
+        SteamLog.step("ksteam.persist_session") { saveCurrentSession(steam) }
         activeQrFlow = null
         return SignInOutcome.Success(auth.token, auth.uid)
     }
@@ -496,7 +517,9 @@ internal class KSteamSignIn(
         SteamLog.d("ksteam: requesting Steam auth session ticket app=$LMU_APP_ID")
         val ticketMark = TimeSource.Monotonic.markNow()
         val ticket = withTimeout(LOGIN_WAIT_MS) {
-            steam.authTickets.getAuthSessionTicket(AppId(LMU_APP_ID))
+            SteamLog.step("ksteam.request_ticket", ::diagnosticState) {
+                steam.authTickets.getAuthSessionTicket(AppId(LMU_APP_ID))
+            }
         }
         SteamLog.d("ksteam: Steam auth session ticket received bytes=${ticket.ticket.size} in ${ticketMark.elapsedNow().inWholeMilliseconds}ms")
         return try {

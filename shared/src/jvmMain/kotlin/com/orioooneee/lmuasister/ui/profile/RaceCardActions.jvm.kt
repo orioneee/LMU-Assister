@@ -24,11 +24,11 @@ private class JvmRaceCardActionsController : RaceCardActionsController {
     override suspend fun copyPng(bytes: ByteArray, fileName: String): RaceCardActionResult =
         runCatching {
             val image = ImageIO.read(ByteArrayInputStream(bytes))
-                ?: error("The race card image couldn't be decoded")
+                ?: error("share_card_invalid_png")
             Toolkit.getDefaultToolkit().systemClipboard.setContents(ImageTransferable(image), null)
             RaceCardActionResult(true, "Race card copied")
         }.getOrElse {
-            RaceCardActionResult(false, it.message ?: "Couldn't copy the race card", cause = it)
+            RaceCardActionResult(false, "Couldn't copy the race card", cause = it)
         }
 }
 
@@ -37,11 +37,10 @@ private class ImageTransferable(
 ) : Transferable {
     override fun getTransferDataFlavors(): Array<DataFlavor> = arrayOf(DataFlavor.imageFlavor)
 
-    override fun isDataFlavorSupported(flavor: DataFlavor): Boolean =
-        flavor == DataFlavor.imageFlavor
+    override fun isDataFlavorSupported(flavor: DataFlavor): Boolean = flavor == DataFlavor.imageFlavor
 
     override fun getTransferData(flavor: DataFlavor): Any {
-        require(isDataFlavorSupported(flavor)) { "Unsupported clipboard format" }
+        check(isDataFlavorSupported(flavor)) { "Unsupported clipboard data flavor" }
         return image
     }
 }

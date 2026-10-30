@@ -3,8 +3,10 @@ package com.orioooneee.lmuasister.ui.profile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -47,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.orioooneee.lmuasister.data.remote.FuelStrategyDto
 import com.orioooneee.lmuasister.data.remote.BackendApiException
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
+import com.orioooneee.lmuasister.data.remote.RaceShareCardDto
 import com.orioooneee.lmuasister.data.remote.SessionStrategyDto
 import com.orioooneee.lmuasister.data.remote.TyreStintDto
 import com.orioooneee.lmuasister.ui.theme.Amber
@@ -70,12 +74,11 @@ private val QualifyingStrategyAccent = Color(0xFF76A9FF)
 private val FuelAccent = Color(0xFFF1667E)
 private val UnknownTyre = Color(0xFF6F7785)
 
-private enum class RaceCardAction { Share, Copy }
-
 @Composable
 internal fun RaceCardActionsRow(
     detail: RaceDetailDto,
-    loadCard: suspend () -> ByteArray,
+    loadCard: suspend () -> RaceShareCardDto,
+    downloadCard: suspend (String) -> ByteArray,
     snackbar: SnackbarHostState,
 ) {
     val controller = rememberRaceCardActionsController()
@@ -83,22 +86,23 @@ internal fun RaceCardActionsRow(
 
     val scope = rememberCoroutineScope()
     var running by remember(detail.eventId, detail.split) { mutableStateOf<RaceCardAction?>(null) }
+    var card by remember(detail.eventId, detail.split) { mutableStateOf<RaceShareCardDto?>(null) }
     var cardBytes by remember(detail.eventId, detail.split) { mutableStateOf<ByteArray?>(null) }
     val fileName = remember(detail.eventId, detail.title, detail.split) { raceCardFileName(detail) }
 
-    fun runAction(action: RaceCardAction) {
+    fun perform(action: RaceCardAction) {
         if (running != null) return
         scope.launch {
             running = action
             val result = runCatching {
-                val bytes = cardBytes ?: loadCard().also { cardBytes = it }
-                require(bytes.isNotEmpty()) { "The race card is empty" }
+                val loadedCard = card ?: loadCard().also { card = it }
+                val bytes = cardBytes ?: downloadCard(loadedCard.url).also { cardBytes = it }
                 when (action) {
                     RaceCardAction.Share -> controller.sharePng(bytes, fileName)
                     RaceCardAction.Copy -> controller.copyPng(bytes, fileName)
                 }
             }.getOrElse {
-                RaceCardActionResult(false, raceCardLoadError(it), cause = it)
+                RaceCardActionResult(false, raceCardActionError(action, it), cause = it)
             }
             running = null
             if (!result.success) {
@@ -123,7 +127,8 @@ internal fun RaceCardActionsRow(
                 loading = running == RaceCardAction.Share,
                 enabled = running == null,
                 modifier = Modifier.weight(1f),
-            ) { runAction(RaceCardAction.Share) }
+                onClick = { perform(RaceCardAction.Share) },
+            )
         }
         if (controller.canCopy) {
             RaceCardActionButton(
@@ -132,9 +137,15 @@ internal fun RaceCardActionsRow(
                 loading = running == RaceCardAction.Copy,
                 enabled = running == null,
                 modifier = Modifier.weight(1f),
-            ) { runAction(RaceCardAction.Copy) }
+                onClick = { perform(RaceCardAction.Copy) },
+            )
         }
     }
+}
+
+private enum class RaceCardAction(val logName: String) {
+    Share("share"),
+    Copy("copy"),
 }
 
 @Composable
@@ -167,15 +178,26 @@ internal fun RaceCardSnackbarHost(
     }
 }
 
-private fun raceCardLoadError(error: Throwable): String {
+private fun raceCardActionError(action: RaceCardAction, error: Throwable): String {
     val code = (error as? BackendApiException)?.code ?: error.message
+    if (code in setOf(
+            "share_card_download_failed",
+            "share_card_invalid_url",
+            "share_card_empty",
+            "share_card_invalid_png",
+        )
+    ) {
+        return when (action) {
+            RaceCardAction.Share -> "Couldn't share the race card. Try again."
+            RaceCardAction.Copy -> "Couldn't copy the race card. Try again."
+        }
+    }
     return when (code) {
         "public_race_card_unsupported" -> "Race card sharing isn't available yet."
         "race_not_found", "user_not_found" -> "Race card isn't available for this race"
-        "share_card_download_failed" -> "Couldn't download the race card. Try again."
         "share_card_storage_unavailable", "share_card_storage_error",
-        "nakama_unavailable", "share_card_unavailable", "share_card_invalid_response",
-        "share_card_invalid_url", "share_card_empty" -> "Couldn't create the race card. Try again later."
+        "nakama_unavailable", "share_card_unavailable", "share_card_invalid_response" ->
+            "Couldn't create the race card. Try again later."
         else -> "Couldn't create the race card. Try again later."
     }
 }
@@ -192,7 +214,7 @@ private fun logRaceCardFailure(
         .orEmpty()
     println(
         "[RaceCard] ERROR" +
-            " action=${action.name.lowercase()}" +
+            " action=${action.logName}" +
             " eventId=${detail.eventId}" +
             " split=${detail.split ?: "none"}" +
             " status=${backendError?.statusCode ?: "none"}" +
@@ -203,7 +225,7 @@ private fun logRaceCardFailure(
     Telemetry.recordError(
         error,
         "feature" to "race_card",
-        "action" to action.name.lowercase(),
+        "action" to action.logName,
         "event_id" to detail.eventId,
         "split" to detail.split,
         "http_status" to backendError?.statusCode,
@@ -367,21 +389,36 @@ private fun SessionStrategyStrip(
 
 @Composable
 private fun TyreStintsRow(stints: List<TyreStintDto>) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        stints.forEachIndexed { index, stint ->
-            if (index > 0) {
-                Box(Modifier.width(1.dp).height(29.dp).background(Outline))
+    val scrollState = rememberScrollState()
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val totalLaps = stints.sumOf { it.lapCount.coerceAtLeast(1) }.coerceAtLeast(1)
+        val dividerWidth = 1.dp * (stints.size - 1).coerceAtLeast(0)
+        val availableWidth = (maxWidth - dividerWidth).coerceAtLeast(0.dp)
+        val stintWidths = stints.map { stint ->
+            val proportionalWidth = availableWidth *
+                (stint.lapCount.coerceAtLeast(1).toFloat() / totalLaps.toFloat())
+            maxOf(104.dp, proportionalWidth)
+        }
+        val contentWidth = stintWidths.fold(dividerWidth) { total, width -> total + width }
+        val overflows = contentWidth > maxWidth
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            stints.forEachIndexed { index, stint ->
+                if (index > 0) {
+                    Box(Modifier.width(1.dp).height(29.dp).background(Outline))
+                }
+                TyreStint(
+                    stint = stint,
+                    modifier = Modifier
+                        .width(stintWidths[index])
+                        .padding(horizontal = if (stints.size == 1) 0.dp else 7.dp),
+                )
             }
-            TyreStint(
-                stint = stint,
-                modifier = Modifier
-                    .weight(stint.lapCount.coerceAtLeast(1).toFloat())
-                    .widthIn(min = 48.dp)
-                    .padding(horizontal = if (stints.size == 1) 0.dp else 7.dp),
-            )
+            if (overflows) Spacer(Modifier.width(12.dp))
         }
     }
 }

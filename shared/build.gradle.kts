@@ -62,9 +62,16 @@ kotlin {
                 implementation(libs.ksteam.core)
             }
         }
+        val javasteamMain by creating {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(libs.javasteam)
+                implementation(libs.bouncycastle.prov)
+            }
+        }
 
         androidMain {
-            dependsOn(nativeSteamMain)
+            dependsOn(javasteamMain)
             dependencies {
                 implementation(libs.compose.uiToolingPreview)
                 implementation(libs.androidx.activity.compose)
@@ -81,7 +88,14 @@ kotlin {
                 api(libs.firebase.analytics)
                 api(libs.firebase.config)
                 api(libs.firebase.crashlytics)
-                api(libs.firebase.performance)
+                // JavaSteam requires the full protobuf runtime. Firebase Performance's
+                // javalite runtime contains the same com.google.protobuf classes and makes
+                // Android's duplicate-class check fail; the full runtime also provides the
+                // lite APIs used by Firebase's generated messages.
+                api("com.google.firebase:firebase-perf") {
+                    exclude(group = "com.google.protobuf", module = "protobuf-javalite")
+                    exclude(group = "com.google.firebase", module = "protolite-well-known-types")
+                }
                 api(libs.firebase.messaging)
             }
         }
@@ -122,7 +136,7 @@ kotlin {
             implementation(libs.kotlinx.coroutinesTest)
         }
         jvmMain {
-            dependsOn(nativeSteamMain)
+            dependsOn(javasteamMain)
             dependencies {
                 implementation(libs.ktor.client.cio)
                 implementation(libs.bouncycastle.prov)

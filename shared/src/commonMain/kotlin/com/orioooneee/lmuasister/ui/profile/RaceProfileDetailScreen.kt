@@ -66,6 +66,7 @@ import com.orioooneee.lmuasister.data.remote.ClassificationRowDto
 import com.orioooneee.lmuasister.data.remote.LapDto
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
 import com.orioooneee.lmuasister.data.remote.RaceSessionDetailDto
+import com.orioooneee.lmuasister.data.remote.RaceShareCardDto
 import com.orioooneee.lmuasister.data.remote.RatingDto
 import com.orioooneee.lmuasister.data.remote.ReasonDto
 import com.orioooneee.lmuasister.data.remote.TeamMemberDto
@@ -158,6 +159,7 @@ fun RaceProfileDetailScreen(
                                 timezone = TimeZone.currentSystemDefault().id,
                             )
                         },
+                        downloadRaceCard = viewModel::downloadRaceShareCardImage,
                     )
                 },
                 onFailure = {
@@ -225,6 +227,7 @@ fun PublicRaceProfileDetailScreen(
                                 timezone = TimeZone.currentSystemDefault().id,
                             )
                         },
+                        downloadRaceCard = viewModel::downloadRaceShareCardImage,
                     )
                 },
                 onFailure = {
@@ -274,7 +277,8 @@ private fun DetailContent(
     bottomInset: Dp,
     cachedSplitSessions: (Int) -> Map<String, RaceSessionDetailDto?>? = { null },
     loadSplitSessions: suspend (Int) -> Map<String, RaceSessionDetailDto?>,
-    loadRaceCard: (suspend () -> ByteArray)? = null,
+    loadRaceCard: (suspend () -> RaceShareCardDto)? = null,
+    downloadRaceCard: (suspend (String) -> ByteArray)? = null,
 ) {
     val mySplit = d.split
     val tabs = d.splitsAvailable.takeIf { it.isNotEmpty() }
@@ -312,8 +316,10 @@ private fun DetailContent(
             contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomInset),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (loadRaceCard != null) {
-                item(key = "race-card-actions") { RaceCardActionsRow(d, loadRaceCard, raceCardSnackbar) }
+            if (loadRaceCard != null && downloadRaceCard != null) {
+                item(key = "race-card-actions") {
+                    RaceCardActionsRow(d, loadRaceCard, downloadRaceCard, raceCardSnackbar)
+                }
             }
             d.trackInfo?.let { item(key = "race-track") { TrackCard(it) } }
             item(key = "race-summary") { SummaryCard(d) }
@@ -695,7 +701,11 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
     val laps = sessionLaps(d, sessionKey)
     val bestMs = laps.mapNotNull { it.lapTimeMs?.takeIf { t -> t > 0L } }.minOrNull()
         ?: sessionRow?.bestLapMs?.takeIf { it > 0L }
-    val globalBestMs = globalSessionBestLapMs(d, sessionKey)
+    val classBestMs = sessionClassBestLapMs(
+        d = d,
+        sessionKey = sessionKey,
+        carClass = sessionRow?.carClass ?: d.carClass,
+    )
     // Fastest time per sector across all laps, used to highlight each best sector.
     val lapBestSectors = bestSectorsByIndex(laps)
     val bestSectors = lapBestSectors.takeIf { it.any { s -> (s ?: 0L) > 0L } }
@@ -728,7 +738,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
             Text("${sessionLabel(sessionKey)} lap times", style = MaterialTheme.typography.titleMedium, color = TextHigh, fontWeight = FontWeight.Bold)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Stat("Laps", laps.size.toString())
-                bestMs?.let { StatColored("Best", formatLap(it), if (it == globalBestMs) BestPurple else PersonalBestGreen) }
+                bestMs?.let { StatColored("Best", formatLap(it), if (it == classBestMs) BestPurple else PersonalBestGreen) }
                 pace?.let { Stat("Avg", formatLap(it.avgMs)) }
                 finishStatus?.takeIf { it.isNotBlank() }?.let { Stat("Result", it) }
             }
@@ -744,7 +754,7 @@ private fun LapsSheet(d: RaceDetailDto, sessionKey: String, onDismiss: () -> Uni
                         lap,
                         alt = i % 2 == 1,
                         isPersonalBest = bestMs != null && lap.lapTimeMs == bestMs,
-                        isGlobalBest = globalBestMs != null && lap.lapTimeMs == globalBestMs,
+                        isClassBest = classBestMs != null && lap.lapTimeMs == classBestMs,
                         bestSectors = bestSectors,
                         lengthKm = lengthKm,
                         showSectors = showSectors,
@@ -791,7 +801,7 @@ private fun LapRow(
     lap: LapDto,
     alt: Boolean,
     isPersonalBest: Boolean,
-    isGlobalBest: Boolean,
+    isClassBest: Boolean,
     bestSectors: List<Long?>,
     lengthKm: Double?,
     showSectors: Boolean,
@@ -824,11 +834,11 @@ private fun LapRow(
                 lap.lapTimeMs?.let { formatLap(it) } ?: "-",
                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
                 color = when {
-                    isGlobalBest -> BestPurple
+                    isClassBest -> BestPurple
                     isPersonalBest -> PersonalBestGreen
                     else -> TextHigh
                 },
-                fontWeight = if (isGlobalBest || isPersonalBest) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = if (isClassBest || isPersonalBest) FontWeight.Bold else FontWeight.Normal,
             )
         }
         if (showSectors && lap.sectorsMs.any { (it ?: 0L) > 0L }) {
@@ -856,9 +866,15 @@ private fun bestSectorsByIndex(laps: List<LapDto>): List<Long?> {
     }
 }
 
-private fun globalSessionBestLapMs(d: RaceDetailDto, sessionKey: String): Long? {
+private fun sessionClassBestLapMs(
+    d: RaceDetailDto,
+    sessionKey: String,
+    carClass: String?,
+): Long? {
     val session = d.sessions[sessionKey] ?: return null
+    val classKey = classificationClassKey(carClass)
     return (session.teamClassification + session.classification)
+        .filter { classificationClassKey(it.carClass) == classKey }
         .mapNotNull { it.bestLapMs?.takeIf { ms -> ms > 0L } }
         .minOrNull()
 }
@@ -1173,11 +1189,12 @@ private fun SessionCard(
     }
     val canToggle = expanded || shown.size < rows.size
     val allRows = teamRows + rows
-    val bestSectors = bestClassificationSectors(allRows)
-    val bestRaceLapMs = if (sessionKey == "race") {
-        allRows.mapNotNull { it.bestLapMs?.takeIf { ms -> ms > 0L } }.minOrNull()
-    } else {
-        null
+    val rowsByClass = allRows.groupBy { classificationClassKey(it.carClass) }
+    val bestSectorsByClass = rowsByClass.mapValues { (_, classRows) ->
+        bestClassificationSectors(classRows)
+    }
+    val bestLapMsByClass = rowsByClass.mapValues { (_, classRows) ->
+        classRows.mapNotNull { it.bestLapMs?.takeIf { ms -> ms > 0L } }.minOrNull()
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1190,13 +1207,14 @@ private fun SessionCard(
                 .border(1.dp, Outline, RoundedCornerShape(12.dp)),
         ) {
             teamRows.forEachIndexed { i, row ->
+                val classKey = classificationClassKey(row.carClass)
                 ClassificationLine(
                     row,
                     alt = i % 2 == 1,
                     showRatingDeltas = showRatingDeltas,
                     showSectors = showSectors,
-                    bestSectors = bestSectors,
-                    bestRaceLapMs = bestRaceLapMs,
+                    bestSectors = bestSectorsByClass[classKey].orEmpty(),
+                    bestRaceLapMs = bestLapMsByClass[classKey],
                 )
             }
             if (teamRows.isNotEmpty() && shown.isNotEmpty()) {
@@ -1209,13 +1227,14 @@ private fun SessionCard(
                 )
             }
             shown.forEachIndexed { i, row ->
+                val classKey = classificationClassKey(row.carClass)
                 ClassificationLine(
                     row,
                     alt = (i + teamRows.size) % 2 == 1,
                     showRatingDeltas = showRatingDeltas,
                     showSectors = showSectors,
-                    bestSectors = bestSectors,
-                    bestRaceLapMs = bestRaceLapMs,
+                    bestSectors = bestSectorsByClass[classKey].orEmpty(),
+                    bestRaceLapMs = bestLapMsByClass[classKey],
                 )
             }
             if (canToggle) {
@@ -1547,6 +1566,9 @@ private fun classificationSectors(r: ClassificationRowDto): List<Long> {
     val bestLap = r.bestLapSectorsMs.filterNotNull().filter { it > 0L }
     return bestLap.ifEmpty { r.bestSectorsMs.filterNotNull().filter { it > 0L } }
 }
+
+private fun classificationClassKey(carClass: String?): String =
+    carClass?.let(::classDisplayLabel)?.takeIf { it.isNotBlank() } ?: "__unknown__"
 
 private fun bestClassificationSectors(rows: List<ClassificationRowDto>): List<Long?> {
     val sectorRows = rows.map { classificationSectors(it) }

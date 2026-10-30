@@ -13,6 +13,7 @@ import com.orioooneee.lmuasister.data.remote.BackendAuthFailed
 import com.orioooneee.lmuasister.data.remote.BackendReauthRequired
 import com.orioooneee.lmuasister.data.remote.RaceDetailDto
 import com.orioooneee.lmuasister.data.remote.RacesPageDto
+import com.orioooneee.lmuasister.data.remote.RaceShareCardDto
 import com.orioooneee.lmuasister.data.remote.SplitDetailDto
 import com.orioooneee.lmuasister.data.remote.TrackDetailResponse
 import com.orioooneee.lmuasister.data.remote.RecentRaceDto
@@ -851,8 +852,11 @@ class SteamLoginViewModel(
         withReauth { backend.raceDetail(it, eventId, split, page) }
             .also { runCatching { LocalCache.write(raceDetailKey(eventId), AppJson.encodeToString(it)) } }
 
-    suspend fun raceShareCard(eventId: String, split: Int?, timezone: String?): ByteArray =
+    suspend fun raceShareCard(eventId: String, split: Int?, timezone: String?): RaceShareCardDto =
         withReauth { backend.raceShareCard(it, eventId, split, timezone) }
+
+    suspend fun downloadRaceShareCardImage(url: String): ByteArray =
+        backend.downloadRaceShareCardImage(url)
 
     fun cachedRaceDetail(eventId: String): RaceDetailDto? =
         LocalCache.read(raceDetailKey(eventId))?.takeIf { it.isNotBlank() }

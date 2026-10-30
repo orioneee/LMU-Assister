@@ -37,9 +37,9 @@ sealed interface SteamAuthEnvironment {
 class SteamAuthEnvironmentUnavailable(message: String) : RuntimeException(message)
 
 /**
- * Steam sign-in strategy. The active production implementation is kSteam on-device
- * auth for Android, iOS and desktop: it signs into Steam locally, mints a Steam ticket,
- * and exchanges it at /auth/steam for our app token.
+ * Steam sign-in strategy. Android and desktop use JavaSteam on-device auth; iOS uses
+ * kSteam. Both implementations mint a Steam ticket locally and exchange it at
+ * /auth/steam for our app token.
  *
  * It ends with our backend app token, which [SteamBackendApi] uses for profile calls.
  */

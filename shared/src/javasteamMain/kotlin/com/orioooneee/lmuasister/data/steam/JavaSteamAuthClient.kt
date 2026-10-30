@@ -7,6 +7,7 @@ import `in`.dragonbra.javasteam.steam.handlers.steamauthticket.SteamAuthTicket
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.LogOnDetails
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.SteamUser
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.callback.LoggedOnCallback
+import `in`.dragonbra.javasteam.steam.handlers.steamuserstats.SteamUserStats
 import `in`.dragonbra.javasteam.steam.steamclient.SteamClient
 import `in`.dragonbra.javasteam.steam.steamclient.callbackmgr.CallbackManager
 import `in`.dragonbra.javasteam.steam.steamclient.callbacks.ConnectedCallback
@@ -40,8 +41,10 @@ internal class JavaSteamAuthClient : SteamAuthClient {
         ensureBouncyCastle()
         val session = SteamSession()
         try {
-            session.open()
-            session.awaitConnected()
+            SteamLog.step("javasteam.connect") {
+                session.open()
+                session.awaitConnected()
+            }
 
             val details = AuthSessionDetails().apply {
                 this.username = username
@@ -53,12 +56,17 @@ internal class JavaSteamAuthClient : SteamAuthClient {
                 // reused to log on and generate game session tickets.
             }
 
-            val authSession = session.client.authentication
-                .beginAuthSessionViaCredentials(details).get()
-            val poll = authSession.pollingWaitForResult()
-                .get(STEAM_GUARD_APPROVAL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            val authSession = SteamLog.step("javasteam.begin_credentials") {
+                session.client.authentication.beginAuthSessionViaCredentials(details).get()
+            }
+            val poll = SteamLog.step("javasteam.wait_auth_result") {
+                authSession.pollingWaitForResult()
+                    .get(STEAM_GUARD_APPROVAL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            }
 
-            val steamId = session.logOn(poll.accountName, poll.refreshToken)
+            val steamId = SteamLog.step("javasteam.logon") {
+                session.logOn(poll.accountName, poll.refreshToken)
+            }
             SteamLoginResult.Success(
                 SteamTokens(
                     steamId = steamId,
@@ -69,7 +77,14 @@ internal class JavaSteamAuthClient : SteamAuthClient {
                 ),
             )
         } catch (t: Throwable) {
-            guardSignalOf(t)?.let { return@withContext SteamLoginResult.GuardRequired(it.kind) }
+            guardSignalOf(t)?.let {
+                return@withContext if (it.rejected) {
+                    SteamLoginResult.Failure("Steam rejected the ${it.kind.label} code. Request a new code and try again.")
+                } else {
+                    SteamLoginResult.GuardRequired(it.kind)
+                }
+            }
+            SteamLog.e("javasteam: credential login failed", t)
             SteamLoginResult.Failure(humanError(t))
         } finally {
             session.close()
@@ -80,25 +95,27 @@ internal class JavaSteamAuthClient : SteamAuthClient {
         steamId: Long,
         refreshToken: String,
     ): Result<SteamTokens> = withContext(Dispatchers.IO) {
-        ensureBouncyCastle()
-        val session = SteamSession()
-        try {
-            session.open()
-            session.awaitConnected()
-            val res = session.client.authentication
-                .generateAccessTokenForApp(SteamID(steamId), refreshToken, false).get()
-            Result.success(
-                SteamTokens(
-                    steamId = steamId,
-                    accountName = "",
-                    accessToken = res.accessToken,
-                    refreshToken = res.refreshToken.ifEmpty { refreshToken },
-                ),
-            )
-        } catch (t: Throwable) {
-            Result.failure(t)
-        } finally {
-            session.close()
+        SteamLog.step("javasteam.renew_access_token") {
+            ensureBouncyCastle()
+            val session = SteamSession()
+            try {
+                session.open()
+                session.awaitConnected()
+                val res = session.client.authentication
+                    .generateAccessTokenForApp(SteamID(steamId), refreshToken, false).get()
+                Result.success(
+                    SteamTokens(
+                        steamId = steamId,
+                        accountName = "",
+                        accessToken = res.accessToken,
+                        refreshToken = res.refreshToken.ifEmpty { refreshToken },
+                    ),
+                )
+            } catch (t: Throwable) {
+                Result.failure(t)
+            } finally {
+                session.close()
+            }
         }
     }
 
@@ -108,10 +125,12 @@ internal class JavaSteamAuthClient : SteamAuthClient {
         refreshToken: String,
         appId: Int,
     ): Result<SteamSessionTicket> = withContext(Dispatchers.IO) {
-        withLoggedOnSession(accountName, refreshToken) { client ->
-            val handler = client.getHandler(SteamAuthTicket::class.java)
-                ?: error("SteamAuthTicket handler unavailable")
-            SteamSessionTicket(appId, handler.getAuthSessionTicket(appId).get().ticket)
+        SteamLog.step("javasteam.session_ticket") {
+            withLoggedOnSession(accountName, refreshToken) { client ->
+                val handler = client.getHandler(SteamAuthTicket::class.java)
+                    ?: error("SteamAuthTicket handler unavailable")
+                SteamSessionTicket(appId, handler.getAuthSessionTicket(appId).get().ticket)
+            }
         }
     }
 
@@ -122,18 +141,65 @@ internal class JavaSteamAuthClient : SteamAuthClient {
         identity: String,
         appId: Int,
     ): Result<SteamSessionTicket> = withContext(Dispatchers.IO) {
-        withLoggedOnSession(accountName, refreshToken) { client ->
-            val handler = client.getHandler(SteamAuthTicket::class.java)
-                ?: error("SteamAuthTicket handler unavailable")
-            SteamSessionTicket(appId, handler.getAuthTicketForWebApi(appId, identity).get().ticket)
+        SteamLog.step("javasteam.web_api_ticket") {
+            withLoggedOnSession(accountName, refreshToken) { client ->
+                val handler = client.getHandler(SteamAuthTicket::class.java)
+                    ?: error("SteamAuthTicket handler unavailable")
+                SteamSessionTicket(appId, handler.getAuthTicketForWebApi(appId, identity).get().ticket)
+            }
         }
     }
 
-    private fun withLoggedOnSession(
+    override suspend fun achievements(
+        steamId: Long,
         accountName: String,
         refreshToken: String,
-        block: (SteamClient) -> SteamSessionTicket,
-    ): Result<SteamSessionTicket> {
+        appId: Int,
+    ): Result<SteamAchievements> = withContext(Dispatchers.IO) {
+        SteamLog.step("javasteam.achievements") {
+            withLoggedOnSession(accountName, refreshToken) { client ->
+                val handler = client.getHandler(SteamUserStats::class.java)
+                    ?: error("SteamUserStats handler unavailable")
+                val response = handler.getUserStats(appId, SteamID(steamId))
+                    .toFuture()
+                    .get(STEAM_REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                check(response.result == EResult.OK) {
+                    "Steam achievements request failed: ${response.result}"
+                }
+                val achievements = response.getExpandedAchievements("english")
+                    .mapNotNull { item ->
+                        val name = item.displayName?.takeIf { it.isNotBlank() }
+                            ?: item.name?.takeIf { it.isNotBlank() }
+                            ?: return@mapNotNull null
+                        SteamAchievement(
+                            name = name,
+                            description = item.description?.takeIf { it.isNotBlank() },
+                            achievedImageUrl = item.icon.steamAchievementIconUrl(appId),
+                            lockedImageUrl = item.iconGray.steamAchievementIconUrl(appId),
+                            achieved = item.isUnlocked,
+                            unlockTime = item.unlockTimestamp.toLong(),
+                        )
+                    }
+                    .sortedWith(
+                        compareBy<SteamAchievement> { if (it.unlockTime > 0L) 0 else 1 }
+                            .thenByDescending { it.unlockTime }
+                            .thenBy { it.name.lowercase() },
+                    )
+                SteamAchievements(
+                    appId = appId,
+                    total = achievements.size,
+                    unlocked = achievements.count { it.achieved },
+                    achievements = achievements,
+                )
+            }
+        }
+    }
+
+    private fun <T> withLoggedOnSession(
+        accountName: String,
+        refreshToken: String,
+        block: (SteamClient) -> T,
+    ): Result<T> {
         ensureBouncyCastle()
         val session = SteamSession()
         return try {
@@ -167,6 +233,7 @@ internal class JavaSteamAuthClient : SteamAuthClient {
 
     private companion object {
         private const val STEAM_GUARD_APPROVAL_TIMEOUT_MS = 120_000L
+        private const val STEAM_REQUEST_TIMEOUT_MS = 45_000L
 
         @Volatile
         private var bcReady = false
@@ -193,7 +260,10 @@ internal class JavaSteamAuthClient : SteamAuthClient {
 }
 
 /** Raised by [GuardAuthenticator] to signal "Steam Guard code needed" up to the caller. */
-private class GuardSignal(val kind: SteamGuardKind) : RuntimeException()
+private class GuardSignal(
+    val kind: SteamGuardKind,
+    val rejected: Boolean,
+) : RuntimeException()
 
 /**
  * Feeds a single user-supplied Guard code into JavaSteam's polling. If no (valid)
@@ -213,11 +283,39 @@ private class GuardAuthenticator(private val code: String?) : IAuthenticator {
         CompletableFuture.completedFuture(code.isNullOrBlank())
 
     private fun supply(kind: SteamGuardKind, incorrect: Boolean): CompletableFuture<String> {
-        if (code.isNullOrBlank() || used || incorrect) {
-            return CompletableFuture.failedFuture(GuardSignal(kind))
+        if (code.isNullOrBlank()) {
+            return CompletableFuture.failedFuture(GuardSignal(kind, rejected = false))
+        }
+        if (used || incorrect) {
+            return CompletableFuture.failedFuture(GuardSignal(kind, rejected = true))
         }
         used = true
         return CompletableFuture.completedFuture(code)
+    }
+}
+
+private val SteamGuardKind.label: String
+    get() = when (this) {
+        SteamGuardKind.EMAIL -> "email"
+        SteamGuardKind.DEVICE -> "Steam Guard"
+    }
+
+private fun String?.steamAchievementIconUrl(appId: Int): String? {
+    val value = this?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val httpsValue = value.replace("http://", "https://")
+    return when {
+        httpsValue.startsWith("https://") -> httpsValue
+        httpsValue.startsWith("//") -> "https:$httpsValue"
+        httpsValue.startsWith("/") -> "https://cdn.cloudflare.steamstatic.com$httpsValue"
+        "/" in httpsValue -> "https://cdn.cloudflare.steamstatic.com/${httpsValue.trimStart('/')}"
+        else -> {
+            val file = if (httpsValue.endsWith(".jpg") || httpsValue.endsWith(".png")) {
+                httpsValue
+            } else {
+                "$httpsValue.jpg"
+            }
+            "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/$appId/$file"
+        }
     }
 }
 

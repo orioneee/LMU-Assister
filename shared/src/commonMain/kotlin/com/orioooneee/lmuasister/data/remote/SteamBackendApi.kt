@@ -157,14 +157,18 @@ class SteamBackendApi(
 ) {
 
     /** Exchanges an on-device Steam Web API ticket (hex) for our app token (Android/JVM). */
-    suspend fun authSteam(ticketHex: String): SteamAuthResponse {
+    suspend fun authSteam(ticketHex: String): SteamAuthResponse = SteamLog.step("backend.POST_auth_steam") {
         val resp = postResponse("/auth/steam") {
             contentType(ContentType.Application.Json)
             setBody("""{"ticket":"$ticketHex"}""") // hex is [0-9a-f], no escaping needed
         }
         SteamLog.d("backend: POST /auth/steam -> ${resp.status.value}")
-        return when (resp.status.value) {
-            in 200..299 -> AppJson.decodeFromString(resp.bodyAsText())
+        when (resp.status.value) {
+            in 200..299 -> SteamLog.step("backend.decode_auth_response") {
+                AppJson.decodeFromString<SteamAuthResponse>(resp.bodyAsText()).also {
+                    SteamLog.d("backend: auth response decoded tokenPresent=${it.token.isNotBlank()} uidPresent=${it.uid.isNotBlank()}")
+                }
+            }
             else -> throw resp.toError()
         }
     }
@@ -238,13 +242,13 @@ class SteamBackendApi(
         return ProfileJson.decodeFromString(getAuthed(path, token))
     }
 
-    /** Ensures the signed-in driver's race card exists in R2, then downloads its PNG. */
+    /** Ensures the signed-in driver's race card exists and returns its immutable public URL. */
     suspend fun raceShareCard(
         token: String,
         eventId: String,
         split: Int?,
         timezone: String?,
-    ): ByteArray {
+    ): RaceShareCardDto {
         val qs = buildList {
             split?.let { add("split=$it") }
             timezone?.takeIf { it.isNotBlank() }?.let {
@@ -254,9 +258,11 @@ class SteamBackendApi(
         val path = "/profile/race/${eventId.encodeURLPathPart()}/share-card" +
             if (qs.isEmpty()) "" else "?$qs"
         val response = getAuthedResponse(path, token, preserveBackendError = true)
-        val card = ProfileJson.decodeFromString<RaceShareCardDto>(response.bodyAsText())
-        return client.downloadRaceShareCard(card.url)
+        return ProfileJson.decodeFromString(response.bodyAsText())
     }
+
+    suspend fun downloadRaceShareCardImage(url: String): ByteArray =
+        client.downloadRaceShareCard(url)
 
     /** One foreign split's classification (lazy, per-tab). `seriesId` lets the backend skip a history re-read. */
     suspend fun raceSplit(token: String, eventId: String, splitNo: Int, seriesId: String?): SplitDetailDto {

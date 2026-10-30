@@ -45,4 +45,12 @@ interface SteamAuthClient {
         identity: String,
         appId: Int = LMU_APP_ID,
     ): Result<SteamSessionTicket>
+
+    /** Loads the signed-in user's achievement schema and unlock state. */
+    suspend fun achievements(
+        steamId: Long,
+        accountName: String,
+        refreshToken: String,
+        appId: Int = LMU_APP_ID,
+    ): Result<SteamAchievements>
 }

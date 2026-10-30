@@ -71,17 +71,17 @@ class SteamAuthRunner(
             return false
         }
         val runId = ++activeRunId
-        SteamLog.d("runner: start stage=$stage")
+        SteamLog.d("runner: start run=$runId stage=$stage")
         _state.value = SteamAuthRunnerState.Running(stage)
         currentJob = scope.launch {
             try {
                 val outcome = try {
-                    block()
+                    SteamLog.step("runner.$stage.run_$runId") { block() }
                 } catch (e: CancellationException) {
                     val requestedByApp = activeRunId != runId
                     SteamLog.d(
                         "runner: cancellation stage=$stage requestedByApp=$requestedByApp " +
-                            "type=${e::class.simpleName} message=${e.message.orEmpty()}",
+                            "type=${e::class.simpleName}",
                     )
                     if (requestedByApp) return@launch
                     SignInOutcome.Failure(e.message ?: e::class.simpleName ?: "Steam login was interrupted")
@@ -91,7 +91,7 @@ class SteamAuthRunner(
                 }
                 if (activeRunId == runId) {
                     currentJob = null
-                    SteamLog.d("runner: finished stage=$stage outcome=${outcome.describeForLog()}")
+                    SteamLog.d("runner: finished run=$runId stage=$stage outcome=${outcome.describeForLog()}")
                     _state.value = SteamAuthRunnerState.Finished(nextId++, stage, outcome)
                 } else {
                     SteamLog.d("runner: ignored stale finish stage=$stage outcome=${outcome.describeForLog()}")
@@ -112,8 +112,8 @@ class SteamAuthRunner(
             is SignInOutcome.DeviceConfirmationPending ->
                 "DeviceConfirmationPending(challenge=${SteamLog.short(challengeId)}, expiresIn=$expiresIn)"
             is SignInOutcome.QrCodePending ->
-                "QrCodePending(flow=${SteamLog.short(flowId)}, code=${displayCode.orEmpty()}, expiresIn=$expiresIn)"
-            is SignInOutcome.Failure -> "Failure(reason=$reason)"
+                "QrCodePending(expiresIn=$expiresIn)"
+            is SignInOutcome.Failure -> "Failure(reason omitted; see stage error logs)"
             /*
              * TUNNEL_DISABLED:
              * SignInOutcome.TunnelRequired is no longer part of the active SteamSignIn

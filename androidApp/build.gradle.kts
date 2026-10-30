@@ -72,7 +72,7 @@ android {
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = lmuVersionCode
-        versionName = "1.0.0"
+        versionName = "1.1.1"
     }
     signingConfigs {
         create("lmu") {
